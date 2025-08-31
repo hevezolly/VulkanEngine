@@ -15,17 +15,22 @@ add_subdirectory(third_party/glfw)
 set(VOLK_STATIC_DEFINES ON  CACHE BOOL "" FORCE)
 set(VOLK_INSTALL        OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/volk)
-
 add_subdirectory(third_party/Vulkan-Headers)
 
+file(GLOB_RECURSE source_files 
+    src/*.cpp
+)
+
 add_executable(VulkanEngine
-    src/main.cpp
+    ${source_files}
 )
 
 target_compile_definitions(VulkanEngine PRIVATE VOLK_STATIC_DEFINES)
 target_link_libraries(VulkanEngine PRIVATE volk Vulkan::Headers glfw)
 
 target_include_directories(VulkanEngine PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/volk
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/Vulkan-Headers/include
