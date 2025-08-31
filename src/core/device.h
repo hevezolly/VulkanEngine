@@ -5,6 +5,7 @@
 
 enum QueueType {
     Graphics,
+    Present,
     None
 };
 
@@ -23,6 +24,6 @@ struct Device {
     QueueFamiliesDescriptor queueFamilies;
     QueuesDescriptor<VkQueue> queues;
 
-    Device(VkInstance instance);
+    Device(VkInstance instance, VkSurfaceKHR surface);
     ~Device();
 };

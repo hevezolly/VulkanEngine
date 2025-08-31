@@ -117,16 +117,16 @@ RenderContext::RenderContext(uint32_t width, uint32_t height, const char* window
     VK(vkCreateDebugUtilsMessengerEXT(vkInstance, &messengerCreateInfo, nullptr, &vkDebugMessenger));
 #endif
 
-    device = new Device(vkInstance);
-
     vkSurface = VK_NULL_HANDLE;
     VK(glfwCreateWindowSurface(vkInstance, pWindow, nullptr, &vkSurface));
+
+    device = new Device(vkInstance, vkSurface);
 }
 
 RenderContext::~RenderContext() {
-    vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
-
     delete device;
+
+    vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
 
 #ifdef ENABLE_VULKAN_VALIDATION
     vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugMessenger, nullptr);
