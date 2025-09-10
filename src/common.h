@@ -5,6 +5,13 @@
 #include <sstream>
 #include <string>
 
+enum ImageUsage: VkFlags {
+    ColorAttachment = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    TransferDst = VK_IMAGE_USAGE_TRANSFER_DST_BIT
+};
+
+inline ImageUsage operator |(ImageUsage, ImageUsage);
+inline ImageUsage operator &(ImageUsage, ImageUsage);
 
 #define VK(call) {\
 auto __result = (call);\

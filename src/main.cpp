@@ -7,9 +7,15 @@
 int main() {
     
     {
-        RenderContext context(800, 600, "VkEngine");
+        RenderContextInitializer args;
+        args.features = EngineFeatures::GraphicsPipeline |
+                        EngineFeatures::WindowOutput;
+        args.windowDescription.width = 800;
+        args.windowDescription.height = 600;
+        args.windowDescription.hint = "VkEngine";
+        RenderContext context(args);
 
-        while (!glfwWindowShouldClose(context.pWindow)) {
+        while (!glfwWindowShouldClose(context.window->pWindow)) {
             glfwPollEvents();
         }
     }

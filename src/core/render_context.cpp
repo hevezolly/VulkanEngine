@@ -61,20 +61,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 }
 
-RenderContext::RenderContext(uint32_t width, uint32_t height, const char* windowTitle) {
-    if (!glfwInit()) {
+RenderContext::RenderContext(const RenderContextInitializer& initializer) {
+    
+    bool useWindow = ((int)initializer.features & (int)EngineFeatures::WindowOutput) > 0;
+    QueueTypes queueTypes = 0;
+
+    if (useWindow && !glfwInit()) {
         std::cout << "Failed to init glfw" << std::endl;
-        std::exit(1);
-    }
-
-    windowWidth = width;
-    windowHeight = height;
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    pWindow = glfwCreateWindow(windowWidth, windowHeight, "VulkanEngine", nullptr, nullptr);
-
-    if (!pWindow) {
-        std::cout << "Failed to create window" << std::endl;
         std::exit(1);
     }
 
@@ -117,22 +110,30 @@ RenderContext::RenderContext(uint32_t width, uint32_t height, const char* window
     VK(vkCreateDebugUtilsMessengerEXT(vkInstance, &messengerCreateInfo, nullptr, &vkDebugMessenger));
 #endif
 
-    vkSurface = VK_NULL_HANDLE;
-    VK(glfwCreateWindowSurface(vkInstance, pWindow, nullptr, &vkSurface));
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
 
-    device = new Device(vkInstance, vkSurface);
+    if (useWindow) {
+        window = new Window(vkInstance, initializer.windowDescription);
+        queueTypes |= 1 << (int)QueueType::Present;
+        surface = window->vkSurface;
+    }
+
+    if ((int)initializer.features & (int)EngineFeatures::GraphicsPipeline) {
+        queueTypes |= 1 << (int)QueueType::Graphics;
+    }
+
+    device = new Device(vkInstance, queueTypes, surface);
 }
 
 RenderContext::~RenderContext() {
     delete device;
 
-    vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
+    delete window;
 
 #ifdef ENABLE_VULKAN_VALIDATION
     vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugMessenger, nullptr);
 #endif
     vkDestroyInstance(vkInstance, nullptr);
 
-    glfwDestroyWindow(pWindow);
     glfwTerminate();
 }

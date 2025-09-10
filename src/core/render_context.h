@@ -6,16 +6,33 @@
 #include <common.h>
 #include <iostream>
 #include "device.h"
+#include "window.h"
+
+enum struct EngineFeatures : uint32_t {
+    None = 0x0,
+    WindowOutput = 0x1,
+    GraphicsPipeline = 0x2,
+};
+
+inline EngineFeatures operator|(EngineFeatures l, EngineFeatures r) {
+    return static_cast<EngineFeatures>(static_cast<uint32_t>(l) | static_cast<uint32_t>(r));
+}
+
+inline EngineFeatures operator&(EngineFeatures l, EngineFeatures r) {
+    return static_cast<EngineFeatures>(static_cast<uint32_t>(l) & static_cast<uint32_t>(r));
+}
+
+struct RenderContextInitializer {
+    EngineFeatures features;
+    WindowInitializer windowDescription;
+};
 
 struct RenderContext {
-    GLFWwindow* pWindow;
-    Device* device;
     VkInstance vkInstance;
-    VkSurfaceKHR vkSurface; 
-    uint32_t windowWidth;
-    uint32_t windowHeight;
+    Window* window;
+    Device* device;
 
-    RenderContext(uint32_t windowWidth, uint32_t windowHeight, const char* windowTitle);
+    RenderContext(const RenderContextInitializer& initializer);
     ~RenderContext();
     
 private:
