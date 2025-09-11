@@ -34,17 +34,6 @@ static bool CheckQueueFits(
     }
 }
 
-template<typename T>
-T QueuesDescriptor<T>::get(QueueType type) {
-    std::optional<T>* value = &queues[(int)type];
-    if (!value->has_value()) {
-        std::stringstream ss;
-        ss << "queue type " << (int)type << " is not initialized";
-        throw std::invalid_argument(ss.str());
-    }
-    return value->.value();
-}
-
 static bool TryConfigureQueueFamilies(
     QueueTypes queueTypes,
     VkPhysicalDevice device, 

@@ -13,9 +13,8 @@ struct WindowInitializer {
 struct Window {
     GLFWwindow* pWindow;
     VkSurfaceKHR vkSurface;
-     
-    uint32_t windowWidth;
-    uint32_t windowHeight;
+    
+    VkExtent2D extent;
 
     Window(VkInstance vkInstance, const WindowInitializer& args);
     ~Window();

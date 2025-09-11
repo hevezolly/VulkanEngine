@@ -7,6 +7,7 @@
 #include <iostream>
 #include "device.h"
 #include "window.h"
+#include "swap_chain.h"
 
 enum struct EngineFeatures : uint32_t {
     None = 0x0,
@@ -25,12 +26,14 @@ inline EngineFeatures operator&(EngineFeatures l, EngineFeatures r) {
 struct RenderContextInitializer {
     EngineFeatures features;
     WindowInitializer windowDescription;
+    SwapChainInitializer swapChainDescription;
 };
 
 struct RenderContext {
     VkInstance vkInstance;
     Window* window;
     Device* device;
+    SwapChain* swapChain;
 
     RenderContext(const RenderContextInitializer& initializer);
     ~RenderContext();

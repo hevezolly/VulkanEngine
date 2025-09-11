@@ -123,11 +123,16 @@ RenderContext::RenderContext(const RenderContextInitializer& initializer) {
     }
 
     device = new Device(vkInstance, queueTypes, surface);
+
+    if (useWindow) {
+        swapChain = new SwapChain(window, device, initializer.swapChainDescription);
+    }
 }
 
 RenderContext::~RenderContext() {
+    
+    delete swapChain;
     delete device;
-
     delete window;
 
 #ifdef ENABLE_VULKAN_VALIDATION

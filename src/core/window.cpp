@@ -3,8 +3,8 @@
 #include <iostream>
 
 Window::Window(VkInstance vkInstance, const WindowInitializer& initializer) {
-    windowWidth = initializer.width;
-    windowHeight = initializer.height;
+    extent.width = initializer.width;
+    extent.height = initializer.height;
 
     const char* hint = initializer.hint;
     if(!hint) {
@@ -12,7 +12,7 @@ Window::Window(VkInstance vkInstance, const WindowInitializer& initializer) {
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    pWindow = glfwCreateWindow(windowWidth, windowHeight, hint, nullptr, nullptr);
+    pWindow = glfwCreateWindow(extent.width, extent.height, hint, nullptr, nullptr);
 
     if (!pWindow) {
         std::cout << "Failed to create window" << std::endl;

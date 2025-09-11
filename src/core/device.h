@@ -18,6 +18,17 @@ struct QueuesDescriptor {
     T get(QueueType);
 };
 
+template<typename T>
+T QueuesDescriptor<T>::get(QueueType type) {
+    std::optional<T>* value = &queues[(int)type];
+    if (!value->has_value()) {
+        std::stringstream ss;
+        ss << "queue type " << (int)type << " is not initialized";
+        throw std::invalid_argument(ss.str());
+    }
+    return value->value();
+}
+
 typedef QueuesDescriptor<uint32_t> QueueFamiliesDescriptor;
 
 struct SwapChainSupport {
