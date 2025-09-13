@@ -99,7 +99,7 @@ SwapChain::SwapChain(Window* window, Device* device, const SwapChainInitializer&
 
     presentMode = SelectPresentMode(args, device->swapChainSupport.presentModes);
     extent = SelectExtents(window, capabilities);
-    imageCount = SelectImageCount(args.imageCount, capabilities);
+    uint32_t imageCount = SelectImageCount(args.imageCount, capabilities);
     imageUsage = args.imageUsage;
     VkImageUsageFlagBits usage = SelectUsage(args.imageUsage, capabilities);
 
@@ -134,6 +134,12 @@ SwapChain::SwapChain(Window* window, Device* device, const SwapChainInitializer&
     }
 
     VK(vkCreateSwapchainKHR(device->device, &createInfo, nullptr, &swapChain));
+
+    auto premadeImages = vkCollect<VkImage>(vkGetSwapchainImagesKHR, device->device, swapChain);
+
+    for (auto img: premadeImages) {
+        images.emplace_back(img, format, extent.width, extent.height);
+    }
 }
 
 SwapChain::~SwapChain() {

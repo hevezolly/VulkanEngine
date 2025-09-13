@@ -4,6 +4,7 @@
 #include <common.h>
 #include <window.h>
 #include <device.h>
+#include <image.h>
 
 struct SwapChainInitializer {
     std::vector<VkFormat> desiredFormats = {VK_FORMAT_B8G8R8A8_SRGB};
@@ -21,8 +22,8 @@ struct SwapChain
     VkFormat format;
     VkColorSpaceKHR colorSpace;
     VkPresentModeKHR presentMode;
-    uint32_t imageCount;
     ImageUsage imageUsage;
+    std::vector<Image> images;
 
     SwapChain(Window* window, Device* device, const SwapChainInitializer& args);
     ~SwapChain();
