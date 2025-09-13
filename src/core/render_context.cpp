@@ -129,16 +129,43 @@ RenderContext::RenderContext(const RenderContextInitializer& initializer) {
     }
 }
 
+RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
+
+    if (&other == this)
+        return *this;
+
+    vkInstance = other.vkInstance;
+    window = other.window;
+    device = other.device;
+    swapChain = other.swapChain;
+#ifdef ENABLE_VULKAN_VALIDATION
+    vkDebugMessenger = other.vkDebugMessenger;
+    other.vkDebugMessenger = VK_NULL_HANDLE;
+#endif
+    other.vkInstance = VK_NULL_HANDLE;
+    other.window = nullptr;
+    other.device = nullptr;
+    other.swapChain = nullptr;
+
+    return *this;
+}
+
+RenderContext::RenderContext(RenderContext&& other) noexcept {
+    *this = std::move(other);
+}
+
 RenderContext::~RenderContext() {
     
-    delete swapChain;
-    delete device;
-    delete window;
-
-#ifdef ENABLE_VULKAN_VALIDATION
-    vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugMessenger, nullptr);
-#endif
-    vkDestroyInstance(vkInstance, nullptr);
-
-    glfwTerminate();
+    if (vkInstance != VK_NULL_HANDLE) {
+        delete swapChain;
+        delete device;
+        delete window;
+    
+    #ifdef ENABLE_VULKAN_VALIDATION
+        vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugMessenger, nullptr);
+    #endif
+        vkDestroyInstance(vkInstance, nullptr);
+    
+        glfwTerminate();
+    }
 }

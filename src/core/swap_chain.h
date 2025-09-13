@@ -27,6 +27,12 @@ struct SwapChain
 
     SwapChain(Window* window, Device* device, const SwapChainInitializer& args);
     ~SwapChain();
+
+    SwapChain(SwapChain&&) noexcept;
+    SwapChain& operator=(SwapChain&&) noexcept;
+    SwapChain(const SwapChain&) = delete;
+    SwapChain& operator=(const SwapChain&) = delete;
+
 private: 
     Device* device;
 };

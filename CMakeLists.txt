@@ -31,6 +31,7 @@ target_link_libraries(VulkanEngine PRIVATE volk Vulkan::Headers glfw)
 target_include_directories(VulkanEngine PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/volk
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/Vulkan-Headers/include

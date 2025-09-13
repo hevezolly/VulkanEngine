@@ -25,7 +25,28 @@ Window::Window(VkInstance vkInstance, const WindowInitializer& initializer) {
     VK(glfwCreateWindowSurface(vkInstance, pWindow, nullptr, &vkSurface));
 }
 
+Window& Window::operator=(Window&& other) noexcept {
+    if (&other == this)
+        return *this;
+    
+    pWindow = other.pWindow;
+    vkSurface = other.vkSurface;
+    vkInstance = other.vkInstance;
+    extent = other.extent;
+    other.pWindow = nullptr;
+    other.vkSurface = VK_NULL_HANDLE;
+    other.vkInstance = VK_NULL_HANDLE;
+
+    return *this;
+}
+
+Window::Window(Window&& other) noexcept {
+    *this = std::move(other);
+}
+
 Window::~Window() {
-    vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
-    glfwDestroyWindow(pWindow);
+    if (vkInstance != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(vkInstance, vkSurface, nullptr);
+        glfwDestroyWindow(pWindow);
+    }
 }

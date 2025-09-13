@@ -36,6 +36,13 @@ struct RenderContext {
     SwapChain* swapChain;
 
     RenderContext(const RenderContextInitializer& initializer);
+
+    RenderContext(const RenderContext&) = delete;
+    RenderContext& operator=(const RenderContext&) = delete;
+
+    RenderContext(RenderContext&&) noexcept;
+    RenderContext& operator=(RenderContext&&) noexcept;
+
     ~RenderContext();
     
 private:

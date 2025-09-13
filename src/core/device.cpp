@@ -196,6 +196,30 @@ Device::Device(VkInstance instance, QueueTypes queueTypes, VkSurfaceKHR surface)
     queues.queues = std::move(preparedQueues);
 }
 
+Device& Device::operator=(Device&& other) noexcept {
+    if (&other == this)
+        return *this;
+
+    vkPhysicalDevice = other.vkPhysicalDevice;
+    device = other.device;
+    queueFamilies.queues = std::move(other.queueFamilies.queues);
+    queues.queues = std::move(other.queues.queues);
+    swapChainSupport.capabilities = other.swapChainSupport.capabilities;
+    swapChainSupport.presentModes = std::move(swapChainSupport.presentModes);
+    swapChainSupport.surfaceFormats = std::move(swapChainSupport.surfaceFormats);
+
+    other.vkPhysicalDevice = VK_NULL_HANDLE;
+    other.device = VK_NULL_HANDLE;
+
+    return *this;
+}
+
+Device::Device(Device&& other) noexcept {
+    *this = std::move(other);
+}
+
 Device::~Device() {
-    vkDestroyDevice(device, nullptr);
+    if (device != VK_NULL_HANDLE) {
+        vkDestroyDevice(device, nullptr);
+    }
 }

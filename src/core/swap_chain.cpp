@@ -138,10 +138,35 @@ SwapChain::SwapChain(Window* window, Device* device, const SwapChainInitializer&
     auto premadeImages = vkCollect<VkImage>(vkGetSwapchainImagesKHR, device->device, swapChain);
 
     for (auto img: premadeImages) {
-        images.emplace_back(img, format, extent.width, extent.height);
+        images.emplace_back(img, device->device, format, extent.width, extent.height);
     }
 }
 
+SwapChain& SwapChain::operator=(SwapChain&& other) noexcept {
+    if (this == &other)
+        return *this;
+
+    images = std::move(other.images);
+    swapChain = other.swapChain;
+    extent = other.extent;
+    format = other.format;
+    colorSpace = other.colorSpace;
+    imageUsage = other.imageUsage;
+    device = other.device;
+
+    other.swapChain = VK_NULL_HANDLE;
+    other.device = nullptr;
+
+    return *this;
+}
+
+SwapChain::SwapChain(SwapChain&& other) noexcept {
+    *this = std::move(other);
+}
+
 SwapChain::~SwapChain() {
-    vkDestroySwapchainKHR(device->device, swapChain, nullptr);
+    if (device) {
+        images.clear();
+        vkDestroySwapchainKHR(device->device, swapChain, nullptr);
+    }
 }
