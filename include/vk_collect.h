@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vk_collect.h"
+#include <common.h>
 #include <functional>
 
 template<typename F, typename... CallArgs>
@@ -16,7 +16,7 @@ void invoke_and_check(F&& f, CallArgs&&... args) {
 }
 
 template<typename T, typename F, typename... Args>
-std::vector<T> vkCollect(F&& f, Args&&... args) {
+API std::vector<T> vkCollect(F&& f, Args&&... args) {
     uint32_t count;
 
     invoke_and_check(std::forward<F>(f), std::forward<Args>(args)..., &count, static_cast<T*>(nullptr));

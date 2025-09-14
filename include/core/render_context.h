@@ -9,27 +9,27 @@
 #include "window.h"
 #include "swap_chain.h"
 
-enum struct EngineFeatures : uint32_t {
+enum struct API EngineFeatures : uint32_t {
     None = 0x0,
     WindowOutput = 0x1,
     GraphicsPipeline = 0x2,
 };
 
-inline EngineFeatures operator|(EngineFeatures l, EngineFeatures r) {
+inline API EngineFeatures operator|(EngineFeatures l, EngineFeatures r) {
     return static_cast<EngineFeatures>(static_cast<uint32_t>(l) | static_cast<uint32_t>(r));
 }
 
-inline EngineFeatures operator&(EngineFeatures l, EngineFeatures r) {
+inline API EngineFeatures operator&(EngineFeatures l, EngineFeatures r) {
     return static_cast<EngineFeatures>(static_cast<uint32_t>(l) & static_cast<uint32_t>(r));
 }
 
-struct RenderContextInitializer {
+struct API RenderContextInitializer {
     EngineFeatures features;
     WindowInitializer windowDescription;
     SwapChainInitializer swapChainDescription;
 };
 
-struct RenderContext {
+struct API RenderContext {
     VkInstance vkInstance;
     Window* window;
     Device* device;

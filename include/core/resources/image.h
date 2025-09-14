@@ -1,10 +1,11 @@
 #pragma once
 
 #include <volk.h>
+#include <common.h>
 
-struct Image;
+struct API Image;
 
-struct ImageView {
+struct API ImageView {
     VkImageView vkImageView;
 
     ImageView(VkDevice device, Image* image);
@@ -21,7 +22,7 @@ private:
     VkDevice device;
 };
 
-struct Image {
+struct API Image {
     VkImage vkImage;
     VkFormat format;
     uint32_t width;

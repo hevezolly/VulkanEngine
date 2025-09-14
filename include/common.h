@@ -1,9 +1,19 @@
 #pragma once
 
-#include "volk.h"
+#include <volk.h>
 #include <iostream>
 #include <sstream>
 #include <string>
+
+#if defined(_WIN32) && defined(VULKAN_ENGINE_SHARED)
+    #if defined(VulkanEngine_EXPORTS)
+        #define API __declspec(dllexport)
+    #else
+        #define API __declspec(dllimport)
+    #endif
+#else
+    #define API
+#endif
 
 enum ImageUsage: VkFlags {
     ColorAttachment = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,

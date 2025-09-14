@@ -3,8 +3,9 @@
 #include <volk.h>
 #include <vector>
 #include <optional>
+#include <common.h>
 
-enum struct QueueType {
+enum struct API QueueType {
     Graphics,
     Present,
     None
@@ -31,13 +32,13 @@ T QueuesDescriptor<T>::get(QueueType type) {
 
 typedef QueuesDescriptor<uint32_t> QueueFamiliesDescriptor;
 
-struct SwapChainSupport {
+struct API SwapChainSupport {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> surfaceFormats;
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct Device {
+struct API Device {
     VkPhysicalDevice vkPhysicalDevice;
     VkDevice device;
     QueueFamiliesDescriptor queueFamilies;
