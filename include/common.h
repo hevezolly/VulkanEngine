@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <stdexcept>
 
 #if defined(_WIN32) && defined(VULKAN_ENGINE_SHARED)
     #if defined(VulkanEngine_EXPORTS)
