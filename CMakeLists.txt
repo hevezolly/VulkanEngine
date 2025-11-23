@@ -13,18 +13,22 @@ foreach(OUTPUTCONFIG IN LISTS CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UP} ${CMAKE_BINARY_DIR}/${OUTPUTCONFIG}/bin)
 endforeach()
 
+#volk
+set(VOLK_STATIC_DEFINES ON  CACHE BOOL "" FORCE)
+set(VOLK_INSTALL        OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/Vulkan-Headers)
+add_subdirectory(third_party/volk)
+
+target_include_directories(volk PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/Vulkan-Headers/include
+)
+
 #glfw
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/glfw)
-
-#volk
-set(VOLK_STATIC_DEFINES ON  CACHE BOOL "" FORCE)
-set(VOLK_INSTALL        OFF CACHE BOOL "" FORCE)
-add_subdirectory(third_party/volk)
-add_subdirectory(third_party/Vulkan-Headers)
 
 add_subdirectory(third_party/glslang)
 
@@ -41,7 +45,7 @@ target_compile_definitions(VulkanEngine PUBLIC
     VOLK_STATIC_DEFINES
     $<$<BOOL:${BUILD_SHARED_LIBS}>:VULKAN_ENGINE_SHARED>
 )
-target_link_libraries(VulkanEngine PUBLIC volk Vulkan::Headers glfw glslang glslang-default-resource-limits)
+target_link_libraries(VulkanEngine PUBLIC Vulkan::Headers volk glfw glslang glslang-default-resource-limits)
 
 target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -49,9 +53,9 @@ target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/resources
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/pipelines
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/shaders
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/Vulkan-Headers/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/volk
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/Vulkan-Headers/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glslang/glslang/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glslang/glslang/Public
 )

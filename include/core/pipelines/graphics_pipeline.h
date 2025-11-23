@@ -1,20 +1,20 @@
 #pragma once
 #include <common.h>
+#include <vector>
+#include <render_context.h>
+#include <shader_source.h>
+#include <volk.h>
 
-
-struct API GraphicsPipeline {
-
-
-    std::vector<VkShaderModule> shaders;
+struct API GraphicsPipelineBuilder {
     
+    std::vector<VkShaderModule> shaderModules;
+    std::vector<VkPipelineShaderStageCreateInfo> stages;
 
-    GraphicsPipeline();
+    GraphicsPipelineBuilder(RenderContext& context);
 
-    ~GraphicsPipeline();
+    GraphicsPipelineBuilder& AddShaderStage(ShaderStage stage, ShaderBinary& binary);
 
-    GraphicsPipeline(const GraphicsPipeline& other) = delete;
-    GraphicsPipeline& operator=(const GraphicsPipeline& other) = delete;
 
-    GraphicsPipeline(GraphicsPipeline&& other) noexcept;
-    GraphicsPipeline& operator=(GraphicsPipeline&& other) noexcept;
+private:
+    RenderContext* context;
 };

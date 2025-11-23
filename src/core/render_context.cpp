@@ -70,7 +70,7 @@ RenderContext::RenderContext(const RenderContextInitializer& initializer) {
         std::cout << "Failed to init glfw" << std::endl;
         std::exit(1);
     }
-
+    
     VK(volkInitialize());
 
     std::vector<const char*> requiredExtentions = getRequiredExtentions();
@@ -100,6 +100,7 @@ RenderContext::RenderContext(const RenderContextInitializer& initializer) {
 
     ci.pNext = &messengerCreateInfo;
 #endif
+
 
     vkInstance = VK_NULL_HANDLE;
     VK(vkCreateInstance(&ci, nullptr, &vkInstance));

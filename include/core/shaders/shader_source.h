@@ -3,12 +3,25 @@
 #include <string>
 #include <common.h>
 #include <device.h>
+#include <volk.h>
 
 enum struct API ShaderStage {
     Pixel,
     Vertex,
     Compute
 };
+
+VkShaderStageFlagBits ToVkShaderStage(ShaderStage stage) {
+    switch (stage) {
+        case ShaderStage::Pixel:
+            return VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+        case ShaderStage::Vertex:
+            return VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
+        case ShaderStage::Compute:
+            return VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
+    } 
+}
+
 
 struct API ShaderSource
 {
@@ -26,20 +39,3 @@ struct API ShaderCompiler {
 
     ShaderBinary FromSource(const ShaderSource& source);
 };
-
-struct API ShaderModule {
-    VkShaderModule vkModule;
-
-    ShaderModule(ShaderBinary binary, Device* device);
-    ~ShaderModule();
-
-    ShaderModule(const ShaderModule& other) = delete;
-    ShaderModule& operator=(const ShaderModule& other) = delete;
-
-    ShaderModule(ShaderModule&& other) noexcept;
-    ShaderModule& operator=(ShaderModule&& other) noexcept;
-
-private:
-    void Clear();
-    Device* device;
-}

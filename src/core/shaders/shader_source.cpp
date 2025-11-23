@@ -87,39 +87,3 @@ ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source)
 
     return bin;
 }
-
-ShaderModule::ShaderModule(ShaderBinary binary, Device* device) {
-    this->device = device;
-
-    VkShaderModuleCreateInfo createInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    createInfo.codeSize = binary.size_in_bytes();
-    createInfo.pCode = binary.spirVWords.data();
-
-    VK(vkCreateShaderModule(device->vkDevice, &createInfo, nullptr, &vkModule));
-
-}
-
-void ShaderModule::Clear() {
-    device = nullptr;
-    vkModule = VK_NULL_HANDLE;
-}
-
-ShaderModule::~ShaderModule() {
-    if (device) {
-        vkDestroyShaderModule(device->vkDevice, vkModule, nullptr);
-        Clear();
-    }
-}
-
-ShaderModule::ShaderModule(ShaderModule&& other) noexcept {
-    *this = std::move(other);
-}
-
-ShaderModule& ShaderModule::operator=(ShaderModule&& other) noexcept {
-    if (this != &other) {
-        device = other.device;
-        vkModule = other.vkModule;
-        other.Clear();
-    }
-    return *this;
-}
