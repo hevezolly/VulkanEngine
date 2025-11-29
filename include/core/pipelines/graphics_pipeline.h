@@ -45,8 +45,8 @@ struct API GraphicsPipelineBuilder {
 
     GraphicsPipelineBuilder& SetPolygoneMode(VkPolygonMode mode);
 
-    GraphicsPipelineBuilder& SetColorBlending(BlendMethod method);
-    GraphicsPipelineBuilder& SetAlphaBlending(BlendMethod method);
+    GraphicsPipelineBuilder& SetColorBlending(BlendMethod& method);
+    GraphicsPipelineBuilder& SetAlphaBlending(BlendMethod& method);
 
 private:
     RenderContext* context;
