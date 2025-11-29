@@ -12,6 +12,24 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context) {
     rasterization.lineWidth = 1.f;
     rasterization.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterization.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterization.polygonMode = VK_POLYGON_MODE_FILL;
+
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.minSampleShading = 1.0f;
+    multisampling.pSampleMask = nullptr;
+    multisampling.alphaToCoverageEnable = VK_FALSE;
+    multisampling.alphaToOneEnable = VK_FALSE;
+
+    blending.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    blending.blendEnable = VK_FALSE;
+    blending.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    blending.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    blending.colorBlendOp = VK_BLEND_OP_ADD;
+    blending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    blending.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    blending.alphaBlendOp = VK_BLEND_OP_ADD;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
@@ -67,5 +85,31 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetCullMode(
 ) {
     rasterization.cullMode = mode;
     rasterization.frontFace = frontFace;
+    return *this;
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetDepthClampEnable(bool enable) {
+    rasterization.depthClampEnable = enable ? VK_TRUE : VK_FALSE;
+    return *this;
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetPolygoneMode(VkPolygonMode mode) {
+    rasterization.polygonMode = mode;
+    return *this;
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetColorBlending(BlendMethod& method) {
+    blending.blendEnable = VK_TRUE;
+    blending.colorBlendOp = method.op;
+    blending.srcColorBlendFactor = method.src;
+    blending.dstColorBlendFactor = method.dst;
+    return *this;
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetAlphaBlending(BlendMethod& method) {
+    blending.blendEnable = VK_TRUE;
+    blending.alphaBlendOp = method.op;
+    blending.srcAlphaBlendFactor = method.src;
+    blending.dstAlphaBlendFactor = method.dst;
     return *this;
 }

@@ -6,6 +6,12 @@
 #include <volk.h>
 #include <optional>
 
+struct BlendMethod {
+    VkBlendFactor src;
+    VkBlendFactor dst;
+    VkBlendOp op;
+};
+
 struct API GraphicsPipelineBuilder {
     
     std::vector<VkShaderModule> shaderModules;
@@ -15,6 +21,8 @@ struct API GraphicsPipelineBuilder {
     std::optional<VkRect2D> scissor;
     VkPipelineInputAssemblyStateCreateInfo inputAssembly;
     VkPipelineRasterizationStateCreateInfo rasterization;
+    VkPipelineMultisampleStateCreateInfo multisampling;
+    VkPipelineColorBlendAttachmentState blending;
 
     GraphicsPipelineBuilder(RenderContext& context);
 
@@ -32,6 +40,13 @@ struct API GraphicsPipelineBuilder {
     GraphicsPipelineBuilder& SetCullMode(
         VkCullModeFlagBits mode, VkFrontFace frontFace = VK_FRONT_FACE_CLOCKWISE
     );
+
+    GraphicsPipelineBuilder& SetDepthClampEnable(bool enable);
+
+    GraphicsPipelineBuilder& SetPolygoneMode(VkPolygonMode mode);
+
+    GraphicsPipelineBuilder& SetColorBlending(BlendMethod method);
+    GraphicsPipelineBuilder& SetAlphaBlending(BlendMethod method);
 
 private:
     RenderContext* context;
