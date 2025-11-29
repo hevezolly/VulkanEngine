@@ -6,15 +6,18 @@
 #include <volk.h>
 #include <optional>
 
-struct BlendMethod {
+struct API BlendMethod {
     VkBlendFactor src;
     VkBlendFactor dst;
     VkBlendOp op;
 };
 
-struct GraphicsPipeline {
+struct API GraphicsPipeline {
     VkPipelineLayout layout;
     VkRenderPass renderPass;
+    VkPipeline pipeline;
+
+    GraphicsPipeline();
 
     RULE_5(GraphicsPipeline)
 
@@ -30,6 +33,7 @@ struct API GraphicsPipelineBuilder {
     std::vector<VkDynamicState> dynamicStates;
     std::optional<VkViewport> viewport;
     std::optional<VkRect2D> scissor;
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo;
     VkPipelineInputAssemblyStateCreateInfo inputAssembly;
     VkPipelineRasterizationStateCreateInfo rasterization;
     VkPipelineMultisampleStateCreateInfo multisampling;
@@ -66,7 +70,9 @@ struct API GraphicsPipelineBuilder {
     GraphicsPipelineBuilder& SetColorBlending(BlendMethod& method);
     GraphicsPipelineBuilder& SetAlphaBlending(BlendMethod& method);
 
-    GraphicsPipeline* Build();
+    Ref<GraphicsPipeline> Build();
+
+    RULE_5(GraphicsPipelineBuilder)
 
 private:
     RenderContext* context;

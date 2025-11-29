@@ -164,6 +164,19 @@ RenderContext::RenderContext(RenderContext&& other) noexcept {
 RenderContext::~RenderContext() {
     
     if (vkInstance != VK_NULL_HANDLE) {
+
+        for (int i = _initOrder.size() - 1; i >= 0; i--) {
+            unsigned long id = _initOrder[i];
+            auto it = _items.find(id);
+
+            if (it != _items.end()) {
+                delete it->second;
+            }
+        }
+
+        _items.clear();
+        _initOrder.clear();
+
         delete swapChain;
         delete device;
         delete window;

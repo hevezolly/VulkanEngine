@@ -6,6 +6,12 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context) {
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
     rasterization.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterization.depthClampEnable = VK_FALSE;
     rasterization.depthBiasEnable = VK_FALSE;
@@ -146,6 +152,104 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetAlphaBlending(BlendMethod& 
     return *this;
 }
 
+
+Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
+    GraphicsPipeline* pipeline = new GraphicsPipeline;
+    pipeline->context = context;
+
+    VK(vkCreatePipelineLayout(
+        context->device->device, 
+        &pipelineLayout, 
+        nullptr, 
+        &pipeline->layout
+    ));
+
+    VkRenderPassCreateInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+
+    VK(vkCreateRenderPass(
+        context->device->device, 
+        &renderPassInfo, 
+        nullptr, 
+        &pipeline->renderPass
+    ));
+
+    VkPipelineViewportStateCreateInfo viewportState{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = nullptr;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = nullptr;
+    if (viewport.has_value())
+        viewportState.pViewports = &viewport.value();
+    if (scissor.has_value())
+        viewportState.pScissors = &scissor.value();
+
+    VkPipelineDynamicStateCreateInfo dynamicStateInfo{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+    dynamicStateInfo.dynamicStateCount = dynamicStates.size();
+    dynamicStateInfo.pDynamicStates = dynamicStates.data();
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+    pipelineInfo.stageCount = stages.size();
+    pipelineInfo.pStages = stages.data();
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterization;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = nullptr;
+    pipelineInfo.pColorBlendState = &blendingCreateInfo;
+    pipelineInfo.pDynamicState = &dynamicStateInfo;
+    pipelineInfo.layout = pipeline->layout;
+    pipelineInfo.renderPass = pipeline->renderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    VK(vkCreateGraphicsPipelines(
+        context->device->device, 
+        VK_NULL_HANDLE,
+        1, &pipelineInfo, nullptr, &pipeline->pipeline
+    ));
+
+    return context->Register(pipeline);
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::operator=(GraphicsPipelineBuilder&& other) {
+    shaderModules = std::move(other.shaderModules);
+    stages = std::move(other.stages);
+    dynamicStates = std::move(other.dynamicStates);
+    viewport = std::move(other.viewport);
+    scissor = std::move(other.scissor);
+    inputAssembly = other.inputAssembly;
+    rasterization = other.rasterization;
+    multisampling = other.multisampling;
+    blending = other.blending;
+    blendingCreateInfo = other.blendingCreateInfo;
+
+    pipelineLayout = other.pipelineLayout;
+    colorAttachment = other.colorAttachment;
+    colorAttachmentRef = other.colorAttachmentRef;
+    subpass = other.subpass;
+
+    return *this;
+}
+
+GraphicsPipelineBuilder::GraphicsPipelineBuilder(GraphicsPipelineBuilder&& other) {
+    *this = std::move(other);
+}
+
+GraphicsPipelineBuilder::~GraphicsPipelineBuilder() {
+    for (int i = 0; i < shaderModules.size(); i++) {
+        vkDestroyShaderModule(context->device->device, shaderModules[i], nullptr);
+    }
+    shaderModules.clear();
+}
+
+GraphicsPipeline::GraphicsPipeline() {}
+
 GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) {
     if (&other == this)
         return *this;
@@ -153,6 +257,8 @@ GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) {
     layout = other.layout;
     context = other.context;
     renderPass = other.renderPass;
+    pipeline = other.pipeline;
+    other.pipeline = VK_NULL_HANDLE;
     other.layout = VK_NULL_HANDLE;
     other.context = nullptr;
     other.renderPass = VK_NULL_HANDLE;
@@ -168,6 +274,7 @@ GraphicsPipeline::~GraphicsPipeline() {
     if (context == nullptr)
         return;
         
+    vkDestroyPipeline(context->device->device, pipeline, nullptr);
     vkDestroyPipelineLayout(context->device->device, layout, nullptr);
     vkDestroyRenderPass(context->device->device, renderPass, nullptr);
     context = nullptr;

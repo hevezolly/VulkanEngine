@@ -9,7 +9,7 @@
 #include "window.h"
 #include "swap_chain.h"
 #include <map>
-#include <handles.h>
+#include <format>
 
 enum struct API EngineFeatures : uint32_t {
     None = 0x0,
@@ -30,6 +30,13 @@ struct API RenderContextInitializer {
     WindowInitializer windowDescription;
     SwapChainInitializer swapChainDescription;
 };
+
+template <typename T>
+struct API Ref
+{
+    unsigned long id;
+};
+
 
 struct API RenderContext {
     VkInstance vkInstance;
@@ -52,8 +59,32 @@ struct API RenderContext {
     }
 
     template<typename T>
-    T* Get() {
+    T* Get(Ref<T> handle) {
+        auto it = _items.find(handle.id);
+        if (it == _items.end())
+            throw std::runtime_error("handle not found");
+        
+        return static_cast<T*>(it->second);
+    }
 
+    template<typename T>
+    T* TryGet(Ref<T> handle) {
+        auto it = _items.find(handle.id);
+        if (it == _items.end())
+            return nullptr;
+        
+        return static_cast<T*>(it->second);
+    }
+
+    template<typename T>
+    T* Extract(Ref<T> handle) {
+        auto it = _items.find(handle.id);
+        if (it == _items.end())
+            throw std::runtime_error("handle not found");
+
+        T* pointer = static_cast<T*>(it->second);
+        _items.erase(it);
+        return pointer;
     }
     
 private:
