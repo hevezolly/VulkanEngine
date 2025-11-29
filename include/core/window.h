@@ -18,13 +18,8 @@ struct API  Window {
     VkExtent2D extent;
 
     Window(VkInstance vkInstance, const WindowInitializer& args);
-    Window(Window&&) noexcept;
-    Window& operator=(Window&&) noexcept;
-
-    Window(const Window&) = delete;
-    Window& operator=(const Window&) = delete;
-
-    ~Window();
+    
+    RULE_5(Window)
 private:
     VkInstance vkInstance;
 };

@@ -66,6 +66,8 @@ RenderContext::RenderContext(const RenderContextInitializer& initializer) {
     bool useWindow = ((int)initializer.features & (int)EngineFeatures::WindowOutput) > 0;
     QueueTypes queueTypes = 0;
 
+    _counter = 0;
+
     if (useWindow && !glfwInit()) {
         std::cout << "Failed to init glfw" << std::endl;
         std::exit(1);
@@ -139,6 +141,9 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
     window = other.window;
     device = other.device;
     swapChain = other.swapChain;
+    _counter = other._counter;
+    _items = std::move(other._items);
+    _initOrder = std::move(other._initOrder);
 #ifdef ENABLE_VULKAN_VALIDATION
     vkDebugMessenger = other.vkDebugMessenger;
     other.vkDebugMessenger = VK_NULL_HANDLE;
@@ -147,6 +152,7 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
     other.window = nullptr;
     other.device = nullptr;
     other.swapChain = nullptr;
+    other._counter = 0;
 
     return *this;
 }

@@ -46,11 +46,6 @@ struct API Device {
     SwapChainSupport swapChainSupport;
 
     Device(VkInstance instance, QueueTypes queueTypes, VkSurfaceKHR surface);
-    Device(const Device&) = delete;
-    Device& operator=(const Device&) = delete;
-
-    Device(Device&&) noexcept;
-    Device& operator=(Device&&) noexcept;
-   
-    ~Device();
+    
+    RULE_5(Device)
 };

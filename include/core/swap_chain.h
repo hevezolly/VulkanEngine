@@ -26,12 +26,8 @@ struct API SwapChain
     std::vector<Image> images;
 
     SwapChain(Window* window, Device* device, const SwapChainInitializer& args);
-    ~SwapChain();
 
-    SwapChain(SwapChain&&) noexcept;
-    SwapChain& operator=(SwapChain&&) noexcept;
-    SwapChain(const SwapChain&) = delete;
-    SwapChain& operator=(const SwapChain&) = delete;
+    RULE_5(SwapChain)
 
 private: 
     Device* device;

@@ -8,6 +8,8 @@
 #include "device.h"
 #include "window.h"
 #include "swap_chain.h"
+#include <map>
+#include <handles.h>
 
 enum struct API EngineFeatures : uint32_t {
     None = 0x0,
@@ -37,15 +39,29 @@ struct API RenderContext {
 
     RenderContext(const RenderContextInitializer& initializer);
 
-    RenderContext(const RenderContext&) = delete;
-    RenderContext& operator=(const RenderContext&) = delete;
+    RULE_5(RenderContext)
 
-    RenderContext(RenderContext&&) noexcept;
-    RenderContext& operator=(RenderContext&&) noexcept;
+    template<typename T>
+    Ref<T> Register(T* item) {
+        unsigned long id = _counter++;
 
-    ~RenderContext();
+        _items.insert(id, static_cast<void*>(item));
+        _initOrder.push_back(id);
+
+        return Ref<T> {id};
+    }
+
+    template<typename T>
+    T* Get() {
+
+    }
     
 private:
+
+    long _counter;
+    std::map<unsigned long, void*> _items;
+    std::vector<unsigned long> _initOrder;
+
 #ifdef ENABLE_VULKAN_VALIDATION
     VkDebugUtilsMessengerEXT vkDebugMessenger;
 #endif

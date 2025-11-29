@@ -1,7 +1,8 @@
-add_executable(window window.cpp)
-target_link_libraries(window PRIVATE VulkanEngine)
 
 foreach (tgt window)
+    add_executable(${tgt} ${tgt}.cpp)
+    target_link_libraries(${tgt} PRIVATE VulkanEngine)
+
     set_target_properties(${tgt} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/examples/${tgt}
     )

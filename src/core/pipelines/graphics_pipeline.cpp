@@ -30,6 +30,38 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context) {
     blending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     blending.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     blending.alphaBlendOp = VK_BLEND_OP_ADD;
+
+    blendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blendingCreateInfo.logicOpEnable = VK_FALSE;
+    blendingCreateInfo.logicOp = VK_LOGIC_OP_COPY;
+    blendingCreateInfo.attachmentCount = 1;
+    blendingCreateInfo.pAttachments = &blending;
+    blendingCreateInfo.blendConstants[0] = 0.0f;
+    blendingCreateInfo.blendConstants[1] = 0.0f;
+    blendingCreateInfo.blendConstants[2] = 0.0f;
+    blendingCreateInfo.blendConstants[3] = 0.0f;
+
+    pipelineLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayout.setLayoutCount = 0;
+    pipelineLayout.pSetLayouts = nullptr;
+    pipelineLayout.pushConstantRangeCount = 0;
+    pipelineLayout.pPushConstantRanges = nullptr;
+
+    colorAttachment.format = context.swapChain->format;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
@@ -112,4 +144,31 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetAlphaBlending(BlendMethod& 
     blending.srcAlphaBlendFactor = method.src;
     blending.dstAlphaBlendFactor = method.dst;
     return *this;
+}
+
+GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) {
+    if (&other == this)
+        return *this;
+    
+    layout = other.layout;
+    context = other.context;
+    renderPass = other.renderPass;
+    other.layout = VK_NULL_HANDLE;
+    other.context = nullptr;
+    other.renderPass = VK_NULL_HANDLE;
+
+    return *this;
+}
+
+GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) {
+    *this = std::move(other);
+}
+
+GraphicsPipeline::~GraphicsPipeline() {
+    if (context == nullptr)
+        return;
+        
+    vkDestroyPipelineLayout(context->device->device, layout, nullptr);
+    vkDestroyRenderPass(context->device->device, renderPass, nullptr);
+    context = nullptr;
 }

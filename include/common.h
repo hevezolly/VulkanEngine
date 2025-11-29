@@ -16,6 +16,13 @@
     #define API
 #endif
 
+#define RULE_5(name) \
+name(const name&) = delete;\
+name& operator=(const name&) = delete;\
+name(name&&) noexcept;\
+name& operator=(name&&) noexcept;\
+~name();
+
 enum ImageUsage: VkFlags {
     ColorAttachment = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
     TransferDst = VK_IMAGE_USAGE_TRANSFER_DST_BIT

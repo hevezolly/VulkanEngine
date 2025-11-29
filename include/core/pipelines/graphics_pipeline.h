@@ -12,6 +12,17 @@ struct BlendMethod {
     VkBlendOp op;
 };
 
+struct GraphicsPipeline {
+    VkPipelineLayout layout;
+    VkRenderPass renderPass;
+
+    RULE_5(GraphicsPipeline)
+
+    friend struct GraphicsPipelineBuilder;
+private: 
+    RenderContext* context;
+};
+
 struct API GraphicsPipelineBuilder {
     
     std::vector<VkShaderModule> shaderModules;
@@ -23,6 +34,13 @@ struct API GraphicsPipelineBuilder {
     VkPipelineRasterizationStateCreateInfo rasterization;
     VkPipelineMultisampleStateCreateInfo multisampling;
     VkPipelineColorBlendAttachmentState blending;
+    VkPipelineColorBlendStateCreateInfo blendingCreateInfo;
+
+    //TODO: rework
+    VkPipelineLayoutCreateInfo pipelineLayout;
+    VkAttachmentDescription colorAttachment;
+    VkAttachmentReference colorAttachmentRef;
+    VkSubpassDescription subpass;
 
     GraphicsPipelineBuilder(RenderContext& context);
 
@@ -47,6 +65,8 @@ struct API GraphicsPipelineBuilder {
 
     GraphicsPipelineBuilder& SetColorBlending(BlendMethod& method);
     GraphicsPipelineBuilder& SetAlphaBlending(BlendMethod& method);
+
+    GraphicsPipeline* Build();
 
 private:
     RenderContext* context;
