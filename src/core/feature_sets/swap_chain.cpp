@@ -92,16 +92,23 @@ SwapChain::SwapChain(Window* window, Device* device, const SwapChainInitializer&
     this->device = device;
     VkSurfaceCapabilitiesKHR& capabilities = device->swapChainSupport.capabilities;
 
+    std::cout << "1" << std::endl;
+    for (int i = 0; i < device->swapChainSupport.surfaceFormats.size(); i++) {
+        std::cout << i << " format" << std::endl;
+    }
     VkSurfaceFormatKHR selectedFormat = SelectFormat(args, device->swapChainSupport.surfaceFormats);
     format = selectedFormat.format;
     colorSpace = selectedFormat.colorSpace;
 
-
+    std::cout << "2" << std::endl;
     presentMode = SelectPresentMode(args, device->swapChainSupport.presentModes);
     extent = SelectExtents(window, capabilities);
     uint32_t imageCount = SelectImageCount(args.imageCount, capabilities);
     imageUsage = args.imageUsage;
     VkImageUsageFlagBits usage = SelectUsage(args.imageUsage, capabilities);
+
+    std::cout << "3" << std::endl;
+    
 
     VkSwapchainCreateInfoKHR createInfo{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
 
@@ -122,6 +129,8 @@ SwapChain::SwapChain(Window* window, Device* device, const SwapChainInitializer&
         device->queueFamilies.get(QueueType::Graphics),
         device->queueFamilies.get(QueueType::Present)
     };
+
+
 
     if (usedQueuesIndices[0] == usedQueuesIndices[1]) {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;

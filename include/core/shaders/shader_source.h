@@ -1,9 +1,8 @@
 #pragma once
+#include <volk.h>
 #include <vector>
 #include <string>
 #include <common.h>
-#include <device.h>
-#include <volk.h>
 
 enum struct API ShaderStage {
     Pixel,
@@ -11,16 +10,7 @@ enum struct API ShaderStage {
     Compute
 };
 
-VkShaderStageFlagBits ToVkShaderStage(ShaderStage stage) {
-    switch (stage) {
-        case ShaderStage::Pixel:
-            return VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-        case ShaderStage::Vertex:
-            return VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
-        case ShaderStage::Compute:
-            return VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-    } 
-}
+VkShaderStageFlagBits ToVkShaderStage(ShaderStage stage);
 
 
 struct API ShaderSource

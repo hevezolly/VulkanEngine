@@ -1,10 +1,10 @@
 #pragma once
+#include <feature_set.h>
 #include <common.h>
 #include <vector>
-#include <render_context.h>
 #include <shader_source.h>
-#include <volk.h>
 #include <optional>
+#include <handles.h>
 
 struct API BlendMethod {
     VkBlendFactor src;
@@ -46,8 +46,6 @@ struct API GraphicsPipelineBuilder {
     VkAttachmentReference colorAttachmentRef;
     VkSubpassDescription subpass;
 
-    GraphicsPipelineBuilder(RenderContext& context);
-
     GraphicsPipelineBuilder& AddShaderStage(ShaderStage stage, ShaderBinary& binary);
 
     GraphicsPipelineBuilder& AddDynamicState(VkDynamicState state);
@@ -74,6 +72,16 @@ struct API GraphicsPipelineBuilder {
 
     RULE_5(GraphicsPipelineBuilder)
 
+    friend struct GraphicsFeature;
+
 private:
+    GraphicsPipelineBuilder(RenderContext& context);
+
     RenderContext* context;
+};
+
+struct GraphicsFeature: FeatureSet {
+    using FeatureSet::FeatureSet;
+
+    GraphicsPipelineBuilder GraphicsPipeline();
 };

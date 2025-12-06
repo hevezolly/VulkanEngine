@@ -1,18 +1,17 @@
 #include <render_context.h>
 #include <vector>
+#include <debugging_feature.h>
+#include <device.h>
 
-const std::vector<const char*> validationLayers = {
-    "VK_LAYER_KHRONOS_validation"
-};
 
-static VkResult checkValidationLayersSupport() {
+static VkResult checkLayersSupport(std::vector<const char*>& layers) {
     uint32_t layerCount;
     VK(vkEnumerateInstanceLayerProperties(&layerCount, nullptr));
     
     std::vector<VkLayerProperties> availableLayers(layerCount);
     VK(vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()));
 
-    for (const char* layerName : validationLayers) {
+    for (const char* layerName : layers) {
         bool layerFound = false;
 
         for (const auto& layerProperties: availableLayers) {
@@ -30,39 +29,28 @@ static VkResult checkValidationLayersSupport() {
     return VK_SUCCESS;
 }
 
-static std::vector<const char*> getRequiredExtentions() {
-    uint32_t extCount = 0;
-    const char** exts = glfwGetRequiredInstanceExtensions(&extCount);
-    if (!exts || extCount == 0) 
-    {
-        std::cout << "glfwGetRequiredInstanceExtensions failed" << std::endl;
-        std::exit(1);
-    }
-
-    std::vector<const char*> extentions(exts, exts + extCount);
-
+RenderContext::RenderContext() {
 #ifdef ENABLE_VULKAN_VALIDATION
-    extentions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    this->WithFeature<DebuggingFeature>();
 #endif
-
-    return extentions;
+    this->WithFeature<Device>();
 }
 
-RenderContext::RenderContext(const RenderContextInitializer& initializer) {
-    
-    bool useWindow = ((int)initializer.features & (int)EngineFeatures::WindowOutput) > 0;
-    QueueTypes queueTypes = 0;
+void RenderContext::Initialize() {
 
-    _counter = 0;
-
-    if (useWindow && !glfwInit()) {
-        std::cout << "Failed to init glfw" << std::endl;
-        std::exit(1);
-    }
-    
     VK(volkInitialize());
 
-    std::vector<const char*> requiredExtentions = getRequiredExtentions();
+    std::vector<const char*> requiredExtentions{};
+    std::vector<const char*> requiredLayers{};
+
+    for (int i = 0; i < _featureInitOrder.size(); i++) 
+    {
+        std::cout << "getting extentions " << _featureInitOrder[i].name() << std::endl;
+        _features[_featureInitOrder[i]]->GetRequiredExtentions(requiredExtentions);
+        _features[_featureInitOrder[i]]->GetRequiredLayers(requiredLayers);
+    }
+
+    VK(checkLayersSupport(requiredLayers))
 
     VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
     app.pApplicationName = "VulkanEngine";
@@ -75,20 +63,12 @@ RenderContext::RenderContext(const RenderContextInitializer& initializer) {
     ci.pApplicationInfo = &app;
     ci.enabledExtensionCount = static_cast<uint32_t>(requiredExtentions.size());
     ci.ppEnabledExtensionNames = requiredExtentions.data();
+    ci.enabledLayerCount = static_cast<uint32_t>(requiredLayers.size());
+    ci.ppEnabledLayerNames = requiredLayers.data();
 
-#ifdef ENABLE_VULKAN_VALIDATION
-    VK(checkValidationLayersSupport());
-    ci.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-    ci.ppEnabledLayerNames = validationLayers.data();
-
-    VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
-    messengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    messengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    messengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    messengerCreateInfo.pfnUserCallback = debugCallback;
-
-    ci.pNext = &messengerCreateInfo;
-#endif
+    DebuggingFeature* debugFeature = TryGet<DebuggingFeature>();
+    if (debugFeature)
+        ci.pNext = &debugFeature->messengerCreateInfo;
 
 
     vkInstance = VK_NULL_HANDLE;
@@ -96,26 +76,14 @@ RenderContext::RenderContext(const RenderContextInitializer& initializer) {
 
     volkLoadInstance(vkInstance);
 
-#ifdef ENABLE_VULKAN_VALIDATION
-    VK(vkCreateDebugUtilsMessengerEXT(vkInstance, &messengerCreateInfo, nullptr, &vkDebugMessenger));
-#endif
-
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-
-    if (useWindow) {
-        window = new Window(vkInstance, initializer.windowDescription);
-        queueTypes |= 1 << (int)QueueType::Present;
-        surface = window->vkSurface;
+    for (int i = 0; i < _featureInitOrder.size(); i++) 
+    {
+        _features[_featureInitOrder[i]]->PreInit();
     }
 
-    if ((int)initializer.features & (int)EngineFeatures::GraphicsPipeline) {
-        queueTypes |= 1 << (int)QueueType::Graphics;
-    }
-
-    device = new Device(vkInstance, queueTypes, surface);
-
-    if (useWindow) {
-        swapChain = new SwapChain(window, device, initializer.swapChainDescription);
+    for (int i = 0; i < _featureInitOrder.size(); i++) 
+    {
+        _features[_featureInitOrder[i]]->Init();
     }
 }
 
@@ -125,20 +93,12 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
         return *this;
 
     vkInstance = other.vkInstance;
-    window = other.window;
-    device = other.device;
-    swapChain = other.swapChain;
     _counter = other._counter;
     _items = std::move(other._items);
     _initOrder = std::move(other._initOrder);
-#ifdef ENABLE_VULKAN_VALIDATION
-    vkDebugMessenger = other.vkDebugMessenger;
-    other.vkDebugMessenger = VK_NULL_HANDLE;
-#endif
+    _features = std::move(other._features);
+    _featureInitOrder = std::move(other._featureInitOrder);
     other.vkInstance = VK_NULL_HANDLE;
-    other.window = nullptr;
-    other.device = nullptr;
-    other.swapChain = nullptr;
     other._counter = 0;
 
     return *this;
@@ -146,6 +106,10 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
 
 RenderContext::RenderContext(RenderContext&& other) noexcept {
     *this = std::move(other);
+}
+
+VkDevice RenderContext::device() {
+    return Get<Device>().device;
 }
 
 RenderContext::~RenderContext() {
@@ -164,15 +128,14 @@ RenderContext::~RenderContext() {
         _items.clear();
         _initOrder.clear();
 
-        delete swapChain;
-        delete device;
-        delete window;
-    
-    #ifdef ENABLE_VULKAN_VALIDATION
-        vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugMessenger, nullptr);
-    #endif
+        for (int i = _featureInitOrder.size()-1; i >= 0; i--) 
+        {
+            _features[_featureInitOrder[i]]->Destroy();
+        }
+        
+        _features.clear();
+        _featureInitOrder.clear();
+
         vkDestroyInstance(vkInstance, nullptr);
-    
-        glfwTerminate();
     }
 }

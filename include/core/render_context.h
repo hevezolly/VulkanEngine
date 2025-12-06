@@ -1,65 +1,54 @@
 #pragma once
 
-#include <volk.h>
 #define GLFW_INCLUDE_NONE
-#include "GLFW/glfw3.h"
+#include <volk.h>
+#include <GLFW/glfw3.h>
 #include <common.h>
 #include <iostream>
-#include "window.h"
-#include "swap_chain.h"
 #include <unordered_map>
 #include <format>
 #include <type_traits>
-
-template <typename T>
-struct API Ref
-{
-    unsigned long id;
-};
-
-struct Device;
+#include <feature_set.h>
+#include <handles.h>
+#include <typeindex>
+#include <typeinfo>
 
 struct API RenderContext {
     VkInstance vkInstance;
-    Window* window;
-    Device* device;
-    SwapChain* swapChain;
 
-    RenderContext(bool enableDebugLayer);
+    RenderContext();
+
+    VkDevice device();
 
     void Initialize();
 
     RULE_5(RenderContext)
 
-    template<typename T>
-    RenderContext& WithFeature(T* feature = nullptr) {
+    template<typename T, typename... CallArgs>
+    RenderContext& WithFeature(CallArgs&&... args) {
         static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");
         
-        if (!feature)
-            T* feature = new T();
+        T* feature = new T(*this, std::forward<CallArgs>(args)...);
 
-        feature->context = this;
-        int typeId = getFeatureId<T>();
-        _features.resize(typeId+1, nullptr);
-        if (features[typeId] != nullptr)
-            throw std::runtime_error("feature was already added");
-        _features.insert(, static_cast<FeatureSet*>(feature));
-        _featureInitOrder.push_back(getFeatureId<T>());
-        return &this;
+        std::type_index typeId = getFeatureId<T>();
+        std::cout << "registered " << typeid(T).name() << " id " << typeId.name() << std::endl;
+
+        _features[typeId] = static_cast<FeatureSet*>(feature);
+        _featureInitOrder.push_back(typeId);
+        return *this;
     }
 
     template<typename T>
     T* TryGet() {
         static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");
-
-        int typeId = getFeatureId<T>();
-        if (_features.size() <= typeId)
-            return nullptr;
-        auto it = _features[getFeatureId<T>()];
-        if (it == nullptr)
+        std::type_index typeId = getFeatureId<T>();
+        std::cout << "TryGet " << typeid(T).name() << " id " << typeId.name() << std::endl;
+        
+        auto it = _features.find(getFeatureId<T>());
+        if (it == _features.end())
             return nullptr;
         
-        return static_cast<T*>(it);
+        return static_cast<T*>(it->second);
     }
 
     template<typename T>
@@ -80,7 +69,7 @@ struct API RenderContext {
     Ref<T> Register(T* item) {
         unsigned long id = _counter++;
 
-        _items.insert(id, static_cast<void*>(item));
+        _items.insert({id, static_cast<void*>(item)});
         _initOrder.push_back(id);
 
         return Ref<T> {id};
@@ -121,10 +110,6 @@ private:
     std::unordered_map<unsigned long, void*> _items;
     std::vector<unsigned long> _initOrder;
 
-    std::vector<FeatureSet*> _features;
-    std::vector<int> _featureInitOrder;
-
-#ifdef ENABLE_VULKAN_VALIDATION
-    VkDebugUtilsMessengerEXT vkDebugMessenger;
-#endif
+    std::unordered_map<std::type_index, FeatureSet*> _features;
+    std::vector<std::type_index> _featureInitOrder;
 };

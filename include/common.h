@@ -1,6 +1,8 @@
 #pragma once
 
+#define GLFW_INCLUDE_NONE
 #include <volk.h>
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -35,8 +37,8 @@ inline ImageUsage operator &(ImageUsage, ImageUsage);
 auto __result = (call);\
 if (__result != VK_SUCCESS) {\
     std::stringstream ss;\
-    ss << "Vk error in " << __FILE__ << " at line " << __LINE__ << " with error " << __result << std::endl;\
     std::cout << ss.str() << std::endl;\
+    ss << "Vk error in " << __FILE__ << " at line " << __LINE__ << " with error " << __result << std::endl;\
     throw std::runtime_error(ss.str());\
 }\
 }\

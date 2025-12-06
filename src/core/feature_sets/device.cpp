@@ -1,4 +1,4 @@
-#include "device.h"
+#include <device.h>
 #include <common.h>
 #include <iostream>
 #include <vector>
@@ -7,6 +7,8 @@
 #include <set>
 #include <vk_collect.h>
 #include <present_feature.h>
+#include <render_context.h>
+#include <graphics_feature.h>
 
 const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -171,7 +173,7 @@ static VkDevice CreateLogicalDevice(const QueueFamiliesDescriptor* queueDescript
 
 void Device::Init() {
 
-    VkInstance instance = context->vkInstance;
+    VkInstance instance = context.vkInstance;
 
     auto availableDevices = vkCollect<VkPhysicalDevice>(vkEnumeratePhysicalDevices, instance);
 
@@ -179,23 +181,30 @@ void Device::Init() {
         throw std::runtime_error("no appropriate physical device is found");
     }
 
-    PresentFeature* present = context->TryGet<PresentFeature>();
+    PresentFeature* present = context.TryGet<PresentFeature>();
 
     QueueTypes queueTypes = 0;
 
     VkSurfaceKHR surface = VK_NULL_HANDLE;
 
     if (present != nullptr) {
-        surface = present->window.vkSurface;
+        surface = present->window->vkSurface;
         queueTypes |= (1 << (int)QueueType::Present);
+    }
+
+    if (context.Has<GraphicsFeature>()) {
+        queueTypes |= (1 << (int)QueueType::Graphics);
     }
 
     vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
         VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, surface, &queueFamilies, &swapChainSupport);
 
-    if (!vkPhysicalDevice)
+    std::cout << "swap chain support: " << swapChainSupport.surfaceFormats.size() << std::endl;
+
+    if (!vkPhysicalDevice) {
         vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
-        VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, surface, &queueFamilies, &swapChainSupport);
+            VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, surface, &queueFamilies, &swapChainSupport);
+    }
 
     device = CreateLogicalDevice(&queueFamilies, vkPhysicalDevice);
 
@@ -209,10 +218,14 @@ void Device::Init() {
     }
 
     queues.queues = std::move(preparedQueues);
+
+    std::cout << "device initialized" << std::endl;
 }
 
 void Device::Destroy() {
     if (device != VK_NULL_HANDLE) {
         vkDestroyDevice(device, nullptr);
+        device = VK_NULL_HANDLE;
+        std::cout << "device destroyed" << std::endl;
     }
 }

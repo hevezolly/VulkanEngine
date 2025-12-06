@@ -1,16 +1,19 @@
 #include <iostream>
 #include <render_context.h>
 #include <shader_source.h>
+#include <present_feature.h>
 
 void RunEngine() {
-    RenderContextInitializer args;
-    args.features = EngineFeatures::GraphicsPipeline |
-                    EngineFeatures::WindowOutput;
-    args.windowDescription.width = 800;
-    args.windowDescription.height = 600;
-    args.windowDescription.hint = "VkEngine";
+    
+    WindowInitializer windowDescription{};
+    SwapChainInitializer swapChainDescription{};
+    windowDescription.width = 800;
+    windowDescription.height = 600;
+    windowDescription.hint = "VkEngine";
     std::cout << "before context" << std::endl;
-    RenderContext context(args);
+    RenderContext context;
+    context.WithFeature<PresentFeature>(windowDescription, swapChainDescription);
+    context.Initialize();
     std::cout << "after context" << std::endl;
 
     ShaderSource vertexSource;
@@ -33,7 +36,7 @@ gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
 
     std::cout << "shader compiled. size: " << shaderBin.spirVWords.size() << std::endl;
 
-    while (!glfwWindowShouldClose(context.window->pWindow)) {
+    while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
     }
 }

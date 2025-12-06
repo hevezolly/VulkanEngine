@@ -1,25 +1,28 @@
 #pragma once
 #include <atomic>
 #include <vector>
-
-extern std::atomic_int TypeIdCounter;
+#include <common.h>
+#include <typeindex>
+#include <typeinfo>
 
 template <typename T>
-int getFeatureId() {
+std::type_index getFeatureId() {
     static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");    
-    static int id = ++TypeIdCounter;
-    return id;
+    return std::type_index(typeid(T));
 }
 
-struct FeatureSet {
+struct RenderContext;
 
-protected:
+struct API FeatureSet {
+
+    FeatureSet(RenderContext&);
+
     virtual void PreInit();
     virtual void Init();
     virtual void Destroy();
     virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
     virtual void GetRequiredLayers(std::vector<const char*>& buffer);
-
-    friend struct RenderContext;
-    RenderContext* context;    
+        
+protected:
+    RenderContext& context;
 };

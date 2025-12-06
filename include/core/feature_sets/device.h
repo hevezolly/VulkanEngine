@@ -5,7 +5,6 @@
 #include <optional>
 #include <common.h>
 #include <feature_set.h>
-#include <render_context.h>
 
 enum struct API QueueType {
     Graphics,
@@ -23,6 +22,12 @@ struct QueuesDescriptor {
 
 template<typename T>
 T QueuesDescriptor<T>::get(QueueType type) {
+    if ((int)type >= queues.size()) {
+        std::stringstream ss;
+        ss << "queue type " << (int)type << " is not initialized";
+        throw std::invalid_argument(ss.str());
+    }
+
     std::optional<T>* value = &queues[(int)type];
     if (!value->has_value()) {
         std::stringstream ss;
@@ -40,14 +45,14 @@ struct API SwapChainSupport {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct API Device: protected FeatureSet {
+struct API Device: FeatureSet {
     VkPhysicalDevice vkPhysicalDevice;
     VkDevice device;
     QueueFamiliesDescriptor queueFamilies;
     QueuesDescriptor<VkQueue> queues;
     SwapChainSupport swapChainSupport;
 
-    Device();
+    using FeatureSet::FeatureSet;
     virtual void Init();
     virtual void Destroy();
 };

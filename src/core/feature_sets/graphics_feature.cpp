@@ -1,7 +1,10 @@
-#include <graphics_pipeline.h>
+#include <graphics_feature.h>
+#include <render_context.h>
+#include <present_feature.h>
 
-GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context) {
-    this->context = &context;
+GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
+    context(&context)
+{
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
@@ -53,7 +56,7 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context) {
     pipelineLayout.pushConstantRangeCount = 0;
     pipelineLayout.pPushConstantRanges = nullptr;
 
-    colorAttachment.format = context.swapChain->format;
+    colorAttachment.format = context.Get<PresentFeature>().swapChain->format;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -79,7 +82,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
     moduleInfo.codeSize = binary.size_in_bytes();
     moduleInfo.pCode = binary.spirVWords.data();
 
-    VK(vkCreateShaderModule(context->device->device, &moduleInfo, nullptr, &vkModule))
+    VK(vkCreateShaderModule(context->device(), &moduleInfo, nullptr, &vkModule))
 
     shaderModules.push_back(vkModule);
     
@@ -110,7 +113,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetScissor(VkRect2D scissor) {
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetTopology(
     VkPrimitiveTopology topology, 
-    bool restartEnabled=false
+    bool restartEnabled
 ) {
     inputAssembly.topology = topology;
     inputAssembly.primitiveRestartEnable = restartEnabled ? VK_TRUE : VK_FALSE;
@@ -119,7 +122,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetTopology(
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetCullMode(
     VkCullModeFlagBits mode, 
-    VkFrontFace frontFace = VK_FRONT_FACE_CLOCKWISE
+    VkFrontFace frontFace
 ) {
     rasterization.cullMode = mode;
     rasterization.frontFace = frontFace;
@@ -158,7 +161,7 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     pipeline->context = context;
 
     VK(vkCreatePipelineLayout(
-        context->device->device, 
+        context->device(), 
         &pipelineLayout, 
         nullptr, 
         &pipeline->layout
@@ -171,7 +174,7 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     renderPassInfo.pSubpasses = &subpass;
 
     VK(vkCreateRenderPass(
-        context->device->device, 
+        context->device(), 
         &renderPassInfo, 
         nullptr, 
         &pipeline->renderPass
@@ -209,7 +212,7 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     pipelineInfo.basePipelineIndex = -1;
 
     VK(vkCreateGraphicsPipelines(
-        context->device->device, 
+        context->device(), 
         VK_NULL_HANDLE,
         1, &pipelineInfo, nullptr, &pipeline->pipeline
     ));
@@ -217,40 +220,43 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     return context->Register(pipeline);
 }
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::operator=(GraphicsPipelineBuilder&& other) {
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::operator=(GraphicsPipelineBuilder&& other) noexcept {
     shaderModules = std::move(other.shaderModules);
     stages = std::move(other.stages);
     dynamicStates = std::move(other.dynamicStates);
     viewport = std::move(other.viewport);
     scissor = std::move(other.scissor);
     inputAssembly = other.inputAssembly;
+    vertexInputInfo = other.vertexInputInfo;
     rasterization = other.rasterization;
     multisampling = other.multisampling;
     blending = other.blending;
     blendingCreateInfo = other.blendingCreateInfo;
-
+    context = other.context;
     pipelineLayout = other.pipelineLayout;
     colorAttachment = other.colorAttachment;
     colorAttachmentRef = other.colorAttachmentRef;
     subpass = other.subpass;
 
+    other.context = nullptr;
+
     return *this;
 }
 
-GraphicsPipelineBuilder::GraphicsPipelineBuilder(GraphicsPipelineBuilder&& other) {
+GraphicsPipelineBuilder::GraphicsPipelineBuilder(GraphicsPipelineBuilder&& other) noexcept {
     *this = std::move(other);
 }
 
 GraphicsPipelineBuilder::~GraphicsPipelineBuilder() {
     for (int i = 0; i < shaderModules.size(); i++) {
-        vkDestroyShaderModule(context->device->device, shaderModules[i], nullptr);
+        vkDestroyShaderModule(context->device(), shaderModules[i], nullptr);
     }
     shaderModules.clear();
 }
 
 GraphicsPipeline::GraphicsPipeline() {}
 
-GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) {
+GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) noexcept {
     if (&other == this)
         return *this;
     
@@ -266,7 +272,7 @@ GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) {
     return *this;
 }
 
-GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) {
+GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) noexcept {
     *this = std::move(other);
 }
 
@@ -274,8 +280,8 @@ GraphicsPipeline::~GraphicsPipeline() {
     if (context == nullptr)
         return;
         
-    vkDestroyPipeline(context->device->device, pipeline, nullptr);
-    vkDestroyPipelineLayout(context->device->device, layout, nullptr);
-    vkDestroyRenderPass(context->device->device, renderPass, nullptr);
+    vkDestroyPipeline(context->device(), pipeline, nullptr);
+    vkDestroyPipelineLayout(context->device(), layout, nullptr);
+    vkDestroyRenderPass(context->device(), renderPass, nullptr);
     context = nullptr;
 }

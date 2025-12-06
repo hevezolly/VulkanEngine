@@ -2,10 +2,16 @@
 
 #include <volk.h>
 #include <feature_set.h>
+#include <common.h>
 
-struct DebuggingFeature: FeatureSet {
+struct API DebuggingFeature: FeatureSet {
 
     VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo; 
+    VkDebugUtilsMessengerEXT vkDebugMessenger;
 
-    DebuggingFeature() {}
+    DebuggingFeature(RenderContext& context);
+    virtual void PreInit();
+    virtual void Destroy();
+    virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
+    virtual void GetRequiredLayers(std::vector<const char*>& buffer);
 };
