@@ -7,6 +7,7 @@ struct API Image;
 
 struct API ImageView {
     VkImageView vkImageView;
+    Image* referencedImage;
 
     ImageView(VkDevice device, Image* image);
 

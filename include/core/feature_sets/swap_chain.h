@@ -24,6 +24,7 @@ struct API SwapChain
     VkPresentModeKHR presentMode;
     ImageUsage imageUsage;
     std::vector<Image> images;
+    
 
     SwapChain(Window* window, Device* device, const SwapChainInitializer& args);
 

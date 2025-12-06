@@ -30,6 +30,8 @@ ImageView& ImageView::operator=(ImageView&& other) noexcept {
 
     vkImageView = other.vkImageView;
     device = other.device;
+    referencedImage = other.referencedImage;
+    other.referencedImage = nullptr;
     other.vkImageView = VK_NULL_HANDLE;
     other.device = VK_NULL_HANDLE;
 
@@ -43,6 +45,8 @@ ImageView::ImageView(ImageView&& other) noexcept {
 ImageView::~ImageView() {
     if (device != VK_NULL_HANDLE) {
         vkDestroyImageView(device, vkImageView, nullptr);
+        referencedImage = nullptr;
+        device = VK_NULL_HANDLE;
     }
 }
 

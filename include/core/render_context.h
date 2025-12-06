@@ -5,31 +5,11 @@
 #include "GLFW/glfw3.h"
 #include <common.h>
 #include <iostream>
-#include "device.h"
 #include "window.h"
 #include "swap_chain.h"
-#include <map>
+#include <unordered_map>
 #include <format>
-
-enum struct API EngineFeatures : uint32_t {
-    None = 0x0,
-    WindowOutput = 0x1,
-    GraphicsPipeline = 0x2,
-};
-
-inline API EngineFeatures operator|(EngineFeatures l, EngineFeatures r) {
-    return static_cast<EngineFeatures>(static_cast<uint32_t>(l) | static_cast<uint32_t>(r));
-}
-
-inline API EngineFeatures operator&(EngineFeatures l, EngineFeatures r) {
-    return static_cast<EngineFeatures>(static_cast<uint32_t>(l) & static_cast<uint32_t>(r));
-}
-
-struct API RenderContextInitializer {
-    EngineFeatures features;
-    WindowInitializer windowDescription;
-    SwapChainInitializer swapChainDescription;
-};
+#include <type_traits>
 
 template <typename T>
 struct API Ref
@@ -37,6 +17,7 @@ struct API Ref
     unsigned long id;
 };
 
+struct Device;
 
 struct API RenderContext {
     VkInstance vkInstance;
@@ -44,9 +25,56 @@ struct API RenderContext {
     Device* device;
     SwapChain* swapChain;
 
-    RenderContext(const RenderContextInitializer& initializer);
+    RenderContext(bool enableDebugLayer);
+
+    void Initialize();
 
     RULE_5(RenderContext)
+
+    template<typename T>
+    RenderContext& WithFeature(T* feature = nullptr) {
+        static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");
+        
+        if (!feature)
+            T* feature = new T();
+
+        feature->context = this;
+        int typeId = getFeatureId<T>();
+        _features.resize(typeId+1, nullptr);
+        if (features[typeId] != nullptr)
+            throw std::runtime_error("feature was already added");
+        _features.insert(, static_cast<FeatureSet*>(feature));
+        _featureInitOrder.push_back(getFeatureId<T>());
+        return &this;
+    }
+
+    template<typename T>
+    T* TryGet() {
+        static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");
+
+        int typeId = getFeatureId<T>();
+        if (_features.size() <= typeId)
+            return nullptr;
+        auto it = _features[getFeatureId<T>()];
+        if (it == nullptr)
+            return nullptr;
+        
+        return static_cast<T*>(it);
+    }
+
+    template<typename T>
+    T& Get() {
+        T* result = TryGet<T>();
+        if (result == nullptr)
+            throw std::runtime_error("feature not found");
+        
+        return *result;
+    }
+
+    template<typename T>
+    bool Has() {
+        return TryGet<T>() != nullptr;
+    }
 
     template<typename T>
     Ref<T> Register(T* item) {
@@ -59,12 +87,12 @@ struct API RenderContext {
     }
 
     template<typename T>
-    T* Get(Ref<T> handle) {
+    T& Get(Ref<T> handle) {
         auto it = _items.find(handle.id);
         if (it == _items.end())
             throw std::runtime_error("handle not found");
         
-        return static_cast<T*>(it->second);
+        return *static_cast<T*>(it->second);
     }
 
     template<typename T>
@@ -90,8 +118,11 @@ struct API RenderContext {
 private:
 
     long _counter;
-    std::map<unsigned long, void*> _items;
+    std::unordered_map<unsigned long, void*> _items;
     std::vector<unsigned long> _initOrder;
+
+    std::vector<FeatureSet*> _features;
+    std::vector<int> _featureInitOrder;
 
 #ifdef ENABLE_VULKAN_VALIDATION
     VkDebugUtilsMessengerEXT vkDebugMessenger;

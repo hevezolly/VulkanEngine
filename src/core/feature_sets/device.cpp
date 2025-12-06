@@ -6,6 +6,7 @@
 #include <string>
 #include <set>
 #include <vk_collect.h>
+#include <present_feature.h>
 
 const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -167,12 +168,26 @@ static VkDevice CreateLogicalDevice(const QueueFamiliesDescriptor* queueDescript
     return device;
 }
 
-Device::Device(VkInstance instance, QueueTypes queueTypes, VkSurfaceKHR surface) {
+
+void Device::Init() {
+
+    VkInstance instance = context->vkInstance;
 
     auto availableDevices = vkCollect<VkPhysicalDevice>(vkEnumeratePhysicalDevices, instance);
 
     if (availableDevices.size() == 0) {
         throw std::runtime_error("no appropriate physical device is found");
+    }
+
+    PresentFeature* present = context->TryGet<PresentFeature>();
+
+    QueueTypes queueTypes = 0;
+
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+
+    if (present != nullptr) {
+        surface = present->window.vkSurface;
+        queueTypes |= (1 << (int)QueueType::Present);
     }
 
     vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
@@ -196,29 +211,7 @@ Device::Device(VkInstance instance, QueueTypes queueTypes, VkSurfaceKHR surface)
     queues.queues = std::move(preparedQueues);
 }
 
-Device& Device::operator=(Device&& other) noexcept {
-    if (&other == this)
-        return *this;
-
-    vkPhysicalDevice = other.vkPhysicalDevice;
-    device = other.device;
-    queueFamilies.queues = std::move(other.queueFamilies.queues);
-    queues.queues = std::move(other.queues.queues);
-    swapChainSupport.capabilities = other.swapChainSupport.capabilities;
-    swapChainSupport.presentModes = std::move(swapChainSupport.presentModes);
-    swapChainSupport.surfaceFormats = std::move(swapChainSupport.surfaceFormats);
-
-    other.vkPhysicalDevice = VK_NULL_HANDLE;
-    other.device = VK_NULL_HANDLE;
-
-    return *this;
-}
-
-Device::Device(Device&& other) noexcept {
-    *this = std::move(other);
-}
-
-Device::~Device() {
+void Device::Destroy() {
     if (device != VK_NULL_HANDLE) {
         vkDestroyDevice(device, nullptr);
     }

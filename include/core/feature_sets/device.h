@@ -4,6 +4,8 @@
 #include <vector>
 #include <optional>
 #include <common.h>
+#include <feature_set.h>
+#include <render_context.h>
 
 enum struct API QueueType {
     Graphics,
@@ -38,14 +40,14 @@ struct API SwapChainSupport {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct API Device {
+struct API Device: protected FeatureSet {
     VkPhysicalDevice vkPhysicalDevice;
     VkDevice device;
     QueueFamiliesDescriptor queueFamilies;
     QueuesDescriptor<VkQueue> queues;
     SwapChainSupport swapChainSupport;
 
-    Device(VkInstance instance, QueueTypes queueTypes, VkSurfaceKHR surface);
-    
-    RULE_5(Device)
+    Device();
+    virtual void Init();
+    virtual void Destroy();
 };

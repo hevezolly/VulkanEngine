@@ -53,6 +53,7 @@ target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/resources
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/pipelines
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/shaders
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/feature_sets
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/Vulkan-Headers/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/volk
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include

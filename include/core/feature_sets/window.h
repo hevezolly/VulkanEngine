@@ -11,7 +11,7 @@ struct API WindowInitializer {
     const char *hint;
 };
 
-struct API  Window {
+struct API Window {
     GLFWwindow* pWindow;
     VkSurfaceKHR vkSurface;
     
