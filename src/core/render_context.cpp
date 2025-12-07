@@ -2,6 +2,7 @@
 #include <vector>
 #include <debugging_feature.h>
 #include <device.h>
+#include <command_pool.h>
 
 
 static VkResult checkLayersSupport(std::vector<const char*>& layers) {
@@ -33,7 +34,8 @@ RenderContext::RenderContext() {
 #ifdef ENABLE_VULKAN_VALIDATION
     this->WithFeature<DebuggingFeature>();
 #endif
-    this->WithFeature<Device>();
+    this->WithFeature<Device>()
+        .WithFeature<CommandPools>();
 }
 
 void RenderContext::Initialize() {
@@ -45,7 +47,6 @@ void RenderContext::Initialize() {
 
     for (int i = 0; i < _featureInitOrder.size(); i++) 
     {
-        std::cout << "getting extentions " << _featureInitOrder[i].name() << std::endl;
         _features[_featureInitOrder[i]]->GetRequiredExtentions(requiredExtentions);
         _features[_featureInitOrder[i]]->GetRequiredLayers(requiredLayers);
     }

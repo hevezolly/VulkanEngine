@@ -14,12 +14,10 @@ PresentFeature::PresentFeature(
         std::cout << "Failed to init glfw" << std::endl;
         std::exit(1);
     }
-    std::cout << "glfw inited" << std::endl;
 }
 
 void PresentFeature::GetRequiredExtentions(std::vector<const char*>& buffer) {
     uint32_t extCount = 0;
-    std::cout << "getting glfw extentions" << std::endl;
     const char** exts = glfwGetRequiredInstanceExtensions(&extCount);
     if (!exts || extCount == 0) 
     {
@@ -34,12 +32,10 @@ void PresentFeature::GetRequiredExtentions(std::vector<const char*>& buffer) {
 
 void PresentFeature::PreInit() {
     window = new Window(context.vkInstance, windowArgs);
-    std::cout << "window created" << std::endl;
 }
 
 void PresentFeature::Init() {
-    swapChain= new SwapChain(window, &context.Get<Device>(), swapChainArgs);
-    std::cout << "swap chain created" << std::endl;
+    swapChain= new SwapChain(&context, swapChainArgs);
 }
 
 void PresentFeature::Destroy() {

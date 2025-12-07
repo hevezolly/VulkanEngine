@@ -2,6 +2,7 @@
 #include <render_context.h>
 #include <shader_source.h>
 #include <present_feature.h>
+#include <graphics_feature.h>
 
 void RunEngine() {
     
@@ -12,7 +13,8 @@ void RunEngine() {
     windowDescription.hint = "VkEngine";
     std::cout << "before context" << std::endl;
     RenderContext context;
-    context.WithFeature<PresentFeature>(windowDescription, swapChainDescription);
+    context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
+           .WithFeature<GraphicsFeature>();
     context.Initialize();
     std::cout << "after context" << std::endl;
 

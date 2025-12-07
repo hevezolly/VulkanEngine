@@ -31,7 +31,6 @@ struct API RenderContext {
         T* feature = new T(*this, std::forward<CallArgs>(args)...);
 
         std::type_index typeId = getFeatureId<T>();
-        std::cout << "registered " << typeid(T).name() << " id " << typeId.name() << std::endl;
 
         _features[typeId] = static_cast<FeatureSet*>(feature);
         _featureInitOrder.push_back(typeId);
@@ -42,7 +41,6 @@ struct API RenderContext {
     T* TryGet() {
         static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");
         std::type_index typeId = getFeatureId<T>();
-        std::cout << "TryGet " << typeid(T).name() << " id " << typeId.name() << std::endl;
         
         auto it = _features.find(getFeatureId<T>());
         if (it == _features.end())

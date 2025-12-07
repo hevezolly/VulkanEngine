@@ -26,10 +26,10 @@ struct API SwapChain
     std::vector<Image> images;
     
 
-    SwapChain(Window* window, Device* device, const SwapChainInitializer& args);
+    SwapChain(RenderContext* context, const SwapChainInitializer& args);
 
     RULE_5(SwapChain)
 
 private: 
-    Device* device;
+    RenderContext* context;
 };

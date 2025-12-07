@@ -4,6 +4,9 @@
 #include <iostream>
 #include <limits>
 #include <algorithm>
+#include <render_context.h>
+#include <present_feature.h>
+#include <graphics_feature.h>
 
 static VkSurfaceFormatKHR SelectFormat(
     const SwapChainInitializer& args, 
@@ -88,27 +91,21 @@ static VkImageUsageFlagBits SelectUsage(ImageUsage desiredUsage, const VkSurface
     return desiredFlags;
 }
 
-SwapChain::SwapChain(Window* window, Device* device, const SwapChainInitializer& args) {
-    this->device = device;
+SwapChain::SwapChain(RenderContext* context, const SwapChainInitializer& args) {
+    this->context = context;
+    auto device = &context->Get<Device>();
+    auto window = context->Get<PresentFeature>().window;
     VkSurfaceCapabilitiesKHR& capabilities = device->swapChainSupport.capabilities;
 
-    std::cout << "1" << std::endl;
-    for (int i = 0; i < device->swapChainSupport.surfaceFormats.size(); i++) {
-        std::cout << i << " format" << std::endl;
-    }
     VkSurfaceFormatKHR selectedFormat = SelectFormat(args, device->swapChainSupport.surfaceFormats);
     format = selectedFormat.format;
     colorSpace = selectedFormat.colorSpace;
 
-    std::cout << "2" << std::endl;
     presentMode = SelectPresentMode(args, device->swapChainSupport.presentModes);
     extent = SelectExtents(window, capabilities);
     uint32_t imageCount = SelectImageCount(args.imageCount, capabilities);
     imageUsage = args.imageUsage;
     VkImageUsageFlagBits usage = SelectUsage(args.imageUsage, capabilities);
-
-    std::cout << "3" << std::endl;
-    
 
     VkSwapchainCreateInfoKHR createInfo{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
 
@@ -125,19 +122,20 @@ SwapChain::SwapChain(Window* window, Device* device, const SwapChainInitializer&
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    uint32_t usedQueuesIndices[] = {
-        device->queueFamilies.get(QueueType::Graphics),
-        device->queueFamilies.get(QueueType::Present)
-    };
+    uint32_t usedQueuesCount = 1;
+    uint32_t usedQueuesIndices[2];
+    usedQueuesIndices[0] = device->queueFamilies.get(QueueType::Present);
 
+    if (context->Has<GraphicsFeature>()) {
+        usedQueuesIndices[usedQueuesCount++] = device->queueFamilies.get(QueueType::Graphics);
+    }
 
-
-    if (usedQueuesIndices[0] == usedQueuesIndices[1]) {
+    if (usedQueuesCount == 1 || usedQueuesIndices[0] == usedQueuesIndices[1]) {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         createInfo.queueFamilyIndexCount = 0;
         createInfo.pQueueFamilyIndices = nullptr;
     } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = usedQueuesIndices;
     }
@@ -161,10 +159,10 @@ SwapChain& SwapChain::operator=(SwapChain&& other) noexcept {
     format = other.format;
     colorSpace = other.colorSpace;
     imageUsage = other.imageUsage;
-    device = other.device;
+    context = other.context;
 
     other.swapChain = VK_NULL_HANDLE;
-    other.device = nullptr;
+    other.context = nullptr;
 
     return *this;
 }
@@ -174,8 +172,8 @@ SwapChain::SwapChain(SwapChain&& other) noexcept {
 }
 
 SwapChain::~SwapChain() {
-    if (device) {
+    if (context) {
         images.clear();
-        vkDestroySwapchainKHR(device->device, swapChain, nullptr);
+        vkDestroySwapchainKHR(context->device(), swapChain, nullptr);
     }
 }

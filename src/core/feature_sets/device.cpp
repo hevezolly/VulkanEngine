@@ -117,7 +117,7 @@ static VkPhysicalDevice FindDeviceOfType(
             if (!TryConfigureQueueFamilies(queueTypes, availableDevices[i], surface, indices))
                 continue;
             
-            if ((queueTypes & (1 << (uint32_t)QueueType::Graphics)) > 0) {
+            if ((queueTypes & (1 << (uint32_t)QueueType::Present)) > 0) {
                 if (!DeviceSupportsExtentions(availableDevices[i]))
                     continue;
     
@@ -199,8 +199,6 @@ void Device::Init() {
     vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
         VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, surface, &queueFamilies, &swapChainSupport);
 
-    std::cout << "swap chain support: " << swapChainSupport.surfaceFormats.size() << std::endl;
-
     if (!vkPhysicalDevice) {
         vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
             VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, surface, &queueFamilies, &swapChainSupport);
@@ -218,14 +216,11 @@ void Device::Init() {
     }
 
     queues.queues = std::move(preparedQueues);
-
-    std::cout << "device initialized" << std::endl;
 }
 
 void Device::Destroy() {
     if (device != VK_NULL_HANDLE) {
         vkDestroyDevice(device, nullptr);
         device = VK_NULL_HANDLE;
-        std::cout << "device destroyed" << std::endl;
     }
 }
