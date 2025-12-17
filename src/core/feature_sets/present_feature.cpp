@@ -44,3 +44,20 @@ void PresentFeature::Destroy() {
     
     glfwTerminate();
 }
+
+uint32_t PresentFeature::swapChainSize() {
+    return swapChain->images.size();
+}
+
+void PresentFeature::Present(uint32_t swapChainImageIndex, Ref<Semaphore> wait) {
+    VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &wait->vk;
+
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &swapChain->swapChain;
+    presentInfo.pImageIndices = &swapChainImageIndex;
+
+    vkQueuePresentKHR(context.Get<Device>().queues.get(QueueType::Present), &presentInfo);
+}

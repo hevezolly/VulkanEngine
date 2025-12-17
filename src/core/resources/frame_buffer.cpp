@@ -1,40 +1,39 @@
 #include <frame_buffer.h>
 
-FrameBuffer::FrameBuffer(RenderContext* context, uint32_t imageCount, ImageView* images, VkRenderPass renderPass)
+FrameBuffer::FrameBuffer(RenderContext* context, ImageView* image, VkRenderPass renderPass)
 {
-    VkImageView* attachments = new VkImageView[imageCount];
-
-    for (int i = 0; i < imageCount; i++) {
-        attachments[i] = images[i].vkImageView;
-    }
-
     this->context = context;
 
     VkFramebufferCreateInfo framebufferInfo{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
     framebufferInfo.renderPass = renderPass;
-    framebufferInfo.attachmentCount = imageCount;
-    framebufferInfo.pAttachments = attachments;
-    framebufferInfo.width = images[0].referencedImage->width;
-    framebufferInfo.height = images[0].referencedImage->height;
+    framebufferInfo.attachmentCount = 1;
+    framebufferInfo.pAttachments = &image->vkImageView;
+    framebufferInfo.width = image->referencedImage->width;
+    framebufferInfo.height = image->referencedImage->height;
     framebufferInfo.layers = 1;
+    framebufferInfo.flags = 0;
+    width = image->referencedImage->width;
+    height = image->referencedImage->height;
 
     
     VK(vkCreateFramebuffer(context->device(), &framebufferInfo, nullptr, &frameBuffer))
 }
 
-FrameBuffer& FrameBuffer::operator=(FrameBuffer&& other) {
+FrameBuffer& FrameBuffer::operator=(FrameBuffer&& other) noexcept {
     if (this == &other)
         return *this;
 
     context = other.context;
     frameBuffer = other.frameBuffer;
+    width = other.width;
+    height = other.height;
     other.context = nullptr;
     other.frameBuffer = VK_NULL_HANDLE;
 
     return *this;
 }
 
-FrameBuffer::FrameBuffer(FrameBuffer&& other) {
+FrameBuffer::FrameBuffer(FrameBuffer&& other) noexcept {
     *this = std::move(other);
 }
 

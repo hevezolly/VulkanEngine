@@ -5,4 +5,4 @@ cmake --build %build_path% --config %2
 
 IF not %ERRORLEVEL% EQU 0 exit /b %ERRORLEVEL%
 
-IF "%3"=="-e" %build_path%\\%2\\bin\\examples\\window\\window.exe
+IF "%3"=="-e" %build_path%\\%2\\bin\\examples\\triangle\\triangle.exe

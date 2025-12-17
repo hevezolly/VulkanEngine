@@ -13,6 +13,19 @@
 #include <typeindex>
 #include <typeinfo>
 
+struct DestructorPair {
+    const void* object_ptr;
+    void(*destroyer_func)(const void*); // A raw function pointer
+};
+
+template <typename T>
+DestructorPair make_dtor_pair(T* obj) {
+    return {
+        obj,
+        [](const void* p) { static_cast<const T*>(p)->~T(); } // Lambda acts as function pointer
+    };
+}
+
 struct API RenderContext {
     VkInstance vkInstance;
 
@@ -63,50 +76,35 @@ struct API RenderContext {
         return TryGet<T>() != nullptr;
     }
 
-    template<typename T>
-    Ref<T> Register(T* item) {
-        unsigned long id = _counter++;
+    template<typename T, typename... Args>
+    Ref<T> New(Args&&... args) {
 
-        _items.insert({id, static_cast<void*>(item)});
-        _initOrder.push_back(id);
+        Storage<T>* item = new Storage<T>(std::forward<Args>(args)...);
 
-        return Ref<T> {id};
+        _initOrder.push_back(make_dtor_pair(item));
+
+        Ref<T> r;
+        r._ptr = item;
+        return r;
     }
 
     template<typename T>
     T& Get(Ref<T> handle) {
-        auto it = _items.find(handle.id);
-        if (it == _items.end())
-            throw std::runtime_error("handle not found");
-        
-        return *static_cast<T*>(it->second);
+        return *handle;
     }
 
     template<typename T>
     T* TryGet(Ref<T> handle) {
-        auto it = _items.find(handle.id);
-        if (it == _items.end())
-            return nullptr;
-        
-        return static_cast<T*>(it->second);
+        return handle.try_get();
     }
 
     template<typename T>
-    T* Extract(Ref<T> handle) {
-        auto it = _items.find(handle.id);
-        if (it == _items.end())
-            throw std::runtime_error("handle not found");
-
-        T* pointer = static_cast<T*>(it->second);
-        _items.erase(it);
-        return pointer;
+    void Delete(Ref<T> handle) {
+        handle._ptr->Delete();
     }
     
 private:
-
-    long _counter;
-    std::unordered_map<unsigned long, void*> _items;
-    std::vector<unsigned long> _initOrder;
+    std::vector<DestructorPair> _initOrder;
 
     std::unordered_map<std::type_index, FeatureSet*> _features;
     std::vector<std::type_index> _featureInitOrder;

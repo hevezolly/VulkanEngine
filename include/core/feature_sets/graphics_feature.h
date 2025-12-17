@@ -5,6 +5,7 @@
 #include <shader_source.h>
 #include <optional>
 #include <handles.h>
+#include <frame_buffer.h>
 
 struct API BlendMethod {
     VkBlendFactor src;
@@ -18,6 +19,10 @@ struct API GraphicsPipeline {
     VkPipeline pipeline;
 
     GraphicsPipeline();
+
+    Ref<FrameBuffer> CreateFrameBuffer(ImageView* image) {
+        return context->New<FrameBuffer>(context, image, renderPass);
+    }
 
     RULE_5(GraphicsPipeline)
 
@@ -81,6 +86,7 @@ private:
 };
 
 struct GraphicsFeature: FeatureSet {
+
     using FeatureSet::FeatureSet;
 
     GraphicsPipelineBuilder GraphicsPipeline();

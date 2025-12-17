@@ -16,6 +16,10 @@ struct API PresentFeature: FeatureSet {
     virtual void Destroy();
     virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
 
+    uint32_t swapChainSize();
+
+    void Present(uint32_t swapChainImageIndex, Ref<Semaphore> wait);
+
 private: 
     WindowInitializer windowArgs;
     SwapChainInitializer swapChainArgs;

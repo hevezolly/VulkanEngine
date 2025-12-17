@@ -3,7 +3,8 @@
 #include <iostream>
 
 ImageView::ImageView(VkDevice device, Image* image):
-device(device)
+device(device),
+referencedImage(image)
 {
     VkImageViewCreateInfo createInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     createInfo.image = image->vkImage;
@@ -50,16 +51,16 @@ ImageView::~ImageView() {
     }
 }
 
-Image::Image(VkImage readyImage, VkDevice device, VkFormat format, uint32_t width, uint32_t height, uint32_t depth):
-vkImage(readyImage),
-format(format),
-width(width),
-height(height),
-depth(depth),
-memory(VK_NULL_HANDLE),
-device(device),
-dispose(false)
+Image::Image(VkImage readyImage, VkDevice device, VkFormat format, uint32_t width, uint32_t height, uint32_t depth)
 {
+    vkImage = readyImage;
+    this->format = format;
+    this->width = width;
+    this->height = height;
+    this->depth = depth;
+    memory = VK_NULL_HANDLE;
+    this->device = device;
+    dispose = false;
     view = new ImageView(device, this);
 }
 
@@ -72,6 +73,7 @@ Image& Image::operator=(Image&& other) noexcept {
     memory = other.memory;
     vkImage = other.vkImage;
     view = other.view;
+    view->referencedImage = this;
     format = other.format;
     width = other.width;
     height = other.height;

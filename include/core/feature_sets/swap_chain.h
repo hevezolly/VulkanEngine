@@ -5,6 +5,8 @@
 #include <window.h>
 #include <device.h>
 #include <image.h>
+#include <frame_buffer.h>
+#include <synchronization.h>
 
 struct API SwapChainInitializer {
     std::vector<VkFormat> desiredFormats = {VK_FORMAT_B8G8R8A8_SRGB};
@@ -24,9 +26,10 @@ struct API SwapChain
     VkPresentModeKHR presentMode;
     ImageUsage imageUsage;
     std::vector<Image> images;
-    
 
     SwapChain(RenderContext* context, const SwapChainInitializer& args);
+
+    uint32_t AcquireNextImage(Ref<Semaphore> imageReady);
 
     RULE_5(SwapChain)
 

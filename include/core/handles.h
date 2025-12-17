@@ -1,8 +1,56 @@
 #pragma once
 #include <common.h>
+#include <iostream>
+#include <optional>
+
+template<typename T>
+struct Storage
+{
+    std::optional<T> item;
+
+    template<typename... Args>
+    Storage(Args&&... args) {
+        item.emplace(std::forward<Args>(args)...);
+    }
+
+    void Delete() {
+        item.reset();
+    }
+};
 
 template <typename T>
 struct API Ref
 {
-    unsigned long id;
+    T& val() {
+        if (!_ptr || !_ptr->item.has_value())
+            throw std::runtime_error("dereferencing null ref");
+        
+        return _ptr->item.value();
+    }
+
+    T* try_get() {
+        if (!_ptr || !_ptr->item.has_value()) {
+            return nullptr;
+        }
+        return &(_ptr->item->value());
+    }
+
+
+    T& operator*() {
+        return val();
+    }
+
+    T* operator ->() {
+        return &val();
+    }
+
+    T* operator &() {
+        return &val();
+    }
+
+    friend struct RenderContext;
+
+private:
+    Storage<T>* _ptr;
 };
+

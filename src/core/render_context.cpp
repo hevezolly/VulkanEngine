@@ -3,6 +3,7 @@
 #include <debugging_feature.h>
 #include <device.h>
 #include <command_pool.h>
+#include <synchronization.h>
 
 
 static VkResult checkLayersSupport(std::vector<const char*>& layers) {
@@ -35,7 +36,8 @@ RenderContext::RenderContext() {
     this->WithFeature<DebuggingFeature>();
 #endif
     this->WithFeature<Device>()
-        .WithFeature<CommandPools>();
+        .WithFeature<CommandPool>()
+        .WithFeature<Synchronization>();
 }
 
 void RenderContext::Initialize() {
@@ -94,13 +96,10 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
         return *this;
 
     vkInstance = other.vkInstance;
-    _counter = other._counter;
-    _items = std::move(other._items);
     _initOrder = std::move(other._initOrder);
     _features = std::move(other._features);
     _featureInitOrder = std::move(other._featureInitOrder);
     other.vkInstance = VK_NULL_HANDLE;
-    other._counter = 0;
 
     return *this;
 }
@@ -117,16 +116,12 @@ RenderContext::~RenderContext() {
     
     if (vkInstance != VK_NULL_HANDLE) {
 
-        for (int i = _initOrder.size() - 1; i >= 0; i--) {
-            unsigned long id = _initOrder[i];
-            auto it = _items.find(id);
+        vkDeviceWaitIdle(device());
 
-            if (it != _items.end()) {
-                delete it->second;
-            }
+        for (int i = _initOrder.size() - 1; i >= 0; i--) {
+            _initOrder[i].destroyer_func(_initOrder[i].object_ptr);
         }
 
-        _items.clear();
         _initOrder.clear();
 
         for (int i = _featureInitOrder.size()-1; i >= 0; i--) 

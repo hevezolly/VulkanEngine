@@ -5,17 +5,17 @@
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     context(&context)
 {
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly = {VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo = {VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
     vertexInputInfo.vertexBindingDescriptionCount = 0;
     vertexInputInfo.pVertexBindingDescriptions = nullptr;
     vertexInputInfo.vertexAttributeDescriptionCount = 0;
     vertexInputInfo.pVertexAttributeDescriptions = nullptr;
 
-    rasterization.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterization = {VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
     rasterization.depthClampEnable = VK_FALSE;
     rasterization.depthBiasEnable = VK_FALSE;
     rasterization.lineWidth = 1.f;
@@ -23,7 +23,8 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     rasterization.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterization.polygonMode = VK_POLYGON_MODE_FILL;
 
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling = {};
+    multisampling = {VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     multisampling.minSampleShading = 1.0f;
@@ -31,6 +32,7 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     multisampling.alphaToCoverageEnable = VK_FALSE;
     multisampling.alphaToOneEnable = VK_FALSE;
 
+    blending = {};
     blending.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     blending.blendEnable = VK_FALSE;
     blending.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -40,7 +42,7 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     blending.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     blending.alphaBlendOp = VK_BLEND_OP_ADD;
 
-    blendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blendingCreateInfo = {VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
     blendingCreateInfo.logicOpEnable = VK_FALSE;
     blendingCreateInfo.logicOp = VK_LOGIC_OP_COPY;
     blendingCreateInfo.attachmentCount = 1;
@@ -50,12 +52,14 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     blendingCreateInfo.blendConstants[2] = 0.0f;
     blendingCreateInfo.blendConstants[3] = 0.0f;
 
-    pipelineLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     pipelineLayout.setLayoutCount = 0;
     pipelineLayout.pSetLayouts = nullptr;
     pipelineLayout.pushConstantRangeCount = 0;
     pipelineLayout.pPushConstantRanges = nullptr;
+    pipelineLayout.flags = 0;
 
+    colorAttachment = {};
     colorAttachment.format = context.Get<PresentFeature>().swapChain->format;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -65,9 +69,11 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+    colorAttachmentRef = {};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
@@ -157,7 +163,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetAlphaBlending(BlendMethod& 
 
 
 Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
-    GraphicsPipeline* pipeline = new GraphicsPipeline;
+    Ref<GraphicsPipeline> pipeline = context->New<GraphicsPipeline>();
     pipeline->context = context;
 
     VK(vkCreatePipelineLayout(
@@ -167,11 +173,22 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
         &pipeline->layout
     ));
 
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
     VkRenderPassCreateInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+    renderPassInfo.flags = 0;
 
     VK(vkCreateRenderPass(
         context->device(), 
@@ -179,6 +196,7 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
         nullptr, 
         &pipeline->renderPass
     ));
+
 
     VkPipelineViewportStateCreateInfo viewportState{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
     viewportState.viewportCount = 1;
@@ -210,6 +228,7 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
+    pipelineInfo.flags = 0;
 
     VK(vkCreateGraphicsPipelines(
         context->device(), 
@@ -217,7 +236,7 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
         1, &pipelineInfo, nullptr, &pipeline->pipeline
     ));
 
-    return context->Register(pipeline);
+    return pipeline;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::operator=(GraphicsPipelineBuilder&& other) noexcept {
@@ -285,3 +304,8 @@ GraphicsPipeline::~GraphicsPipeline() {
     vkDestroyRenderPass(context->device(), renderPass, nullptr);
     context = nullptr;
 }
+
+GraphicsPipelineBuilder GraphicsFeature::GraphicsPipeline() {
+    return GraphicsPipelineBuilder(context);
+}
+

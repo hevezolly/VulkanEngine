@@ -1,5 +1,5 @@
 
-foreach (tgt window)
+foreach (tgt window triangle)
     add_executable(${tgt} ${tgt}.cpp)
     target_link_libraries(${tgt} PRIVATE VulkanEngine)
 
