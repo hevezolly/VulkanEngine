@@ -98,8 +98,10 @@ void CommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, Ref<FrameBuf
     renderPassInfo.pClearValues = &clearColor;
 
     vkCmdBeginRenderPass(buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    LOG("render pass begin internal")
 
     vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+    LOG("render pass bind pipeline")
 }
 
 void CommandBuffer::EndRenderPass() {

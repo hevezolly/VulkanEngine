@@ -7,7 +7,9 @@
 
 void RecordCommandBuffer(CommandBuffer& cmd, Ref<GraphicsPipeline> pipeline, Ref<FrameBuffer> frameBuffer) {
     cmd.Begin();
+    LOG("cmd begin")
     cmd.BeginRenderPass(pipeline, frameBuffer);
+    LOG("render pass begin")
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -17,16 +19,22 @@ void RecordCommandBuffer(CommandBuffer& cmd, Ref<GraphicsPipeline> pipeline, Ref
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(cmd.buffer, 0, 1, &viewport);
+    LOG("render pass set viewport")
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
     scissor.extent = {frameBuffer->width, frameBuffer->height};
     vkCmdSetScissor(cmd.buffer, 0, 1, &scissor);
+    LOG("render pass set scissor")
+
 
     vkCmdDraw(cmd.buffer, 3, 1, 0, 0);
+    LOG("render pass draw")
 
     cmd.EndRenderPass();
+    LOG("render pass end")
     cmd.End();
+    LOG("cmd end")
 }
 
 void DrawFrame(
@@ -39,21 +47,30 @@ void DrawFrame(
     std::vector<Ref<FrameBuffer>>& buffers
 ) {
     inFlight->Wait();
+    LOG("wait")
     inFlight->Reset();
+    LOG("reset")
 
     uint32_t imageIndex = context.Get<PresentFeature>().swapChain->AcquireNextImage(imgAvailable);
+    LOG("acquire next image")
 
     cmd.Reset();
+    LOG("cmd reset")
     RecordCommandBuffer(cmd, pipeline, buffers[imageIndex]);
+    LOG("cmd record")
 
     Ref<Semaphore> renderInCurrentImageFinish = renderFinish[imageIndex];
 
     context.Get<CommandPool>().Submit(cmd, imgAvailable, renderInCurrentImageFinish, inFlight);
+    LOG("commands submit")
 
     context.Get<PresentFeature>().Present(imageIndex, renderInCurrentImageFinish);
+    LOG("present")
 }
 
 void Run() {
+
+    volkInitialize();
 
     WindowInitializer windowDescription{};
     SwapChainInitializer swapChainDescription{};
@@ -64,6 +81,8 @@ void Run() {
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .WithFeature<GraphicsFeature>();
     context.Initialize();
+    volkLoadInstance(context.vkInstance);
+    LOG("init")
 
     SwapChain* swapChain = context.Get<PresentFeature>().swapChain;
 
@@ -99,6 +118,8 @@ void main() {
     ShaderBinary vertexBin = compiler.FromSource(vertexSource);
     ShaderBinary fragmentBin = compiler.FromSource(fragmentSource);
 
+    LOG("shaders compiled")
+
     auto pipeline = context
         .Get<GraphicsFeature>().GraphicsPipeline()
         .AddShaderStage(ShaderStage::Vertex, vertexBin)
@@ -106,6 +127,8 @@ void main() {
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
         .Build();
+
+    LOG("pipeline built")
     
     Ref<Semaphore> imageAvailable = context.Get<Synchronization>().CreateSemaphore();
     Ref<Fence> inFlight = context.Get<Synchronization>().CreateFence(true);
@@ -119,10 +142,15 @@ void main() {
         frameBuffers.push_back(pipeline->CreateFrameBuffer(swapChain->images[i].view));
     }
 
+    LOG("synchronization built")
+
     CommandBuffer cmd = context.Get<CommandPool>().CreateGraphicsBuffer();
+
+    LOG("command buffer built")
 
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
+        LOG("poll events")
         DrawFrame(
             context, 
             cmd, 
@@ -132,6 +160,7 @@ void main() {
             pipeline,
             frameBuffers
         );
+        LOG("frame finish")
     }
 }
 

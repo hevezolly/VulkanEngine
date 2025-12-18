@@ -13,7 +13,7 @@
 #include <typeindex>
 #include <typeinfo>
 
-struct DestructorPair {
+struct API DestructorPair {
     const void* object_ptr;
     void(*destroyer_func)(const void*); // A raw function pointer
 };

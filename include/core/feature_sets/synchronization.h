@@ -2,7 +2,7 @@
 #include <feature_set.h>
 #include <handles.h>
 
-struct Semaphore {
+struct API Semaphore {
     VkSemaphore vk;
 
     ~Semaphore();
@@ -12,7 +12,7 @@ private:
     RenderContext* context;
 };
 
-struct Fence {
+struct API Fence {
     VkFence vk;
 
     void Wait(uint64_t timeout = UINT64_MAX);
@@ -25,7 +25,7 @@ private:
     RenderContext* context;
 };
 
-struct Synchronization: FeatureSet {
+struct API Synchronization: FeatureSet {
     using FeatureSet::FeatureSet;
 
     Ref<Semaphore> CreateSemaphore();

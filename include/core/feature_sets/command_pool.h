@@ -5,7 +5,7 @@
 #include <graphics_feature.h>
 #include <synchronization.h>
 
-struct CommandBuffer {
+struct API CommandBuffer {
     VkCommandBuffer buffer;
     void Begin();
     void End();
@@ -14,7 +14,7 @@ struct CommandBuffer {
     void EndRenderPass();
 };
 
-struct CommandPool: FeatureSet {
+struct API CommandPool: FeatureSet {
     
     CommandPool(RenderContext&);
 

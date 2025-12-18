@@ -85,7 +85,7 @@ private:
     RenderContext* context;
 };
 
-struct GraphicsFeature: FeatureSet {
+struct API GraphicsFeature: FeatureSet {
 
     using FeatureSet::FeatureSet;
 

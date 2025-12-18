@@ -3,7 +3,7 @@
 #include <common.h>
 #include <image.h>
 
-struct FrameBuffer
+struct API FrameBuffer
 {
     uint32_t width;
     uint32_t height;

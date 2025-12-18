@@ -42,3 +42,9 @@ if (__result != VK_SUCCESS) {\
     throw std::runtime_error(ss.str());\
 }\
 }\
+
+#ifdef ENGINE_DEBUG
+#define LOG(str) std::cout << str << std::endl;
+#else
+#define LOG(str)
+#endif
