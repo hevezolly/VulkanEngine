@@ -86,8 +86,8 @@ void Run() {
     windowDescription.hint = "VkEngine";
     RenderContext context;
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
-           .WithFeature<GraphicsFeature>();
-    context.Initialize();
+           .WithFeature<GraphicsFeature>()
+           .Initialize();
     volkLoadInstance(context.vkInstance);
     LOG("init")
 

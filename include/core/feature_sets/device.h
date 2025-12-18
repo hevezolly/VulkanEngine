@@ -5,6 +5,7 @@
 #include <optional>
 #include <common.h>
 #include <feature_set.h>
+#include <messages.h>
 
 enum struct API QueueType {
     Graphics,
@@ -45,7 +46,7 @@ struct API SwapChainSupport {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct API Device: FeatureSet {
+struct API Device: FeatureSet, CanHandle<InitMessage> {
     VkPhysicalDevice vkPhysicalDevice;
     VkDevice device;
     QueueFamiliesDescriptor queueFamilies;
@@ -53,6 +54,6 @@ struct API Device: FeatureSet {
     SwapChainSupport swapChainSupport;
 
     using FeatureSet::FeatureSet;
-    virtual void Init();
+    virtual void OnMessage(InitMessage*);
     virtual void Destroy();
 };

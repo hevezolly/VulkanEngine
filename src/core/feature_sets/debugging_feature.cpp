@@ -24,7 +24,7 @@ DebuggingFeature::DebuggingFeature(RenderContext& context): FeatureSet(context) 
     messengerCreateInfo.pfnUserCallback = debugCallback;
 }
 
-void DebuggingFeature::PreInit() {
+void DebuggingFeature::OnMessage(EarlyInitMessage* m) {
     VK(vkCreateDebugUtilsMessengerEXT(context.vkInstance, &messengerCreateInfo, nullptr, &vkDebugMessenger));
 }
 

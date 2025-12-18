@@ -17,7 +17,7 @@ VkCommandPool CreateCommandPool(VkDevice device, uint32_t queueFamily) {
 CommandPool::CommandPool(RenderContext& context): FeatureSet(context) {
 }
 
-void CommandPool::Init() {
+void CommandPool::OnMessage(InitMessage* m) {
 
     graphicsCommandPool = VK_NULL_HANDLE;
     

@@ -4,6 +4,7 @@
 #include <device.h>
 #include <graphics_feature.h>
 #include <synchronization.h>
+#include <messages.h>
 
 struct API CommandBuffer {
     VkCommandBuffer buffer;
@@ -14,11 +15,11 @@ struct API CommandBuffer {
     void EndRenderPass();
 };
 
-struct API CommandPool: FeatureSet {
+struct API CommandPool: FeatureSet, CanHandle<InitMessage> {
     
     CommandPool(RenderContext&);
 
-    virtual void Init();
+    virtual void OnMessage(InitMessage*);
     virtual void Destroy();
 
     CommandBuffer CreateGraphicsBuffer();

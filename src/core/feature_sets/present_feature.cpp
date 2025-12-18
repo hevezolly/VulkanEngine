@@ -31,11 +31,11 @@ void PresentFeature::GetRequiredExtentions(std::vector<const char*>& buffer) {
     }
 }
 
-void PresentFeature::PreInit() {
+void PresentFeature::OnMessage(EarlyInitMessage* m) {
     window = new Window(context.vkInstance, windowArgs);
 }
 
-void PresentFeature::Init() {
+void PresentFeature::OnMessage(InitMessage* m) {
     swapChain= new SwapChain(&context, swapChainArgs);
 }
 

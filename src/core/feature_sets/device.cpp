@@ -171,7 +171,7 @@ static VkDevice CreateLogicalDevice(const QueueFamiliesDescriptor* queueDescript
 }
 
 
-void Device::Init() {
+void Device::OnMessage(InitMessage* m) {
 
     VkInstance instance = context.vkInstance;
 

@@ -2,8 +2,6 @@
 
 API std::atomic_int TypeIdCounter = 0;
 
-void FeatureSet::PreInit() {}
-void FeatureSet::Init() {}
 void FeatureSet::Destroy() {}
 void FeatureSet::GetRequiredExtentions(std::vector<const char*>& buffer) {}
 void FeatureSet::GetRequiredLayers(std::vector<const char*>& buffer) {}

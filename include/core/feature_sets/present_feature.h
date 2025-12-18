@@ -6,15 +6,23 @@
 #include <swap_chain.h>
 #include <distinct_storage.h>
 #include <frame_buffer.h>
+#include <messages.h>
 
-struct API PresentFeature: FeatureSet {
+struct BeforePresentMessage{
+    uint32_t swapChainIndex;
+};
+
+struct API PresentFeature: FeatureSet, 
+    CanHandle<EarlyInitMessage>,
+    CanHandle<InitMessage>
+{
     Window* window;
     SwapChain* swapChain;
 
     PresentFeature(RenderContext&, const WindowInitializer& windowArgs, const SwapChainInitializer& swapChaniArgs);
 
-    virtual void PreInit();
-    virtual void Init();
+    virtual void OnMessage(EarlyInitMessage*);
+    virtual void OnMessage(InitMessage*);
     virtual void Destroy();
     virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
 

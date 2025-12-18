@@ -1,6 +1,6 @@
 @echo off
 set build_path="%1\\build"
-cmake -S %1 -B %build_path% -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=%2 -G "Visual Studio 17 2022"
+cmake -S %1 -B %build_path% -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=%2 -G "Visual Studio 17 2022"
 cmake --build %build_path% --config %2
 
 IF not %ERRORLEVEL% EQU 0 exit /b %ERRORLEVEL%

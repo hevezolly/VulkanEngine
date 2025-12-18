@@ -31,7 +31,7 @@ static VkResult checkLayersSupport(std::vector<const char*>& layers) {
     return VK_SUCCESS;
 }
 
-RenderContext::RenderContext() {
+RenderContext::RenderContext(): _handling(false) {
 #ifdef ENABLE_VULKAN_VALIDATION
     this->WithFeature<DebuggingFeature>();
 #endif
@@ -79,15 +79,8 @@ void RenderContext::Initialize() {
 
     volkLoadInstance(vkInstance);
 
-    for (int i = 0; i < _featureInitOrder.size(); i++) 
-    {
-        _features[_featureInitOrder[i]]->PreInit();
-    }
-
-    for (int i = 0; i < _featureInitOrder.size(); i++) 
-    {
-        _features[_featureInitOrder[i]]->Init();
-    }
+    Send<EarlyInitMessage>(nullptr);
+    Send<InitMessage>(nullptr);
 }
 
 RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
@@ -99,6 +92,8 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
     _initOrder = std::move(other._initOrder);
     _features = std::move(other._features);
     _featureInitOrder = std::move(other._featureInitOrder);
+    _messageHandlers = std::move(other._messageHandlers);
+    _messages = std::move(other._messages);
     other.vkInstance = VK_NULL_HANDLE;
 
     return *this;
@@ -134,4 +129,25 @@ RenderContext::~RenderContext() {
 
         vkDestroyInstance(vkInstance, nullptr);
     }
+}
+
+void RenderContext::HandleMessages() {
+    if (_handling)
+        return;
+
+    _handling = true;
+
+    while (_messages.size() > 0)
+    {
+        Message m = _messages.front();
+        _messages.pop();
+
+        std::vector<MessageHandler>& handlers = _messageHandlers[m.type];
+        for (int i = 0; i < handlers.size(); i++) {
+            handlers[i].handler_func(handlers[i].handlerPtr, m.message);
+        }
+    }
+    
+
+    _handling = false;
 }

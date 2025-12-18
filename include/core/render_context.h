@@ -10,19 +10,48 @@
 #include <type_traits>
 #include <feature_set.h>
 #include <handles.h>
-#include <typeindex>
-#include <typeinfo>
+#include <messages.h>
+#include <queue>
 
 struct API DestructorPair {
     const void* object_ptr;
     void(*destroyer_func)(const void*); // A raw function pointer
 };
 
+struct API MessageHandler {
+    void* handlerPtr;
+    void(*handler_func)(void*, void*);
+};
+
+struct API Message {
+    void* message;
+    std::type_index type;
+};
+
+template <typename T>
+Message make_message(T* message) {
+    return {
+        message,
+        getTypeId<T>()
+    };
+}
+
 template <typename T>
 DestructorPair make_dtor_pair(T* obj) {
     return {
         obj,
         [](const void* p) { delete static_cast<const T*>(p); } // Lambda acts as function pointer
+    };
+}
+
+template<typename T>
+MessageHandler make_handler(CanHandle<T>* handler) {
+    return {
+        handler,
+        [](void* h, void* m) { 
+            static_cast<CanHandle<T>*>(h)->
+                    OnMessage(static_cast<T*>(m));
+        }
     };
 }
 
@@ -43,7 +72,7 @@ struct API RenderContext {
         
         T* feature = new T(*this, std::forward<CallArgs>(args)...);
 
-        std::type_index typeId = getFeatureId<T>();
+        std::type_index typeId = getTypeId<T>();
 
         _features[typeId] = static_cast<FeatureSet*>(feature);
         _featureInitOrder.push_back(typeId);
@@ -53,9 +82,9 @@ struct API RenderContext {
     template<typename T>
     T* TryGet() {
         static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");
-        std::type_index typeId = getFeatureId<T>();
-        
-        auto it = _features.find(getFeatureId<T>());
+        std::type_index typeId = getTypeId<T>();
+    
+        auto it = _features.find(getTypeId<T>());
         if (it == _features.end())
             return nullptr;
         
@@ -120,10 +149,46 @@ struct API RenderContext {
     void Delete(Ref<T> handle) {
         handle._ptr->Delete();
     }
+
+    template<typename T>
+    void Send(T* message) {
+        std::type_index id = getTypeId<T>();
+        auto it = _messageHandlers.find(id);
+
+        if (it == _messageHandlers.end()) {
+            _messageHandlers.insert({id, std::vector<MessageHandler>()});
+
+            for (int i = 0; i < _featureInitOrder.size(); i++) {
+                FeatureSet* feature = _features[_featureInitOrder[i]];
+                auto h = dynamic_cast<CanHandle<T>*>(feature);
+                if (!h)
+                    continue;
+
+                _messageHandlers[id].push_back(make_handler(h));
+            }
+        }
+
+        _messages.push(make_message(message));
+        HandleMessages();
+    }
+
+    template<typename T>
+    void Send(T&& message) {
+        T copy = message;
+        Send(&copy);
+    }
     
 private:
+
+    void HandleMessages();
+
     std::vector<DestructorPair> _initOrder;
 
     std::unordered_map<std::type_index, FeatureSet*> _features;
     std::vector<std::type_index> _featureInitOrder;
+
+    std::unordered_map<std::type_index, std::vector<MessageHandler>> _messageHandlers;
+    std::queue<Message> _messages;
+
+    bool _handling;
 };
