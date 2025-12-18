@@ -1,6 +1,13 @@
 
-foreach (tgt window triangle)
+file(GLOB EXAMPLE_FILES *.cpp)
+
+foreach (tgt_full ${EXAMPLE_FILES})
+
+    get_filename_component(tgt ${tgt_full} NAME_WE)
+    
     add_executable(${tgt} ${tgt}.cpp)
+    target_include_directories(${tgt} PRIVATE .)
+
     target_link_libraries(${tgt} PRIVATE VulkanEngine)
 
     set_target_properties(${tgt} PROPERTIES
