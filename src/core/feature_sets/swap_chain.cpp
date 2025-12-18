@@ -177,10 +177,3 @@ SwapChain::~SwapChain() {
         vkDestroySwapchainKHR(context->device(), swapChain, nullptr);
     }
 }
-
-uint32_t SwapChain::AcquireNextImage(Ref<Semaphore> imageReady) {
-    uint32_t nextImage;
-    vkAcquireNextImageKHR(context->device(), swapChain, UINT64_MAX, imageReady->vk, VK_NULL_HANDLE, &nextImage);
-
-    return nextImage;
-}

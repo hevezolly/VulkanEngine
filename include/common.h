@@ -43,7 +43,7 @@ if (__result != VK_SUCCESS) {\
 }\
 }\
 
-#ifdef ENGINE_DEBUG
+#ifdef ENGINE_LOG
 #define LOG(str) std::cout << str << std::endl;
 #else
 #define LOG(str)

@@ -63,7 +63,7 @@ target_include_directories(VulkanEngine PUBLIC
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(VulkanEngine PUBLIC ENABLE_VULKAN_VALIDATION)
-    target_compile_definitions(VulkanEngine PUBLIC ENGINE_DEBUG)
+    # target_compile_definitions(VulkanEngine PUBLIC ENGINE_LOG)
 endif()
 
 

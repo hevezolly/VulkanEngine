@@ -22,7 +22,7 @@ template <typename T>
 DestructorPair make_dtor_pair(T* obj) {
     return {
         obj,
-        [](const void* p) { static_cast<const T*>(p)->~T(); } // Lambda acts as function pointer
+        [](const void* p) { delete static_cast<const T*>(p); } // Lambda acts as function pointer
     };
 }
 
@@ -86,6 +86,24 @@ struct API RenderContext {
         Ref<T> r;
         r._ptr = item;
         return r;
+    }
+
+    template<typename T, typename... Args>
+    Refs<T> NewRefs(uint32_t size, Args&&... args) {
+
+        Refs<T> refs;
+        refs.reserve(size);
+
+        for (int i = 0; i < size; i++) 
+        {
+            Storage<T>* item = new Storage<T>(std::forward<Args>(args)...);
+            _initOrder.push_back(make_dtor_pair(item));
+            Ref<T> r;
+            r._ptr = item;
+            refs.push_back(r);
+        }
+
+        return refs;
     }
 
     template<typename T>

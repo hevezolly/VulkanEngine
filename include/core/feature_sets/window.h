@@ -18,7 +18,7 @@ struct API Window {
     VkExtent2D extent;
 
     Window(VkInstance vkInstance, const WindowInitializer& args);
-    
+
     RULE_5(Window)
 private:
     VkInstance vkInstance;

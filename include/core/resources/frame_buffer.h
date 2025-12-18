@@ -3,12 +3,14 @@
 #include <common.h>
 #include <image.h>
 
+#define FrameBuffer_CtorArgs RenderContext*, ImageView*, VkRenderPass
+
 struct API FrameBuffer
 {
     uint32_t width;
     uint32_t height;
     VkFramebuffer frameBuffer;
-    FrameBuffer(RenderContext* context, ImageView* image, VkRenderPass renderPass);
+    FrameBuffer(FrameBuffer_CtorArgs);
 
     RULE_5(FrameBuffer)
 

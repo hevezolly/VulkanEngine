@@ -1,6 +1,9 @@
 #include <synchronization.h>
 #include <render_context.h>
 
+Semaphore::Semaphore(RenderContext* ctx): context(ctx){}
+Fence::Fence(RenderContext* ctx): context(ctx){}
+
 Semaphore::~Semaphore() {
     if (context) {
         vkDestroySemaphore(context->device(), vk, nullptr);
@@ -24,8 +27,7 @@ Fence::~Fence() {
 }
 
 Ref<Semaphore> Synchronization::CreateSemaphore() {
-    Ref<Semaphore> s = context.New<Semaphore>();
-    s->context = &context;
+    Ref<Semaphore> s = context.New<Semaphore>(&context);
 
     VkSemaphoreCreateInfo info {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     VK(vkCreateSemaphore(context.device(), &info, nullptr, &s->vk))
@@ -33,12 +35,34 @@ Ref<Semaphore> Synchronization::CreateSemaphore() {
 }
 
 Ref<Fence> Synchronization::CreateFence(bool signaled) {
-    Ref<Fence> s = context.New<Fence>();
-    s -> context = &context;
+    Ref<Fence> s = context.New<Fence>(&context);
     VkFenceCreateInfo info {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     if (signaled)
         info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     VK(vkCreateFence(context.device(), &info, nullptr, &s->vk))
+    return s;
+}
+
+Refs<Semaphore> Synchronization::CreateSemaphores(uint32_t size) {
+    Refs<Semaphore> s = context.NewRefs<Semaphore>(size, &context);
+
+    VkSemaphoreCreateInfo info {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    for (int i = 0; i < size; i++) {
+        VK(vkCreateSemaphore(context.device(), &info, nullptr, &(s[i]->vk)))
+    }
+    return s;
+}
+
+Refs<Fence> Synchronization::CreateFences(uint32_t size, bool signaled) {
+    Refs<Fence> s = context.NewRefs<Fence>(size, &context);
+    
+    VkFenceCreateInfo info {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    if (signaled)
+        info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (int i = 0; i < size; i++) {
+        VK(vkCreateFence(context.device(), &info, nullptr, &(s[i]->vk)))
+    }
     return s;
 }
 

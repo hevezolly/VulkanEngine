@@ -29,8 +29,6 @@ struct API SwapChain
 
     SwapChain(RenderContext* context, const SwapChainInitializer& args);
 
-    uint32_t AcquireNextImage(Ref<Semaphore> imageReady);
-
     RULE_5(SwapChain)
 
 private: 

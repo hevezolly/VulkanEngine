@@ -4,6 +4,8 @@
 #include <feature_set.h>
 #include <window.h>
 #include <swap_chain.h>
+#include <distinct_storage.h>
+#include <frame_buffer.h>
 
 struct API PresentFeature: FeatureSet {
     Window* window;
@@ -16,6 +18,9 @@ struct API PresentFeature: FeatureSet {
     virtual void Destroy();
     virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
 
+    uint32_t AcquireNextImage(Ref<Semaphore> imageReady);
+    Ref<FrameBuffer> GetFrameBuffer(uint32_t swapChainImage, VkRenderPass renderPass);
+
     uint32_t swapChainSize();
 
     void Present(uint32_t swapChainImageIndex, Ref<Semaphore> wait);
@@ -23,4 +28,7 @@ struct API PresentFeature: FeatureSet {
 private: 
     WindowInitializer windowArgs;
     SwapChainInitializer swapChainArgs;
+    DistinctStorage<FrameBuffer, FrameBuffer_CtorArgs> swapChainFrameBuffers;
+
+    void recreateSwapChain();
 };

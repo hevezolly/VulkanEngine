@@ -48,9 +48,19 @@ struct API Ref
         return &val();
     }
 
+    bool operator==(const Ref<T>& other) const {
+        return _ptr == other._ptr;
+    }
+
+    bool operator!=(const Ref<T>& other) const {
+        return !(*this == other)
+    }
+
     friend struct RenderContext;
 
 private:
     Storage<T>* _ptr;
 };
 
+template<typename T>
+using Refs = std::vector<Ref<T>>;

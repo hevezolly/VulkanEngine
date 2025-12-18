@@ -1,7 +1,6 @@
 #include <command_pool.h>
 #include <render_context.h>
 #include <graphics_feature.h>
-#include <object_pool.h>
 
 VkCommandPool CreateCommandPool(VkDevice device, uint32_t queueFamily) {
     VkCommandPool pool;

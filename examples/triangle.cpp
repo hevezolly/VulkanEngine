@@ -39,24 +39,31 @@ void RecordCommandBuffer(CommandBuffer& cmd, Ref<GraphicsPipeline> pipeline, Ref
 
 void DrawFrame(
     RenderContext& context,
-    CommandBuffer& cmd, 
-    Ref<Semaphore> imgAvailable, 
-    std::vector<Ref<Semaphore>>& renderFinish, 
-    Ref<Fence> inFlight,
+    std::vector<CommandBuffer>& commandBuffers, 
+    Refs<Semaphore>& imgAvailableSemaphores, 
+    Refs<Semaphore>& renderFinish, 
+    Refs<Fence>& inFlightFences,
     Ref<GraphicsPipeline> pipeline,
-    std::vector<Ref<FrameBuffer>>& buffers
+    uint32_t frameId
 ) {
+    LOG("begin frame " << frameId)
+    Ref<Fence> inFlight = inFlightFences[frameId];
     inFlight->Wait();
     LOG("wait")
     inFlight->Reset();
     LOG("reset")
 
-    uint32_t imageIndex = context.Get<PresentFeature>().swapChain->AcquireNextImage(imgAvailable);
+    Ref<Semaphore> imgAvailable = imgAvailableSemaphores[frameId];
+
+    uint32_t imageIndex = context.Get<PresentFeature>().AcquireNextImage(imgAvailable);
     LOG("acquire next image")
+
+    CommandBuffer& cmd = commandBuffers[frameId];
 
     cmd.Reset();
     LOG("cmd reset")
-    RecordCommandBuffer(cmd, pipeline, buffers[imageIndex]);
+    RecordCommandBuffer(cmd, pipeline, 
+        context.Get<PresentFeature>().GetFrameBuffer(imageIndex, pipeline->renderPass));
     LOG("cmd record")
 
     Ref<Semaphore> renderInCurrentImageFinish = renderFinish[imageIndex];
@@ -65,7 +72,7 @@ void DrawFrame(
     LOG("commands submit")
 
     context.Get<PresentFeature>().Present(imageIndex, renderInCurrentImageFinish);
-    LOG("present")
+    LOG("end frame " << frameId)
 }
 
 void Run() {
@@ -129,38 +136,38 @@ void main() {
         .Build();
 
     LOG("pipeline built")
+
+    const uint32_t framesInFlight = 3;
     
-    Ref<Semaphore> imageAvailable = context.Get<Synchronization>().CreateSemaphore();
-    Ref<Fence> inFlight = context.Get<Synchronization>().CreateFence(true);
-    
-    std::vector<Ref<Semaphore>> renderFinish;
-    renderFinish.reserve(swapChain->images.size());
-    std::vector<Ref<FrameBuffer>> frameBuffers;
-    frameBuffers.reserve(swapChain->images.size());
-    for (int i = 0; i < swapChain->images.size(); i++) {
-        renderFinish.push_back(context.Get<Synchronization>().CreateSemaphore());
-        frameBuffers.push_back(pipeline->CreateFrameBuffer(swapChain->images[i].view));
+    Refs<Semaphore> imageAvailable = context.Get<Synchronization>().CreateSemaphores(framesInFlight);
+    LOG("image available semaphores")
+    Refs<Fence> inFlight = context.Get<Synchronization>().CreateFences(framesInFlight, true);
+    LOG("in flight fences")
+    Refs<Semaphore> renderFinish = context.Get<Synchronization>().CreateSemaphores(swapChain->images.size());
+    LOG("render finish fences")
+
+    std::vector<CommandBuffer> cmds;
+    cmds.reserve(framesInFlight);
+
+    for (int i = 0; i < framesInFlight; i++) {
+        cmds.push_back(context.Get<CommandPool>().CreateGraphicsBuffer());
     }
-
-    LOG("synchronization built")
-
-    CommandBuffer cmd = context.Get<CommandPool>().CreateGraphicsBuffer();
 
     LOG("command buffer built")
 
+    uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
         LOG("poll events")
         DrawFrame(
             context, 
-            cmd, 
+            cmds, 
             imageAvailable, 
             renderFinish, 
             inFlight, 
             pipeline,
-            frameBuffers
+            (currentFrame++) % framesInFlight
         );
-        LOG("frame finish")
     }
 }
 
