@@ -15,12 +15,15 @@ struct API CommandBuffer {
     void EndRenderPass();
 };
 
-struct API CommandPool: FeatureSet, CanHandle<InitMessage> {
+struct API CommandPool: FeatureSet, 
+    CanHandle<InitMsg>,
+    CanHandle<DestroyMsg>
+{
     
     CommandPool(RenderContext&);
 
-    virtual void OnMessage(InitMessage*);
-    virtual void Destroy();
+    virtual void OnMessage(InitMsg*);
+    virtual void OnMessage(DestroyMsg*);
 
     CommandBuffer CreateGraphicsBuffer();
 

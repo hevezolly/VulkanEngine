@@ -4,6 +4,7 @@
 #include <common.h>
 #include <typeindex>
 #include <typeinfo>
+#include <messages.h>
 
 template <typename T>
 std::type_index getTypeId() {
@@ -14,11 +15,12 @@ struct RenderContext;
 
 struct API FeatureSet {
 
-    FeatureSet(RenderContext&);
+    virtual ~FeatureSet(){};
+    FeatureSet(RenderContext& c): context(c){};
 
-    virtual void Destroy();
-    virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
-    virtual void GetRequiredLayers(std::vector<const char*>& buffer);
+    // virtual void Destroy();
+    // virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
+    // virtual void GetRequiredLayers(std::vector<const char*>& buffer);
         
 protected:
     RenderContext& context;

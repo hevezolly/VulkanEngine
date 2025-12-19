@@ -8,30 +8,35 @@
 #include <frame_buffer.h>
 #include <messages.h>
 
-struct BeforePresentMessage{
+struct PresentMsg{
     uint32_t swapChainIndex;
+    Ref<Semaphore> wait;
 };
 
 struct API PresentFeature: FeatureSet, 
-    CanHandle<EarlyInitMessage>,
-    CanHandle<InitMessage>
+    CanHandle<EarlyInitMsg>,
+    CanHandle<InitMsg>,
+    CanHandle<DestroyMsg>,
+    CanHandle<CollectInstanceRequirementsMsg>,
+    CanHandle<CollectDeviceRequirementsMsg>,
+    CanHandle<PresentMsg>
 {
     Window* window;
     SwapChain* swapChain;
 
     PresentFeature(RenderContext&, const WindowInitializer& windowArgs, const SwapChainInitializer& swapChaniArgs);
 
-    virtual void OnMessage(EarlyInitMessage*);
-    virtual void OnMessage(InitMessage*);
-    virtual void Destroy();
-    virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
+    virtual void OnMessage(EarlyInitMsg*);
+    virtual void OnMessage(InitMsg*);
+    virtual void OnMessage(DestroyMsg*);
+    virtual void OnMessage(CollectInstanceRequirementsMsg*);
+    virtual void OnMessage(CollectDeviceRequirementsMsg*);
+    virtual void OnMessage(PresentMsg*);
 
     uint32_t AcquireNextImage(Ref<Semaphore> imageReady);
     Ref<FrameBuffer> GetFrameBuffer(uint32_t swapChainImage, VkRenderPass renderPass);
 
     uint32_t swapChainSize();
-
-    void Present(uint32_t swapChainImageIndex, Ref<Semaphore> wait);
 
 private: 
     WindowInitializer windowArgs;

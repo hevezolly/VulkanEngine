@@ -17,7 +17,7 @@ VkCommandPool CreateCommandPool(VkDevice device, uint32_t queueFamily) {
 CommandPool::CommandPool(RenderContext& context): FeatureSet(context) {
 }
 
-void CommandPool::OnMessage(InitMessage* m) {
+void CommandPool::OnMessage(InitMsg* m) {
 
     graphicsCommandPool = VK_NULL_HANDLE;
     
@@ -28,7 +28,7 @@ void CommandPool::OnMessage(InitMessage* m) {
     };
 }
 
-void CommandPool::Destroy() {
+void CommandPool::OnMessage(DestroyMsg* m) {
     if (graphicsCommandPool != VK_NULL_HANDLE)
         vkDestroyCommandPool(context.device(), graphicsCommandPool, nullptr);
 }

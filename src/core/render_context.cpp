@@ -44,14 +44,15 @@ void RenderContext::Initialize() {
 
     VK(volkInitialize());
 
-    std::vector<const char*> requiredExtentions{};
+    std::vector<const char*> requiredExtensions{};
     std::vector<const char*> requiredLayers{};
 
-    for (int i = 0; i < _featureInitOrder.size(); i++) 
-    {
-        _features[_featureInitOrder[i]]->GetRequiredExtentions(requiredExtentions);
-        _features[_featureInitOrder[i]]->GetRequiredLayers(requiredLayers);
-    }
+    LOG("collecting instance data")
+
+    Send(CollectInstanceRequirementsMsg{&requiredExtensions, &requiredLayers}, true);
+
+    LOG("extensions: " << requiredExtensions.size())
+    LOG("layers: " << requiredLayers.size())
 
     VK(checkLayersSupport(requiredLayers))
 
@@ -64,8 +65,8 @@ void RenderContext::Initialize() {
 
     VkInstanceCreateInfo ci{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     ci.pApplicationInfo = &app;
-    ci.enabledExtensionCount = static_cast<uint32_t>(requiredExtentions.size());
-    ci.ppEnabledExtensionNames = requiredExtentions.data();
+    ci.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
+    ci.ppEnabledExtensionNames = requiredExtensions.data();
     ci.enabledLayerCount = static_cast<uint32_t>(requiredLayers.size());
     ci.ppEnabledLayerNames = requiredLayers.data();
 
@@ -79,8 +80,8 @@ void RenderContext::Initialize() {
 
     volkLoadInstance(vkInstance);
 
-    Send<EarlyInitMessage>(nullptr);
-    Send<InitMessage>(nullptr);
+    Send<EarlyInitMsg>(nullptr, true);
+    Send<InitMsg>(nullptr, true);
 }
 
 RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
@@ -119,15 +120,24 @@ RenderContext::~RenderContext() {
 
         _initOrder.clear();
 
-        for (int i = _featureInitOrder.size()-1; i >= 0; i--) 
-        {
-            _features[_featureInitOrder[i]]->Destroy();
-        }
+        Send<DestroyMsg>(nullptr);
         
         _features.clear();
         _featureInitOrder.clear();
+        _messageHandlers.clear();
 
         vkDestroyInstance(vkInstance, nullptr);
+    }
+}
+
+void RenderContext::HandleMessageNow(Message&& msg) {
+    std::vector<MessageHandler>& handlers = _messageHandlers[msg.type];
+        
+    for (int i = 0; i < handlers.size(); i++) {
+
+        int index = msg.bottomToTop ? i : (handlers.size() - 1 - i);
+
+        handlers[index].handler_func(handlers[index].handlerPtr, msg.message);
     }
 }
 
@@ -142,12 +152,8 @@ void RenderContext::HandleMessages() {
         Message m = _messages.front();
         _messages.pop();
 
-        std::vector<MessageHandler>& handlers = _messageHandlers[m.type];
-        for (int i = 0; i < handlers.size(); i++) {
-            handlers[i].handler_func(handlers[i].handlerPtr, m.message);
-        }
+        HandleMessageNow(std::move(m));
     }
-    
 
     _handling = false;
 }

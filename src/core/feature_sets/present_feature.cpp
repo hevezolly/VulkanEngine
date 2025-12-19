@@ -17,7 +17,7 @@ swapChainFrameBuffers(context)
     }
 }
 
-void PresentFeature::GetRequiredExtentions(std::vector<const char*>& buffer) {
+void PresentFeature::OnMessage(CollectInstanceRequirementsMsg* m) {
     uint32_t extCount = 0;
     const char** exts = glfwGetRequiredInstanceExtensions(&extCount);
     if (!exts || extCount == 0) 
@@ -27,19 +27,23 @@ void PresentFeature::GetRequiredExtentions(std::vector<const char*>& buffer) {
     }
 
     for (int i = 0; i < extCount; i++) {
-        buffer.push_back(exts[i]);
+        m->extentions->push_back(exts[i]);
     }
 }
 
-void PresentFeature::OnMessage(EarlyInitMessage* m) {
+void PresentFeature::OnMessage(CollectDeviceRequirementsMsg* m) {
+    m->extentions->push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+}
+
+void PresentFeature::OnMessage(EarlyInitMsg*) {
     window = new Window(context.vkInstance, windowArgs);
 }
 
-void PresentFeature::OnMessage(InitMessage* m) {
+void PresentFeature::OnMessage(InitMsg*) {
     swapChain= new SwapChain(&context, swapChainArgs);
 }
 
-void PresentFeature::Destroy() {
+void PresentFeature::OnMessage(DestroyMsg*) {
     delete swapChain;
     delete window;
     
@@ -90,7 +94,11 @@ uint32_t PresentFeature::AcquireNextImage(Ref<Semaphore> imageReady) {
     return nextImage;
 }
 
-void PresentFeature::Present(uint32_t swapChainImageIndex, Ref<Semaphore> wait) {
+void PresentFeature::OnMessage(PresentMsg* m) {
+
+    uint32_t swapChainImageIndex = m->swapChainIndex;
+    Ref<Semaphore> wait = m->wait;
+
     VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
 
     presentInfo.waitSemaphoreCount = 1;

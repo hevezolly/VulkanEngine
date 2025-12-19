@@ -26,13 +26,15 @@ struct API MessageHandler {
 struct API Message {
     void* message;
     std::type_index type;
+    bool bottomToTop;
 };
 
 template <typename T>
-Message make_message(T* message) {
+Message make_message(T* message, bool bottomToTop) {
     return {
         message,
-        getTypeId<T>()
+        getTypeId<T>(),
+        bottomToTop
     };
 }
 
@@ -151,7 +153,7 @@ struct API RenderContext {
     }
 
     template<typename T>
-    void Send(T* message) {
+    void Send(T* message, bool bottomToTop=false) {
         std::type_index id = getTypeId<T>();
         auto it = _messageHandlers.find(id);
 
@@ -168,18 +170,27 @@ struct API RenderContext {
             }
         }
 
-        _messages.push(make_message(message));
-        HandleMessages();
+        if (_messageHandlers[id].empty())
+            return;
+
+        if (std::is_base_of<InstantMessage, T>::value) {
+            HandleMessageNow(make_message(message, bottomToTop));
+        }
+        else {
+            _messages.push(make_message(message, bottomToTop));
+            HandleMessages();
+        }
     }
 
     template<typename T>
-    void Send(T&& message) {
+    void Send(T&& message, bool bottomToTop=false) {
         T copy = message;
-        Send(&copy);
+        Send(&copy, bottomToTop);
     }
     
 private:
 
+    void HandleMessageNow(Message&&);
     void HandleMessages();
 
     std::vector<DestructorPair> _initOrder;

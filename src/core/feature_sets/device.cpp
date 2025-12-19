@@ -10,10 +10,6 @@
 #include <render_context.h>
 #include <graphics_feature.h>
 
-const std::vector<const char*> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
-
 static bool CheckQueueFits(
     VkQueueFamilyProperties* properties, 
     uint32_t familyIndex,
@@ -83,7 +79,7 @@ static bool SwapChainSupported(VkPhysicalDevice device, VkSurfaceKHR surface, Sw
     return support->surfaceFormats.size() > 0 && support->presentModes.size() > 0;
 }
 
-static bool DeviceSupportsExtentions(VkPhysicalDevice device) {
+static bool DeviceSupportsExtentions(VkPhysicalDevice device, std::vector<const char*>& deviceExtensions) {
 
     auto availableExtensions = vkCollect<VkExtensionProperties>(
         vkEnumerateDeviceExtensionProperties, device, nullptr);
@@ -104,7 +100,8 @@ static VkPhysicalDevice FindDeviceOfType(
     VkPhysicalDeviceType type,
     VkSurfaceKHR surface,
     QueueFamiliesDescriptor* indices,
-    SwapChainSupport* swapChainSupport
+    SwapChainSupport* swapChainSupport,
+    std::vector<const char*>& extensions
 ) {
     
     VkPhysicalDeviceProperties properties;
@@ -118,7 +115,7 @@ static VkPhysicalDevice FindDeviceOfType(
                 continue;
             
             if ((queueTypes & (1 << (uint32_t)QueueType::Present)) > 0) {
-                if (!DeviceSupportsExtentions(availableDevices[i]))
+                if (!DeviceSupportsExtentions(availableDevices[i], extensions))
                     continue;
     
                 if (!SwapChainSupported(availableDevices[i], surface, swapChainSupport))
@@ -132,7 +129,11 @@ static VkPhysicalDevice FindDeviceOfType(
     return VK_NULL_HANDLE;
 }
 
-static VkDevice CreateLogicalDevice(const QueueFamiliesDescriptor* queueDescriptors, VkPhysicalDevice physicalDevice) {
+static VkDevice CreateLogicalDevice(
+    const QueueFamiliesDescriptor* queueDescriptors, 
+    VkPhysicalDevice physicalDevice,
+    std::vector<const char*> deviceExtensions
+) {
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies;
@@ -171,7 +172,7 @@ static VkDevice CreateLogicalDevice(const QueueFamiliesDescriptor* queueDescript
 }
 
 
-void Device::OnMessage(InitMessage* m) {
+void Device::OnMessage(InitMsg* m) {
 
     VkInstance instance = context.vkInstance;
 
@@ -196,15 +197,23 @@ void Device::OnMessage(InitMessage* m) {
         queueTypes |= (1 << (int)QueueType::Graphics);
     }
 
+    std::vector<const char*> deviceExtensions{};
+
+    LOG("collecting device extensions");
+    context.Send(CollectDeviceRequirementsMsg{&deviceExtensions});
+    LOG("device extensions: " << deviceExtensions.size())
+
     vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
-        VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, surface, &queueFamilies, &swapChainSupport);
+        VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, 
+        surface, &queueFamilies, &swapChainSupport, deviceExtensions);
 
     if (!vkPhysicalDevice) {
         vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
-            VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, surface, &queueFamilies, &swapChainSupport);
+            VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, 
+            surface, &queueFamilies, &swapChainSupport, deviceExtensions);
     }
 
-    device = CreateLogicalDevice(&queueFamilies, vkPhysicalDevice);
+    device = CreateLogicalDevice(&queueFamilies, vkPhysicalDevice, deviceExtensions);
 
     std::vector<std::optional<VkQueue>> preparedQueues(queueFamilies.queues.size());
 
@@ -218,7 +227,7 @@ void Device::OnMessage(InitMessage* m) {
     queues.queues = std::move(preparedQueues);
 }
 
-void Device::Destroy() {
+void Device::OnMessage(DestroyMsg* m) {
     if (device != VK_NULL_HANDLE) {
         vkDestroyDevice(device, nullptr);
         device = VK_NULL_HANDLE;

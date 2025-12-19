@@ -46,7 +46,11 @@ struct API SwapChainSupport {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct API Device: FeatureSet, CanHandle<InitMessage> {
+struct API Device: FeatureSet, 
+    CanHandle<InitMsg>,
+    CanHandle<DestroyMsg>
+{
+    
     VkPhysicalDevice vkPhysicalDevice;
     VkDevice device;
     QueueFamiliesDescriptor queueFamilies;
@@ -54,6 +58,6 @@ struct API Device: FeatureSet, CanHandle<InitMessage> {
     SwapChainSupport swapChainSupport;
 
     using FeatureSet::FeatureSet;
-    virtual void OnMessage(InitMessage*);
-    virtual void Destroy();
+    virtual void OnMessage(InitMsg*);
+    virtual void OnMessage(DestroyMsg*);
 };

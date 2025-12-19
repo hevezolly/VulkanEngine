@@ -24,18 +24,15 @@ DebuggingFeature::DebuggingFeature(RenderContext& context): FeatureSet(context) 
     messengerCreateInfo.pfnUserCallback = debugCallback;
 }
 
-void DebuggingFeature::OnMessage(EarlyInitMessage* m) {
+void DebuggingFeature::OnMessage(EarlyInitMsg* m) {
     VK(vkCreateDebugUtilsMessengerEXT(context.vkInstance, &messengerCreateInfo, nullptr, &vkDebugMessenger));
 }
 
-void DebuggingFeature::Destroy() {
+void DebuggingFeature::OnMessage(DestroyMsg* m) {
     vkDestroyDebugUtilsMessengerEXT(context.vkInstance, vkDebugMessenger, nullptr);
 }
 
-void DebuggingFeature::GetRequiredExtentions(std::vector<const char*>& buffer) {
-    buffer.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-}
-
-void DebuggingFeature::GetRequiredLayers(std::vector<const char*>& buffer) {
-    buffer.push_back("VK_LAYER_KHRONOS_validation");
+void DebuggingFeature::OnMessage(CollectInstanceRequirementsMsg* m) {
+    m->extentions->push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    m->layers->push_back("VK_LAYER_KHRONOS_validation");
 }
