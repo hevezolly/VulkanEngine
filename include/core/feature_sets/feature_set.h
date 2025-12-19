@@ -17,10 +17,6 @@ struct API FeatureSet {
 
     virtual ~FeatureSet(){};
     FeatureSet(RenderContext& c): context(c){};
-
-    // virtual void Destroy();
-    // virtual void GetRequiredExtentions(std::vector<const char*>& buffer);
-    // virtual void GetRequiredLayers(std::vector<const char*>& buffer);
         
 protected:
     RenderContext& context;
