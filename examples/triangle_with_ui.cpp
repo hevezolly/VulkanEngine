@@ -5,6 +5,7 @@
 #include <graphics_feature.h>
 #include <command_pool.h>
 #include "raw_draw.h"
+#include <imgui_ui.h>
 
 void Run() {
 
@@ -18,6 +19,7 @@ void Run() {
     RenderContext context;
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .WithFeature<GraphicsFeature>()
+           .WithFeature<ImguiUI>()
            .Initialize();
     volkLoadInstance(context.vkInstance);
     LOG("init")
@@ -30,10 +32,15 @@ void Run() {
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
+        currentFrame = (currentFrame++) % framesInFlight;
+        context.Send(BeginFrameMsg{currentFrame});
+
+        ImGui::ShowDemoWindow();
+
         DrawFrame(
             context, 
             resources,
-            (currentFrame++) % framesInFlight
+            currentFrame
         );
     }
 }

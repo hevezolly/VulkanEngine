@@ -56,12 +56,14 @@ void RenderContext::Initialize() {
 
     VK(checkLayersSupport(requiredLayers))
 
+    apiVersion = VK_API_VERSION_1_2;
+
     VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
     app.pApplicationName = "VulkanEngine";
     app.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
     app.pEngineName = "VulkanEngine";
     app.engineVersion = VK_MAKE_VERSION(0, 0, 1);
-    app.apiVersion = VK_API_VERSION_1_2;
+    app.apiVersion = apiVersion;
 
     VkInstanceCreateInfo ci{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     ci.pApplicationInfo = &app;

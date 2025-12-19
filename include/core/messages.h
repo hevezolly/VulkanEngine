@@ -9,6 +9,10 @@ struct API InitMsg{};
 
 struct API DestroyMsg{};
 
+struct API BeginFrameMsg{
+    const uint32_t inFlightFrame;
+};
+
 struct API CollectInstanceRequirementsMsg: InstantMessage{
     std::vector<const char*>* extentions;
     std::vector<const char*>* layers;

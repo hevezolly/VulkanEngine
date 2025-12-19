@@ -57,8 +57,12 @@ MessageHandler make_handler(CanHandle<T>* handler) {
     };
 }
 
+template<class>
+inline constexpr bool dependent_false_v = false;
+
 struct API RenderContext {
     VkInstance vkInstance;
+    uint32_t apiVersion;
 
     RenderContext();
 
@@ -110,7 +114,7 @@ struct API RenderContext {
     template<typename T, typename... Args>
     Ref<T> New(Args&&... args) {
 
-        Storage<T>* item = new Storage<T>(std::forward<Args>(args)...);
+        Storage<T>* item = ConstructStorage<T, Args...>(std::forward<Args>(args)...);
 
         _initOrder.push_back(make_dtor_pair(item));
 
@@ -127,7 +131,7 @@ struct API RenderContext {
 
         for (int i = 0; i < size; i++) 
         {
-            Storage<T>* item = new Storage<T>(std::forward<Args>(args)...);
+            Storage<T>* item = ConstructStorage<T, Args...>(std::forward<Args>(args)...);
             _initOrder.push_back(make_dtor_pair(item));
             Ref<T> r;
             r._ptr = item;
@@ -153,7 +157,7 @@ struct API RenderContext {
     }
 
     template<typename T>
-    void Send(T* message, bool bottomToTop=false) {
+    void Send(T* message=nullptr, bool bottomToTop=false) {
         std::type_index id = getTypeId<T>();
         auto it = _messageHandlers.find(id);
 
@@ -189,6 +193,18 @@ struct API RenderContext {
     }
     
 private:
+
+    template<typename T, typename... Args>
+    Storage<T>* ConstructStorage(Args&&... args) {
+        if constexpr (std::is_constructible_v<T, Args&&...>)
+            return new Storage<T>(std::forward<Args>(args)...);
+        else if constexpr (std::is_constructible_v<T, RenderContext*, Args&&...>)
+            return new Storage<T>(this, std::forward<Args>(args)...);
+        else if constexpr (std::is_constructible_v<T, RenderContext&, Args&&...>)
+            return new Storage<T>(*this, std::forward<Args>(args)...);
+        else
+            static_assert(dependent_false_v<T>, "No matching T constructor for these arguments");
+    }
 
     void HandleMessageNow(Message&&);
     void HandleMessages();

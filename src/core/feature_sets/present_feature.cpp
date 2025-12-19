@@ -52,7 +52,6 @@ void PresentFeature::OnMessage(DestroyMsg*) {
 
 Ref<FrameBuffer> PresentFeature::GetFrameBuffer(uint32_t swapChainImage, VkRenderPass renderPass) {
     Ref<FrameBuffer> result = swapChainFrameBuffers.Get(
-        &context, 
         swapChain->images[static_cast<size_t>(swapChainImage)].view,
         renderPass
     );

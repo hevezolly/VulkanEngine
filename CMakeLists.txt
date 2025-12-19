@@ -36,8 +36,20 @@ file(GLOB_RECURSE source_files
     src/*.cpp
 )
 
+file(GLOB IMGUI_SOURCE
+    third_party/imgui/*.cpp
+    third_party/imgui/*.h
+)
+
+message(STATUS "IMGUI_SOURCE: ${IMGUI_SOURCE}")
+
 add_library(VulkanEngine
     ${source_files}
+    ${IMGUI_SOURCE}
+    third_party/imgui/backends/imgui_impl_glfw.h
+    third_party/imgui/backends/imgui_impl_glfw.cpp
+    third_party/imgui/backends/imgui_impl_vulkan.h
+    third_party/imgui/backends/imgui_impl_vulkan.cpp
 )
 
 target_compile_features(VulkanEngine PUBLIC cxx_std_17)
@@ -45,7 +57,8 @@ target_compile_definitions(VulkanEngine PUBLIC
     VOLK_STATIC_DEFINES
     $<$<BOOL:${BUILD_SHARED_LIBS}>:VULKAN_ENGINE_SHARED>
 )
-target_link_libraries(VulkanEngine PUBLIC Vulkan::Headers volk glfw glslang glslang-default-resource-limits)
+target_link_libraries(VulkanEngine PUBLIC 
+    Vulkan::Headers volk glfw glslang glslang-default-resource-limits)
 
 target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -59,6 +72,8 @@ target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/volk
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glslang/glslang/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glslang/glslang/Public
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

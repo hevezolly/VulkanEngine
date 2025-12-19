@@ -81,9 +81,7 @@ void main() {
 
 void RecordCommandBuffer(CommandBuffer& cmd, Ref<GraphicsPipeline> pipeline, Ref<FrameBuffer> frameBuffer) {
     cmd.Begin();
-    LOG("cmd begin")
     cmd.BeginRenderPass(pipeline, frameBuffer);
-    LOG("render pass begin")
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -93,22 +91,17 @@ void RecordCommandBuffer(CommandBuffer& cmd, Ref<GraphicsPipeline> pipeline, Ref
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(cmd.buffer, 0, 1, &viewport);
-    LOG("render pass set viewport")
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
     scissor.extent = {frameBuffer->width, frameBuffer->height};
     vkCmdSetScissor(cmd.buffer, 0, 1, &scissor);
-    LOG("render pass set scissor")
 
 
     vkCmdDraw(cmd.buffer, 3, 1, 0, 0);
-    LOG("render pass draw")
 
     cmd.EndRenderPass();
-    LOG("render pass end")
     cmd.End();
-    LOG("cmd end")
 }
 
 void DrawFrame(
@@ -119,28 +112,22 @@ void DrawFrame(
     LOG("begin frame " << frameId)
     Ref<Fence> inFlight = r.inFlightFences[frameId];
     inFlight->Wait();
-    LOG("wait")
     inFlight->Reset();
-    LOG("reset")
 
     Ref<Semaphore> imgAvailable = r.imgAvailableSemaphores[frameId];
 
     uint32_t imageIndex = context.Get<PresentFeature>().AcquireNextImage(imgAvailable);
-    LOG("acquire next image")
+    LOG("acquire next image "<< imageIndex)
 
     CommandBuffer& cmd = r.commandBuffers[frameId];
 
     cmd.Reset();
-    LOG("cmd reset")
     RecordCommandBuffer(cmd, r.pipeline, 
         context.Get<PresentFeature>().GetFrameBuffer(imageIndex, r.pipeline->renderPass));
-    LOG("cmd record")
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
 
     context.Get<CommandPool>().Submit(cmd, imgAvailable, renderInCurrentImageFinish, inFlight);
-    LOG("commands submit")
 
     context.Send(PresentMsg{imageIndex, renderInCurrentImageFinish});
-    LOG("end frame " << frameId)
 }
