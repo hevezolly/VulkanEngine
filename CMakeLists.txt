@@ -52,6 +52,8 @@ add_library(VulkanEngine
     third_party/imgui/backends/imgui_impl_vulkan.cpp
 )
 
+target_compile_definitions(VulkanEngine PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK)
+
 target_compile_features(VulkanEngine PUBLIC cxx_std_17)
 target_compile_definitions(VulkanEngine PUBLIC 
     VOLK_STATIC_DEFINES
