@@ -15,8 +15,10 @@ static bool CheckQueueFits(
     uint32_t familyIndex,
     VkPhysicalDevice device, 
     VkSurfaceKHR surface,
-    QueueType type
+    QueueType type,
+    bool& suboptimal
 ) {
+    suboptimal = false;
     switch (type)
     {
     case QueueType::Graphics:
@@ -25,6 +27,9 @@ static bool CheckQueueFits(
         VkBool32 support;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, surface, &support);
         return support == VK_TRUE;
+    case QueueType::Transfer:
+        suboptimal = ((properties->queueFlags) & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) > 0;
+        return (((properties->queueFlags) & VK_QUEUE_TRANSFER_BIT) > 0);
     default:
         std::stringstream ss;
         ss << "queue type " << (int)type << " is invalid";
@@ -50,11 +55,14 @@ static bool TryConfigureQueueFamilies(
             continue;
         }
 
+        bool suboptimalQueue = false;
         for (uint32_t i = 0; i < queueFamilies.size(); i++) {
-            if (CheckQueueFits(&queueFamilies[i], i, device, surface, type)) {
+            if (CheckQueueFits(&queueFamilies[i], i, device, surface, type, suboptimalQueue)) {
                 indices_vec[(int)type] = i;
                 queueFits = true;
-                break;
+
+                if (!suboptimalQueue)
+                    break;
             }
         }
 
@@ -64,19 +72,6 @@ static bool TryConfigureQueueFamilies(
     
     descriptor->queues = std::move(indices_vec);
     return true;
-}
-
-static bool SwapChainSupported(VkPhysicalDevice device, VkSurfaceKHR surface, SwapChainSupport* support) {
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &support->capabilities);
-    support->surfaceFormats = std::move(vkCollect<VkSurfaceFormatKHR>(
-        vkGetPhysicalDeviceSurfaceFormatsKHR, device, surface 
-    ));
-
-    support->presentModes = std::move(vkCollect<VkPresentModeKHR>(
-        vkGetPhysicalDeviceSurfacePresentModesKHR, device, surface
-    ));
-
-    return support->surfaceFormats.size() > 0 && support->presentModes.size() > 0;
 }
 
 static bool DeviceSupportsExtentions(VkPhysicalDevice device, std::vector<const char*>& deviceExtensions) {
@@ -94,13 +89,13 @@ static bool DeviceSupportsExtentions(VkPhysicalDevice device, std::vector<const 
 }
 
 static VkPhysicalDevice FindDeviceOfType(
+    RenderContext& context,
     VkPhysicalDevice* availableDevices, 
     uint32_t count, 
     QueueTypes queueTypes,
     VkPhysicalDeviceType type,
     VkSurfaceKHR surface,
     QueueFamiliesDescriptor* indices,
-    SwapChainSupport* swapChainSupport,
     std::vector<const char*>& extensions
 ) {
     
@@ -114,13 +109,14 @@ static VkPhysicalDevice FindDeviceOfType(
             if (!TryConfigureQueueFamilies(queueTypes, availableDevices[i], surface, indices))
                 continue;
             
-            if ((queueTypes & (1 << (uint32_t)QueueType::Present)) > 0) {
-                if (!DeviceSupportsExtentions(availableDevices[i], extensions))
-                    continue;
-    
-                if (!SwapChainSupported(availableDevices[i], surface, swapChainSupport))
-                    continue;
-            }
+            if (!DeviceSupportsExtentions(availableDevices[i], extensions))
+                continue;
+
+            CheckDeviceAppropriateMsg deviceAppropriate(availableDevices[i]);
+            context.Send(&deviceAppropriate);
+            
+            if (!deviceAppropriate.appropriate)
+                continue;
             
             return availableDevices[i];
         }
@@ -184,33 +180,29 @@ void Device::OnMessage(InitMsg* m) {
 
     PresentFeature* present = context.TryGet<PresentFeature>();
 
-    QueueTypes queueTypes = 0;
+    CollectRequiredQueueTypesMsg queuesM{};
+    queuesM.requiredTypes |= QueueType::Transfer;
 
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-
-    if (present != nullptr) {
-        surface = present->window->vkSurface;
-        queueTypes |= (1 << (int)QueueType::Present);
-    }
-
-    if (context.Has<GraphicsFeature>()) {
-        queueTypes |= (1 << (int)QueueType::Graphics);
-    }
+    context.Send(&queuesM);
+    QueueTypes queueTypes = queuesM.requiredTypes;
 
     std::vector<const char*> deviceExtensions{};
 
-    LOG("collecting device extensions");
-    context.Send(CollectDeviceRequirementsMsg{&deviceExtensions});
-    LOG("device extensions: " << deviceExtensions.size())
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    if (context.Has<PresentFeature>()) {
+        surface = context.Get<PresentFeature>().window->vkSurface;
+    }
 
-    vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
+    context.Send(CollectDeviceRequirementsMsg{&deviceExtensions});
+
+    vkPhysicalDevice = FindDeviceOfType(context, availableDevices.data(), availableDevices.size(), queueTypes,
         VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, 
-        surface, &queueFamilies, &swapChainSupport, deviceExtensions);
+        surface, &queueFamilies, deviceExtensions);
 
     if (!vkPhysicalDevice) {
-        vkPhysicalDevice = FindDeviceOfType(availableDevices.data(), availableDevices.size(), queueTypes,
+        vkPhysicalDevice = FindDeviceOfType(context, availableDevices.data(), availableDevices.size(), queueTypes,
             VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, 
-            surface, &queueFamilies, &swapChainSupport, deviceExtensions);
+            surface, &queueFamilies, deviceExtensions);
     }
 
     device = CreateLogicalDevice(&queueFamilies, vkPhysicalDevice, deviceExtensions);

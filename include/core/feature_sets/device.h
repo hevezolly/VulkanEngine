@@ -7,14 +7,6 @@
 #include <feature_set.h>
 #include <messages.h>
 
-enum struct API QueueType {
-    Graphics,
-    Present,
-    None
-};
-
-typedef uint32_t QueueTypes;
-
 template<typename T>
 struct QueuesDescriptor {
     std::vector<std::optional<T>> queues;    
@@ -40,12 +32,6 @@ T QueuesDescriptor<T>::get(QueueType type) {
 
 typedef QueuesDescriptor<uint32_t> QueueFamiliesDescriptor;
 
-struct API SwapChainSupport {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> surfaceFormats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
-
 struct API Device: FeatureSet, 
     CanHandle<InitMsg>,
     CanHandle<DestroyMsg>
@@ -55,7 +41,6 @@ struct API Device: FeatureSet,
     VkDevice device;
     QueueFamiliesDescriptor queueFamilies;
     QueuesDescriptor<VkQueue> queues;
-    SwapChainSupport swapChainSupport;
 
     using FeatureSet::FeatureSet;
     virtual void OnMessage(InitMsg*);

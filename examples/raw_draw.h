@@ -7,7 +7,7 @@
 #include <command_pool.h>
 
 struct Resources {
-    std::vector<CommandBuffer> commandBuffers;
+    std::vector<GraphicsCommandBuffer> commandBuffers;
     Refs<Semaphore> imgAvailableSemaphores;
     Refs<Semaphore> renderFinish;
     Refs<Fence> inFlightFences;
@@ -79,7 +79,7 @@ void main() {
     return r;
 }
 
-void RecordCommandBuffer(CommandBuffer& cmd, Ref<GraphicsPipeline> pipeline, Ref<FrameBuffer> frameBuffer) {
+void RecordCommandBuffer(GraphicsCommandBuffer& cmd, Ref<GraphicsPipeline> pipeline, Ref<FrameBuffer> frameBuffer) {
     cmd.Begin();
     cmd.BeginRenderPass(pipeline, frameBuffer);
 
@@ -119,7 +119,7 @@ void DrawFrame(
     uint32_t imageIndex = context.Get<PresentFeature>().AcquireNextImage(imgAvailable);
     LOG("acquire next image "<< imageIndex)
 
-    CommandBuffer& cmd = r.commandBuffers[frameId];
+    GraphicsCommandBuffer& cmd = r.commandBuffers[frameId];
 
     cmd.Reset();
     RecordCommandBuffer(cmd, r.pipeline, 
@@ -127,7 +127,11 @@ void DrawFrame(
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
 
-    context.Get<CommandPool>().Submit(cmd, imgAvailable, renderInCurrentImageFinish, inFlight);
+    context.Get<CommandPool>().Submit(cmd, 
+        {{imgAvailable, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}}, 
+        {renderInCurrentImageFinish}, 
+        inFlight
+    );
 
     context.Send(PresentMsg{imageIndex, renderInCurrentImageFinish});
 }

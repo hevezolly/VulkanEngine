@@ -25,6 +25,36 @@ name(name&&) noexcept;\
 name& operator=(name&&) noexcept;\
 ~name();
 
+enum struct API QueueType {
+    Graphics,
+    Transfer,
+    Compute,
+    Present,
+    None
+};
+
+using QueueTypes=uint32_t;
+
+inline QueueTypes operator|(const QueueTypes lhs, const QueueType rhs) {
+    return lhs | (1 << (uint32_t)rhs);
+}
+
+inline QueueTypes operator|(const QueueType lhs, const QueueTypes rhs) {
+    return rhs | lhs;
+}
+
+inline QueueTypes& operator |= (QueueTypes& lhs, const QueueType rhs) {
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+inline QueueTypes operator | (const QueueType lhs, const QueueType rhs) {
+    QueueTypes r = 0;
+    r |= lhs;
+    r |= rhs;
+    return r;
+}
+
 enum ImageUsage: VkFlags {
     ColorAttachment = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
     TransferDst = VK_IMAGE_USAGE_TRANSFER_DST_BIT

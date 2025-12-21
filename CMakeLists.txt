@@ -32,6 +32,9 @@ add_subdirectory(third_party/glfw)
 
 add_subdirectory(third_party/glslang)
 
+set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/glm)
+
 file(GLOB_RECURSE source_files 
     src/*.cpp
 )
@@ -76,6 +79,7 @@ target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glslang/glslang/Public
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/glm
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

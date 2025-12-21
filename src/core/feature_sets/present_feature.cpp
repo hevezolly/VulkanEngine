@@ -1,5 +1,6 @@
 #include <present_feature.h>
 #include <render_context.h>
+#include <vk_collect.h>
 
 PresentFeature::PresentFeature(
     RenderContext& context,
@@ -115,4 +116,23 @@ void PresentFeature::OnMessage(PresentMsg* m) {
     else {
         VK(result)
     }
+}
+
+void PresentFeature::OnMessage(CheckDeviceAppropriateMsg* m) {
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m->device, window->vkSurface, &swapChainSupport.capabilities);
+    swapChainSupport.surfaceFormats = std::move(vkCollect<VkSurfaceFormatKHR>(
+        vkGetPhysicalDeviceSurfaceFormatsKHR, m->device, window->vkSurface 
+    ));
+
+    swapChainSupport.presentModes = std::move(vkCollect<VkPresentModeKHR>(
+        vkGetPhysicalDeviceSurfacePresentModesKHR, m->device, window->vkSurface
+    ));
+
+    bool supported = swapChainSupport.surfaceFormats.size() > 0 && swapChainSupport.presentModes.size() > 0;
+
+    m->appropriate &= supported;
+}
+
+void PresentFeature::OnMessage(CollectRequiredQueueTypesMsg* m) {
+    m->requiredTypes |= QueueType::Present;
 }

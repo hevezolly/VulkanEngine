@@ -56,6 +56,12 @@ struct API Ref
         return !(*this == other)
     }
 
+    bool isNull() {
+        return _ptr == nullptr;
+    }
+
+    inline static const Ref Null() {return{};}
+
     friend struct RenderContext;
 
 private:

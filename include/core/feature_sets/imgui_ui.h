@@ -21,8 +21,8 @@ struct API ImguiUI: FeatureSet,
     virtual void OnMessage(PresentMsg*);
 
 private:
-    Ref<DescriptorPool> _descriptorPool;
-    std::vector<CommandBuffer> _commandBuffers;
+    DescriptorPool* _descriptorPool;
+    std::vector<GraphicsCommandBuffer> _commandBuffers;
     Refs<Fence> _waitFences;
     Refs<Semaphore> _presentReady;
     VkRenderPass renderPass;

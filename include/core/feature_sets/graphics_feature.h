@@ -73,6 +73,19 @@ struct API GraphicsPipelineBuilder {
     GraphicsPipelineBuilder& SetColorBlending(BlendMethod& method);
     GraphicsPipelineBuilder& SetAlphaBlending(BlendMethod& method);
 
+    template<typename T>
+    GraphicsPipelineBuilder& SetVertex() {
+        VkVertexInputBindingDescription description = T::GetBindingDescription();
+        std::vector<VkVertexInputAttributeDescription> attributes;
+        T::CollectAttributeDescription(attributes);
+
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributes.size());
+        vertexInputInfo.pVertexBindingDescriptions = &description;
+        vertexInputInfo.pVertexAttributeDescriptions = attributes.data();
+
+    }
+
     Ref<GraphicsPipeline> Build();
 
     RULE_5(GraphicsPipelineBuilder)
@@ -85,9 +98,13 @@ private:
     RenderContext* context;
 };
 
-struct API GraphicsFeature: FeatureSet {
+struct API GraphicsFeature: FeatureSet,
+    CanHandle<CollectRequiredQueueTypesMsg>
+{
 
     using FeatureSet::FeatureSet;
 
     GraphicsPipelineBuilder GraphicsPipeline();
+
+    virtual void OnMessage(CollectRequiredQueueTypesMsg*);
 };

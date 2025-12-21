@@ -30,6 +30,21 @@ struct API CollectDeviceRequirementsMsg: InstantMessage {
     {}
 };
 
+struct API CheckDeviceAppropriateMsg: InstantMessage {
+    bool appropriate;
+    const VkPhysicalDevice device;
+
+    CheckDeviceAppropriateMsg(const VkPhysicalDevice d):
+        appropriate(true),
+        device(d){}
+};
+
+struct API CollectRequiredQueueTypesMsg: InstantMessage {
+    QueueTypes requiredTypes;
+
+    CollectRequiredQueueTypesMsg(): requiredTypes(0){}
+};
+
 template<typename T>
 struct CanHandle {
     virtual void OnMessage(T*) = 0;

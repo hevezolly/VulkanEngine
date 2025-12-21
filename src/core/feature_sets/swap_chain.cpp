@@ -95,13 +95,14 @@ SwapChain::SwapChain(RenderContext* context, const SwapChainInitializer& args) {
     this->context = context;
     auto device = &context->Get<Device>();
     auto window = context->Get<PresentFeature>().window;
-    VkSurfaceCapabilitiesKHR& capabilities = device->swapChainSupport.capabilities;
+    SwapChainSupport& support = context->Get<PresentFeature>().swapChainSupport;
+    VkSurfaceCapabilitiesKHR& capabilities = support.capabilities;
 
-    VkSurfaceFormatKHR selectedFormat = SelectFormat(args, device->swapChainSupport.surfaceFormats);
+    VkSurfaceFormatKHR selectedFormat = SelectFormat(args, support.surfaceFormats);
     format = selectedFormat.format;
     colorSpace = selectedFormat.colorSpace;
 
-    presentMode = SelectPresentMode(args, device->swapChainSupport.presentModes);
+    presentMode = SelectPresentMode(args, support.presentModes);
     extent = SelectExtents(window, capabilities);
     uint32_t imageCount = SelectImageCount(args.imageCount, capabilities);
     imageUsage = args.imageUsage;

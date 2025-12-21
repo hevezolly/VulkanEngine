@@ -309,3 +309,6 @@ GraphicsPipelineBuilder GraphicsFeature::GraphicsPipeline() {
     return GraphicsPipelineBuilder(context);
 }
 
+void GraphicsFeature::OnMessage(CollectRequiredQueueTypesMsg* m){
+    m->requiredTypes |= QueueType::Graphics;
+}
