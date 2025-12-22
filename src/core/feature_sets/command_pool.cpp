@@ -2,8 +2,57 @@
 #include <render_context.h>
 #include <graphics_feature.h>
 
+TransferCommandBuffer::~TransferCommandBuffer() {
+    if (!transient || vkDevice == VK_NULL_HANDLE)
+        return;
+
+    vkFreeCommandBuffers(vkDevice, vkCommandPool, 1, &buffer);
+}
+
+TransferCommandBuffer::TransferCommandBuffer(VkCommandBuffer b, VkDevice device, VkCommandPool pool, bool t):
+    transient(t),
+    vkDevice(device),
+    vkCommandPool(pool),
+    buffer(b)
+{}
+
+TransferCommandBuffer& TransferCommandBuffer::operator=(TransferCommandBuffer&& other) noexcept {
+    if (this == &other)
+        return *this;
+
+    buffer = other.buffer;
+    vkDevice = other.vkDevice;
+    vkCommandPool = other.vkCommandPool;
+    transient = other.transient;
+
+    other.buffer = VK_NULL_HANDLE;
+    other.vkDevice = VK_NULL_HANDLE;
+    other.vkCommandPool = VK_NULL_HANDLE;
+
+    return *this;
+}
+
+void TransferCommandBuffer::CopyBufferRegion(
+    VkBuffer src, 
+    VkBuffer dst, 
+    uint32_t size, 
+    uint32_t src_offset, 
+    uint32_t dst_offset
+) {
+    VkBufferCopy copy{};
+    copy.srcOffset = src_offset;
+    copy.dstOffset = dst_offset;
+    copy.size = size;
+
+    vkCmdCopyBuffer(buffer, src, dst, 1, &copy);
+}
+
+TransferCommandBuffer::TransferCommandBuffer(TransferCommandBuffer&& other) noexcept {
+    *this = std::move(other);
+}
+
 QueueType TransferCommandBuffer::queueType() {
-    return QueueType::Graphics;
+    return QueueType::Transfer;
 }
 
 QueueType ComputeCommandBuffer::queueType() {
@@ -14,11 +63,11 @@ QueueType GraphicsCommandBuffer::queueType() {
     return QueueType::Graphics;
 }
 
-VkCommandPool CreateCommandPool(VkDevice device, uint32_t queueFamily) {
+VkCommandPool CreateCommandPool(VkDevice device, uint32_t queueFamily, bool transient) {
     VkCommandPool pool;
 
     VkCommandPoolCreateInfo info {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    info.flags = transient ? VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     info.queueFamilyIndex = queueFamily;
 
     VK(vkCreateCommandPool(device, &info, nullptr, &pool));
@@ -43,36 +92,38 @@ void CommandPool::OnMessage(InitMsg* m) {
     graphicsCommandPool = VK_NULL_HANDLE;
     compueCommandPool = VK_NULL_HANDLE;
     
-    separateTransferPool = true;
+    separateTransferQueue = true;
     uint32_t transferQueue = context.Get<Device>().queueFamilies.get(QueueType::Transfer);
 
     if (context.Has<GraphicsFeature>()) {
         uint32_t graphicsQueue = context.Get<Device>().queueFamilies.get(QueueType::Graphics);
         graphicsCommandPool = CreateCommandPool(
             context.device(), 
-            graphicsQueue
+            graphicsQueue,
+            false
         );
-        
-        if (separateTransferPool && graphicsQueue == transferQueue)
-            transferCommandPool = graphicsCommandPool;
-        
-        separateTransferPool &= graphicsQueue != transferQueue;
+        separateTransferQueue &= graphicsQueue != transferQueue;
     }
 
-    if (separateTransferPool) {
-        transferCommandPool = CreateCommandPool(
-            context.device(),
-            transferQueue
-        );
-    }
+    transferCommandPool = CreateCommandPool(
+        context.device(),
+        transferQueue,
+        false
+    );
+
+    transientTransferCommandPool = CreateCommandPool(
+        context.device(),
+        transferQueue,
+        true
+    );
 }
 
 void CommandPool::OnMessage(DestroyMsg* m) {
     if (graphicsCommandPool != VK_NULL_HANDLE)
         vkDestroyCommandPool(context.device(), graphicsCommandPool, nullptr);
 
-    if (separateTransferPool)
-        vkDestroyCommandPool(context.device(), transferCommandPool, nullptr);
+    vkDestroyCommandPool(context.device(), transferCommandPool, nullptr);
+    vkDestroyCommandPool(context.device(), transientTransferCommandPool, nullptr);
 }
 
 void CommandPool::Submit(
@@ -130,15 +181,17 @@ void CommandPool::Submit(
 }
 
 GraphicsCommandBuffer CommandPool::CreateGraphicsBuffer() {
-    GraphicsCommandBuffer buffer;
-    CreateBuffer(context.device(), graphicsCommandPool, &buffer.buffer);
-    return buffer;
+    VkCommandBuffer buffer;
+    CreateBuffer(context.device(), graphicsCommandPool, &buffer);
+
+    return GraphicsCommandBuffer(buffer, context.device(), graphicsCommandPool, false);
 }
 
-TransferCommandBuffer CommandPool::CreateTransferBuffer() {
-    TransferCommandBuffer buffer;
-    CreateBuffer(context.device(), transferCommandPool, &buffer.buffer);
-    return buffer;
+TransferCommandBuffer CommandPool::CreateTransferBuffer(bool transient) {
+    VkCommandBuffer buffer;
+    VkCommandPool pool = transient ? transientTransferCommandPool : transferCommandPool;
+    CreateBuffer(context.device(), pool, &buffer);
+    return TransferCommandBuffer(buffer, context.device(), pool, transient);
 }
 
 void TransferCommandBuffer::Begin() {
@@ -155,6 +208,7 @@ void TransferCommandBuffer::End() {
 }
 
 void TransferCommandBuffer::Reset() {
+    assert(!transient);
     vkResetCommandBuffer(buffer, 0);
 }
 

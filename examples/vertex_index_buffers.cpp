@@ -1,52 +1,68 @@
-#pragma once
-
+#include <iostream>
 #include <render_context.h>
 #include <shader_source.h>
 #include <present_feature.h>
 #include <graphics_feature.h>
 #include <command_pool.h>
+#include <resources.h>
 
-struct Resources {
+#define BLOCK_NAME Vertex
+#define BLOCK \
+VEC2(position, 0)\
+VEC3(color, 1)
+#include <gen_vertex_data.h>
+
+/*
+expands to:
+struct Vertex {
+    glm::vec2 position;
+    glm::vec3 color;
+
+    //... other required binding information
+};
+*/
+
+struct _Resources {
     std::vector<GraphicsCommandBuffer> commandBuffers;
     Refs<Semaphore> imgAvailableSemaphores;
     Refs<Semaphore> renderFinish;
     Refs<Fence> inFlightFences;
     Ref<GraphicsPipeline> pipeline;
+    Ref<Buffer> vertexBuffer;
+    Ref<Buffer> indexBuffer;
 };
 
-Resources PrepareResources(
+_Resources PrepareResources(
     RenderContext& context, 
-    const uint32_t framesInFlight, 
-    std::string* vertexShader = nullptr,
-    std::string* fragmentShader = nullptr) {
+    const uint32_t framesInFlight) {
 
-    Resources r{};
+    _Resources r{};
 
     ShaderSource vertexSource;
     vertexSource.name = "testVertex";
     vertexSource.stage = ShaderStage::Vertex;
-    vertexSource.source = (vertexShader) ? *vertexShader :
+    vertexSource.source = 
 R"(#version 450
-vec2 positions[3] = vec2[](
-vec2(0.0, -0.5),
-vec2(0.5, 0.5),
-vec2(-0.5, 0.5)
-);
+layout(location = 0) in vec2 in_position;
+layout(location = 1) in vec3 in_color;
+layout(location = 0) out vec3 fragColor;
 
 void main() {
-gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
+    gl_Position = vec4(in_position, 0.0, 1.0);
+    fragColor = in_color;
 })";
 
     ShaderSource fragmentSource;
     fragmentSource.name = "testFragment";
     fragmentSource.stage = ShaderStage::Pixel;
-    fragmentSource.source = (fragmentShader) ? *fragmentShader :
+    fragmentSource.source = 
 R"(#version 450
 
+layout(location = 0) in vec3 fragColor;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    outColor = vec4(1.0, 0.0, 0.0, 1.0);
+    outColor = vec4(fragColor, 1);
 }
 )";
 
@@ -58,6 +74,7 @@ void main() {
 
     r.pipeline = context
         .Get<GraphicsFeature>().GraphicsPipeline()
+        .SetVertex<Vertex>()
         .AddShaderStage(ShaderStage::Vertex, vertexBin)
         .AddShaderStage(ShaderStage::Pixel, fragmentBin)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
@@ -65,6 +82,21 @@ void main() {
         .Build();
 
     LOG("pipeline built")
+
+    std::vector<Vertex> vertices = {
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+    };
+    r.vertexBuffer = context.Get<Resources>().CreateBuffer<Vertex>(BufferPreset::VERTEX, vertices);
+
+    std::vector<uint16_t> indices = {
+        0, 1, 2, 2, 3, 0
+    };
+    r.indexBuffer = context.Get<Resources>().CreateBuffer<uint16_t>(BufferPreset::INDEX, indices);
+
+    LOG("buffers created")
     
     r.imgAvailableSemaphores = context.Get<Synchronization>().CreateSemaphores(framesInFlight);
     LOG("image available semaphores")
@@ -85,6 +117,8 @@ void main() {
 
 void RecordCommandBuffer(
     GraphicsCommandBuffer& cmd, 
+    Ref<Buffer> vertexBuffer,
+    Ref<Buffer> indexBuffer,
     Ref<GraphicsPipeline> pipeline, 
     Ref<FrameBuffer> frameBuffer
 ) {
@@ -105,8 +139,12 @@ void RecordCommandBuffer(
     scissor.extent = {frameBuffer->width, frameBuffer->height};
     vkCmdSetScissor(cmd.buffer, 0, 1, &scissor);
 
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd.buffer, 0, 1, &vertexBuffer->vkBuffer, &offset);
 
-    vkCmdDraw(cmd.buffer, 3, 1, 0, 0);
+    vkCmdBindIndexBuffer(cmd.buffer, indexBuffer->vkBuffer, 0, VkIndexType::VK_INDEX_TYPE_UINT16);
+
+    vkCmdDrawIndexed(cmd.buffer, indexBuffer->count<uint16_t>(), 1, 0, 0, 0);
 
     cmd.EndRenderPass();
     cmd.End();
@@ -114,7 +152,7 @@ void RecordCommandBuffer(
 
 void DrawFrame(
     RenderContext& context,
-    Resources& r,
+    _Resources& r,
     uint32_t frameId
 ) {
     LOG("begin frame " << frameId)
@@ -130,7 +168,7 @@ void DrawFrame(
     GraphicsCommandBuffer& cmd = r.commandBuffers[frameId];
 
     cmd.Reset();
-    RecordCommandBuffer(cmd, r.pipeline, 
+    RecordCommandBuffer(cmd, r.vertexBuffer, r.indexBuffer, r.pipeline, 
         context.Get<PresentFeature>().GetFrameBuffer(imageIndex, r.pipeline->renderPass));
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
@@ -142,4 +180,49 @@ void DrawFrame(
     );
 
     context.Send(PresentMsg{imageIndex, renderInCurrentImageFinish});
+}
+
+void Run() {
+
+    volkInitialize();
+
+    WindowInitializer windowDescription{};
+    SwapChainInitializer swapChainDescription{};
+    windowDescription.width = 800;
+    windowDescription.height = 600;
+    windowDescription.hint = "VkEngine";
+    RenderContext context;
+    context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
+           .WithFeature<GraphicsFeature>()
+           .Initialize();
+    volkLoadInstance(context.vkInstance);
+
+    const uint32_t framesInFlight = 3;
+
+
+
+    _Resources resources = PrepareResources(context, framesInFlight);
+
+    uint32_t currentFrame = 0;
+    while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
+        glfwPollEvents();
+        DrawFrame(
+            context, 
+            resources,
+            (currentFrame++) % framesInFlight
+        );
+    }
+}
+
+int main() {
+    try {
+        Run();
+    } catch (const std::exception &e) {
+        std::cout << e.what() << std::endl;
+        throw;
+    }
+
+    std::cout << "Success!" << std::endl;
+
+    return 0;
 }

@@ -42,17 +42,17 @@ BLOCK
         #include "define_scalar_atributes.h"
 BLOCK
 
-        uint32_t __counter = initialSize;
+        __counter = initialSize;
         #define LOCATION
         #include "define_scalar_atributes.h"
 BLOCK
 
-        uint32_t __counter = initialSize;
+        __counter = initialSize;
         #define OFFSET
         #include "define_scalar_atributes.h"
 BLOCK
 
-        for (int i = initialiSize; i < __attributes.size(); i++) {
+        for (int i = initialSize; i < __attributes.size(); i++) {
             __attributes[i].binding = 0;
         }
     }

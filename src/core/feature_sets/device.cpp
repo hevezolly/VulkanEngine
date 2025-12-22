@@ -225,3 +225,19 @@ void Device::OnMessage(DestroyMsg* m) {
         device = VK_NULL_HANDLE;
     }
 }
+
+void Device::FillQueueUsages(QueueTypes types, std::vector<uint32_t>* data) {
+    for (QueueType type = (QueueType)0; (int)type < (int)QueueType::None; type = (QueueType)((int)type + 1)) {
+        if ((types & type) == 0)
+            continue;
+
+        std::optional<uint32_t> queue = queueFamilies.try_get(type);
+        if (!queue.has_value())
+            continue;
+
+        if (std::find(data->begin(), data->end(), queue.value()) != data->end())
+            continue;
+
+        data->push_back(queue.value());
+    }
+}

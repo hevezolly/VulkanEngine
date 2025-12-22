@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <stdexcept>
+#include <cassert>
 
 #if defined(_WIN32) && defined(VULKAN_ENGINE_SHARED)
     #if defined(VulkanEngine_EXPORTS)
@@ -19,11 +20,11 @@
 #endif
 
 #define RULE_5(name) \
+~name();\
 name(const name&) = delete;\
 name& operator=(const name&) = delete;\
 name(name&&) noexcept;\
-name& operator=(name&&) noexcept;\
-~name();
+name& operator=(name&&) noexcept;
 
 enum struct API QueueType {
     Graphics,
@@ -35,12 +36,28 @@ enum struct API QueueType {
 
 using QueueTypes=uint32_t;
 
+static inline QueueTypes convert(QueueType t) {
+    return (1 << (uint32_t)t);
+}
+
+static inline QueueTypes convert(QueueTypes t) {
+    return t;
+}
+
 inline QueueTypes operator|(const QueueTypes lhs, const QueueType rhs) {
-    return lhs | (1 << (uint32_t)rhs);
+    return lhs | convert(rhs);
+}
+
+inline QueueTypes operator&(const QueueTypes lhs, const QueueType rhs) {
+    return lhs & convert(rhs);
 }
 
 inline QueueTypes operator|(const QueueType lhs, const QueueTypes rhs) {
     return rhs | lhs;
+}
+
+inline QueueTypes operator&(const QueueType lhs, const QueueTypes rhs) {
+    return rhs & lhs;
 }
 
 inline QueueTypes& operator |= (QueueTypes& lhs, const QueueType rhs) {

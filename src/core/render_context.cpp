@@ -4,6 +4,7 @@
 #include <device.h>
 #include <command_pool.h>
 #include <synchronization.h>
+#include <resources.h>
 
 
 static VkResult checkLayersSupport(std::vector<const char*>& layers) {
@@ -37,7 +38,8 @@ RenderContext::RenderContext(): _handling(false) {
 #endif
     this->WithFeature<Device>()
         .WithFeature<CommandPool>()
-        .WithFeature<Synchronization>();
+        .WithFeature<Synchronization>()
+        .WithFeature<Resources>();
 }
 
 void RenderContext::Initialize() {

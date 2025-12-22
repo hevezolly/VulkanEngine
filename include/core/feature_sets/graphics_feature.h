@@ -38,12 +38,14 @@ struct API GraphicsPipelineBuilder {
     std::vector<VkDynamicState> dynamicStates;
     std::optional<VkViewport> viewport;
     std::optional<VkRect2D> scissor;
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo;
     VkPipelineInputAssemblyStateCreateInfo inputAssembly;
     VkPipelineRasterizationStateCreateInfo rasterization;
     VkPipelineMultisampleStateCreateInfo multisampling;
     VkPipelineColorBlendAttachmentState blending;
     VkPipelineColorBlendStateCreateInfo blendingCreateInfo;
+    
+    std::vector<VkVertexInputBindingDescription> vertexDescriptions;
+    std::vector<VkVertexInputAttributeDescription> vertexAttributes;
 
     //TODO: rework
     VkPipelineLayoutCreateInfo pipelineLayout;
@@ -75,15 +77,11 @@ struct API GraphicsPipelineBuilder {
 
     template<typename T>
     GraphicsPipelineBuilder& SetVertex() {
-        VkVertexInputBindingDescription description = T::GetBindingDescription();
-        std::vector<VkVertexInputAttributeDescription> attributes;
-        T::CollectAttributeDescription(attributes);
-
-        vertexInputInfo.vertexBindingDescriptionCount = 1;
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributes.size());
-        vertexInputInfo.pVertexBindingDescriptions = &description;
-        vertexInputInfo.pVertexAttributeDescriptions = attributes.data();
-
+        vertexDescriptions.resize(1);
+        vertexDescriptions[0] = T::GetBindingDescription();
+        vertexAttributes.clear();
+        T::CollectAttributeDescription(vertexAttributes);
+        return *this;
     }
 
     Ref<GraphicsPipeline> Build();

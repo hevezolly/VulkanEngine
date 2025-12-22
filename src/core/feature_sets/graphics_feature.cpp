@@ -9,11 +9,7 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    vertexInputInfo = {VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+    
 
     rasterization = {VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
     rasterization.depthClampEnable = VK_FALSE;
@@ -212,6 +208,12 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     dynamicStateInfo.dynamicStateCount = dynamicStates.size();
     dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+    vertexInputInfo.vertexBindingDescriptionCount = vertexDescriptions.size();
+    vertexInputInfo.pVertexBindingDescriptions = vertexDescriptions.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = vertexAttributes.size();
+    vertexInputInfo.pVertexAttributeDescriptions = vertexAttributes.data();
+
     VkGraphicsPipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
     pipelineInfo.stageCount = stages.size();
     pipelineInfo.pStages = stages.data();
@@ -245,8 +247,9 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::operator=(GraphicsPipelineBuil
     dynamicStates = std::move(other.dynamicStates);
     viewport = std::move(other.viewport);
     scissor = std::move(other.scissor);
+    vertexAttributes = std::move(other.vertexAttributes);
+    vertexDescriptions = std::move(other.vertexDescriptions);
     inputAssembly = other.inputAssembly;
-    vertexInputInfo = other.vertexInputInfo;
     rasterization = other.rasterization;
     multisampling = other.multisampling;
     blending = other.blending;

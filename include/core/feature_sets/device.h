@@ -11,6 +11,7 @@ template<typename T>
 struct QueuesDescriptor {
     std::vector<std::optional<T>> queues;    
     T get(QueueType);
+    std::optional<T> try_get(QueueType);
 };
 
 template<typename T>
@@ -30,6 +31,19 @@ T QueuesDescriptor<T>::get(QueueType type) {
     return value->value();
 }
 
+template<typename T>
+std::optional<T> QueuesDescriptor<T>::try_get(QueueType type) {
+   if ((int)type >= queues.size()) {
+        return std::nullopt;
+    }
+
+    std::optional<T>* value = &queues[(int)type];
+    if (!value->has_value()) {
+        return std::nullopt;
+    }
+    return *value;
+}
+
 typedef QueuesDescriptor<uint32_t> QueueFamiliesDescriptor;
 
 struct API Device: FeatureSet, 
@@ -41,6 +55,8 @@ struct API Device: FeatureSet,
     VkDevice device;
     QueueFamiliesDescriptor queueFamilies;
     QueuesDescriptor<VkQueue> queues;
+
+    void FillQueueUsages(QueueTypes tupes, std::vector<uint32_t>* data);
 
     using FeatureSet::FeatureSet;
     virtual void OnMessage(InitMsg*);

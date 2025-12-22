@@ -9,33 +9,50 @@
 
 struct API TransferCommandBuffer {
     VkCommandBuffer buffer;
-
+    
+    TransferCommandBuffer(VkCommandBuffer buffer, VkDevice device, VkCommandPool pool, bool transient);
+    
     virtual QueueType queueType();
 
     void Begin();
     void End();
     void Reset();
+    void CopyBufferRegion(VkBuffer src, VkBuffer dst, uint32_t size, uint32_t src_offset = 0, uint32_t dst_offset = 0);
+
+    virtual RULE_5(TransferCommandBuffer)
+    
+    friend struct CommandPool;
+    
+protected:
+    bool transient;
+    VkDevice vkDevice;
+    VkCommandPool vkCommandPool;
 };
 
 struct API ComputeCommandBuffer: TransferCommandBuffer {
+    using TransferCommandBuffer::TransferCommandBuffer;
     virtual QueueType queueType();
+    friend struct CommandPool;
 };
 
 struct API GraphicsCommandBuffer: ComputeCommandBuffer {
+    using ComputeCommandBuffer::ComputeCommandBuffer;
     virtual QueueType queueType();
     
     void BeginRenderPass(Ref<GraphicsPipeline> pipeline, Ref<FrameBuffer> frameBuffer);
     void EndRenderPass();
+    friend struct CommandPool;
 };
 
 struct API CommandPool: FeatureSet, 
     CanHandle<InitMsg>,
     CanHandle<DestroyMsg>
 {
-    bool separateTransferPool;
+    bool separateTransferQueue;
     VkCommandPool graphicsCommandPool;
     VkCommandPool compueCommandPool;
     VkCommandPool transferCommandPool;
+    VkCommandPool transientTransferCommandPool;
     
     CommandPool(RenderContext&);
 
@@ -43,7 +60,7 @@ struct API CommandPool: FeatureSet,
     virtual void OnMessage(DestroyMsg*);
 
     GraphicsCommandBuffer CreateGraphicsBuffer();
-    TransferCommandBuffer CreateTransferBuffer();
+    TransferCommandBuffer CreateTransferBuffer(bool transient);
 
     void Submit(
         TransferCommandBuffer&, 

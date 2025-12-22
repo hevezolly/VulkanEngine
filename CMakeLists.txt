@@ -63,7 +63,7 @@ target_compile_definitions(VulkanEngine PUBLIC
     $<$<BOOL:${BUILD_SHARED_LIBS}>:VULKAN_ENGINE_SHARED>
 )
 target_link_libraries(VulkanEngine PUBLIC 
-    Vulkan::Headers volk glfw glslang glslang-default-resource-limits)
+    Vulkan::Headers volk glfw glslang glslang-default-resource-limits glm)
 
 target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -79,7 +79,7 @@ target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glslang/glslang/Public
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/glm
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/glm/
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
