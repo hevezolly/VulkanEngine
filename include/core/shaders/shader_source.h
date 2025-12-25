@@ -3,20 +3,13 @@
 #include <vector>
 #include <string>
 #include <common.h>
-
-enum struct API ShaderStage {
-    Pixel,
-    Vertex,
-    Compute
-};
-
-VkShaderStageFlagBits ToVkShaderStage(ShaderStage stage);
+#include <shader_stage.h>
 
 
 struct API ShaderSource
 {
     std::string name;
-    ShaderStage stage;
+    Stage stage;
     std::string source;
 };
 

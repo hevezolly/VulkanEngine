@@ -32,15 +32,15 @@ void Run() {
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
-        currentFrame = (currentFrame++) % framesInFlight;
-        context.Send(BeginFrameMsg{currentFrame});
+        uint32_t f = (currentFrame++) % framesInFlight;
+        context.Send(BeginFrameMsg{f});
 
         ImGui::ShowDemoWindow();
 
         DrawFrame(
             context, 
             resources,
-            currentFrame
+            f
         );
     }
 }

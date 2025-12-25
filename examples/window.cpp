@@ -21,6 +21,7 @@ void RunEngine() {
 
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
+        context.Send<BeginFrameMsg>({});
     }
 }
 

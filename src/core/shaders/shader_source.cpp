@@ -3,25 +3,14 @@
 #include <stdexcept>
 #include <glslang/Public/resource_limits_c.h>
 
-VkShaderStageFlagBits ToVkShaderStage(ShaderStage stage) {
-    switch (stage) {
-        case ShaderStage::Pixel:
-            return VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-        case ShaderStage::Vertex:
-            return VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
-        case ShaderStage::Compute:
-            return VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-    } 
-}
-
-glslang_stage_t GetShaderStage(ShaderStage stage) {
+glslang_stage_t GetShaderStage(Stage stage) {
     switch (stage)
     {
-    case ShaderStage::Compute:
+    case Stage::Compute:
         return GLSLANG_STAGE_COMPUTE;
-    case ShaderStage::Pixel:
+    case Stage::Fragment:
         return GLSLANG_STAGE_FRAGMENT;
-    case ShaderStage::Vertex:
+    case Stage::Vertex:
         return GLSLANG_STAGE_VERTEX;
     
     default:

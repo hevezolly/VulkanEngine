@@ -48,9 +48,7 @@ struct API Buffer {
     VkBuffer vkBuffer;
     uint32_t size_bytes;
 
-    Buffer(VkDevice device, VkBuffer buffer, uint32_t size, Memory&& memory);
-    MemoryMapToken Map();
-    MemoryMapToken Map(uint32_t offset, uint32_t size);
+    Buffer(VkDevice device, VkBuffer buffer, Memory&& memory);
 
     template<typename T>
     uint32_t count() {

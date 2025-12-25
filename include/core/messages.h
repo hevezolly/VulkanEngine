@@ -8,10 +8,13 @@ struct API EarlyInitMsg{};
 struct API InitMsg{};
 
 struct API DestroyMsg{};
+struct API EarlyDestroyMsg{};
 
 struct API BeginFrameMsg{
     const uint32_t inFlightFrame;
 };
+
+struct API EndFrameMsg {};
 
 struct API CollectInstanceRequirementsMsg: InstantMessage{
     std::vector<const char*>* extentions;

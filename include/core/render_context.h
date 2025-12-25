@@ -81,7 +81,9 @@ struct API RenderContext {
         std::type_index typeId = getTypeId<T>();
 
         _features[typeId] = static_cast<FeatureSet*>(feature);
-        _featureInitOrder.push_back(typeId);
+
+        if (std::find(_featureInitOrder.begin(), _featureInitOrder.end(), typeId) == _featureInitOrder.end())
+            _featureInitOrder.push_back(typeId);
         return *this;
     }
 

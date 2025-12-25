@@ -20,11 +20,18 @@
 #endif
 
 #define RULE_5(name) \
-~name();\
-name(const name&) = delete;\
-name& operator=(const name&) = delete;\
-name(name&&) noexcept;\
+~name(); \
+name(const name&) = delete; \
+name& operator=(const name&) = delete; \
+name(name&&) noexcept; \
 name& operator=(name&&) noexcept;
+
+#define RULE_NO(name) \
+~name(); \
+name(const name&) = delete; \
+name& operator=(const name&) = delete; \
+name(name&&) = delete; \
+name& operator=(name&&) = delete;
 
 enum struct API QueueType {
     Graphics,

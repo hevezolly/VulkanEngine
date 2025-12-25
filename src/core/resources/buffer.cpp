@@ -20,12 +20,12 @@ const BufferPreset BufferPreset::STAGING = {
     convert(QueueType::Transfer)
 };
 
-Buffer::Buffer(VkDevice device, VkBuffer buffer, uint32_t size, Memory&& mem):
+Buffer::Buffer(VkDevice device, VkBuffer buffer, Memory&& mem):
     memory(std::move(mem)),
     vkBuffer(buffer),
-    vkDevice(device),
-    size_bytes(size)
+    vkDevice(device)
 {
+    size_bytes = memory.size_bytes;
     vkBindBufferMemory(vkDevice, vkBuffer, memory.vkMemory, memory.offset);
 }
 
@@ -52,14 +52,4 @@ Buffer::~Buffer() {
         vkDestroyBuffer(vkDevice, vkBuffer, nullptr);
         vkDevice = VK_NULL_HANDLE;
     }
-}
-
-MemoryMapToken Buffer::Map() {
-    return memory.Map(size_bytes);
-}
-
-MemoryMapToken Buffer::Map(uint32_t offset, uint32_t size) {
-    assert(offset + size <= size_bytes);
-
-    return memory.Map(size, offset);
 }

@@ -76,7 +76,7 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
-    ShaderStage stage, 
+    Stage stage, 
     ShaderBinary& binary
 ) {
     VkShaderModule vkModule;
@@ -96,6 +96,10 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
     stages.push_back(stageInfo);
 
     return *this;
+}
+
+Descriptors& GraphicsPipelineBuilder::getDescriptors() {
+    return context->Get<Descriptors>();
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddDynamicState(VkDynamicState state) {

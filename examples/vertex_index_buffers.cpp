@@ -8,7 +8,7 @@
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
-VEC2(position, 0)\
+VEC2(position, 0) \
 VEC3(color, 1)
 #include <gen_vertex_data.h>
 
@@ -40,7 +40,7 @@ _Resources PrepareResources(
 
     ShaderSource vertexSource;
     vertexSource.name = "testVertex";
-    vertexSource.stage = ShaderStage::Vertex;
+    vertexSource.stage = Stage::Vertex;
     vertexSource.source = 
 R"(#version 450
 layout(location = 0) in vec2 in_position;
@@ -54,7 +54,7 @@ void main() {
 
     ShaderSource fragmentSource;
     fragmentSource.name = "testFragment";
-    fragmentSource.stage = ShaderStage::Pixel;
+    fragmentSource.stage = Stage::Fragment;
     fragmentSource.source = 
 R"(#version 450
 
@@ -75,8 +75,8 @@ void main() {
     r.pipeline = context
         .Get<GraphicsFeature>().GraphicsPipeline()
         .SetVertex<Vertex>()
-        .AddShaderStage(ShaderStage::Vertex, vertexBin)
-        .AddShaderStage(ShaderStage::Pixel, fragmentBin)
+        .AddShaderStage(Stage::Vertex, vertexBin)
+        .AddShaderStage(Stage::Fragment, fragmentBin)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
         .Build();
@@ -206,10 +206,12 @@ void Run() {
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
+        uint32_t frameId = (currentFrame++) % framesInFlight;
+        context.Send(BeginFrameMsg{frameId});
         DrawFrame(
             context, 
             resources,
-            (currentFrame++) % framesInFlight
+            frameId
         );
     }
 }

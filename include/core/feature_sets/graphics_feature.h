@@ -6,6 +6,7 @@
 #include <optional>
 #include <handles.h>
 #include <frame_buffer.h>
+#include <descriptor_pool.h>
 
 struct API BlendMethod {
     VkBlendFactor src;
@@ -46,6 +47,7 @@ struct API GraphicsPipelineBuilder {
     
     std::vector<VkVertexInputBindingDescription> vertexDescriptions;
     std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+    std::vector<VkDescriptorSetLayout> descriptorLayouts;
 
     //TODO: rework
     VkPipelineLayoutCreateInfo pipelineLayout;
@@ -53,7 +55,7 @@ struct API GraphicsPipelineBuilder {
     VkAttachmentReference colorAttachmentRef;
     VkSubpassDescription subpass;
 
-    GraphicsPipelineBuilder& AddShaderStage(ShaderStage stage, ShaderBinary& binary);
+    GraphicsPipelineBuilder& AddShaderStage(Stage stage, ShaderBinary& binary);
 
     GraphicsPipelineBuilder& AddDynamicState(VkDynamicState state);
 
@@ -84,6 +86,11 @@ struct API GraphicsPipelineBuilder {
         return *this;
     }
 
+    template<typename T>
+    GraphicsPipelineBuilder& AddLayout() {
+        descriptorLayouts.push_back(getDescriptors().GetLayout<T>());
+    }
+
     Ref<GraphicsPipeline> Build();
 
     RULE_5(GraphicsPipelineBuilder)
@@ -91,6 +98,7 @@ struct API GraphicsPipelineBuilder {
     friend struct GraphicsFeature;
 
 private:
+    Descriptors& getDescriptors();
     GraphicsPipelineBuilder(RenderContext& context);
 
     RenderContext* context;

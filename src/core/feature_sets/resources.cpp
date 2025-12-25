@@ -34,7 +34,7 @@ Memory Resources::AllocateMemory(VkMemoryRequirements requirements, VkMemoryProp
     VkDeviceMemory mem;
     VK(vkAllocateMemory(context.device(), &allocInfo, nullptr, &mem));
 
-    return Memory(mem, context.device());
+    return Memory(mem, context.device(), requirements.size);
 }
 
 Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes) {
@@ -56,15 +56,16 @@ Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes) {
     
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(context.device(), buffer, &memRequirements);
+    assert(memRequirements.size == size_bytes);
 
-    return Buffer(context.device(), buffer, size_bytes, AllocateMemory(memRequirements, preset.memoryProperties));
+    return Buffer(context.device(), buffer, AllocateMemory(memRequirements, preset.memoryProperties));
 }
 
 Buffer createAndFillBuffer(Resources& r, BufferPreset preset, uint32_t size_bytes, void* data) {
     Buffer buffer = r.CreateRawBuffer(preset, size_bytes);
     {
-        auto token = buffer.Map();
-        memcpy(token.data, data, (size_t)size_bytes);
+        auto token = buffer.memory.Map();
+        memcpy(token.data(), data, (size_t)size_bytes);
     }
     return buffer;
 }

@@ -5,6 +5,7 @@
 #include <command_pool.h>
 #include <synchronization.h>
 #include <resources.h>
+#include <descriptor_pool.h>
 
 
 static VkResult checkLayersSupport(std::vector<const char*>& layers) {
@@ -37,9 +38,11 @@ RenderContext::RenderContext(): _handling(false) {
     this->WithFeature<DebuggingFeature>();
 #endif
     this->WithFeature<Device>()
+        .WithFeature<Allocator>()
         .WithFeature<CommandPool>()
         .WithFeature<Synchronization>()
-        .WithFeature<Resources>();
+        .WithFeature<Resources>()
+        .WithFeature<Descriptors>();
 }
 
 void RenderContext::Initialize() {
@@ -118,13 +121,15 @@ RenderContext::~RenderContext() {
 
         vkDeviceWaitIdle(device());
 
+        Send<EarlyDestroyMsg>();
+
         for (int i = _initOrder.size() - 1; i >= 0; i--) {
             _initOrder[i].destroyer_func(_initOrder[i].object_ptr);
         }
 
         _initOrder.clear();
 
-        Send<DestroyMsg>(nullptr);
+        Send<DestroyMsg>();
         
         _features.clear();
         _featureInitOrder.clear();
