@@ -8,9 +8,14 @@ struct MemoryChunk {
     T* data;
     uint32_t size;
 
-    T* operator[](int index) {
+    T& operator[](int index) {
         assert(index >= 0 && index < size);
-        return data + index;
+        return *(data + index);
+    }
+
+    const T& operator[](int index) const {
+        assert(index >= 0 && index < size);
+        return *(data + index);
     }
     
     operator MemoryChunk<char>() const {return {static_cast<char*>(data), size * sizeof(T)}} 
@@ -94,7 +99,7 @@ struct Allocator: FeatureSet,
         uintptr_t c = reinterpret_cast<uintptr_t>(chunk);
         assert(b >= c);
         uintptr_t chunkStart = b - c;
-        if (force || (sizeof(T) * borrowed.count + chunkStart == freeOffset))
+        if (force || (sizeof(T) * borrowed.size + chunkStart == freeOffset))
             freeOffset = chunkStart;
     }
 

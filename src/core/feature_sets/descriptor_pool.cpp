@@ -48,7 +48,7 @@ SpecializedDescriptorSet& SpecializedDescriptorSet::operator=(SpecializedDescrip
     return *this;
 }
 
-SpecializedDescriptorSet::SpecializedDescriptorSet(SpecializedDescriptorSet&& other) {
+SpecializedDescriptorSet::SpecializedDescriptorSet(SpecializedDescriptorSet&& other) noexcept {
     *this = std::move(other);
 }
 

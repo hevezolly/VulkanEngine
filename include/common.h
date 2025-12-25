@@ -91,14 +91,15 @@ inline ImageUsage operator &(ImageUsage, ImageUsage);
 auto __result = (call);\
 if (__result != VK_SUCCESS) {\
     std::stringstream ss;\
-    std::cout << ss.str() << std::endl;\
     ss << "Vk error in " << __FILE__ << " at line " << __LINE__ << " with error " << __result << std::endl;\
+    std::cout << ss.str() << std::endl;\
     throw std::runtime_error(ss.str());\
 }\
 }\
 
 #ifdef ENGINE_LOG
 #define LOG(str) std::cout << str << std::endl;
+#define _S_ << " " <<
 #else
 #define LOG(str)
 #endif

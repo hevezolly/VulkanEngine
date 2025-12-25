@@ -2,6 +2,7 @@
 #include <feature_set.h>
 #include <unordered_map>
 #include <allocator_feature.h>
+#include <handles.h>
 
 struct DescriptorPool 
 {

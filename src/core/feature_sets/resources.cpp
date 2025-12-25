@@ -33,7 +33,6 @@ Memory Resources::AllocateMemory(VkMemoryRequirements requirements, VkMemoryProp
 
     VkDeviceMemory mem;
     VK(vkAllocateMemory(context.device(), &allocInfo, nullptr, &mem));
-
     return Memory(mem, context.device(), requirements.size);
 }
 
@@ -42,22 +41,17 @@ Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes) {
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size_bytes;
     bufferInfo.usage = preset.usageFlags;
-
     std::vector<uint32_t> usedQueues;
     context.Get<Device>().FillQueueUsages(preset.usedQueues, &usedQueues);
-
     bufferInfo.sharingMode = usedQueues.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
     bufferInfo.queueFamilyIndexCount = usedQueues.size();
     bufferInfo.pQueueFamilyIndices = usedQueues.data();
-
     VkBuffer buffer;
 
     VK(vkCreateBuffer(context.device(), &bufferInfo, nullptr, &buffer));
-    
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(context.device(), buffer, &memRequirements);
     assert(memRequirements.size == size_bytes);
-
     return Buffer(context.device(), buffer, AllocateMemory(memRequirements, preset.memoryProperties));
 }
 
@@ -65,7 +59,7 @@ Buffer createAndFillBuffer(Resources& r, BufferPreset preset, uint32_t size_byte
     Buffer buffer = r.CreateRawBuffer(preset, size_bytes);
     {
         auto token = buffer.memory.Map();
-        memcpy(token.data(), data, (size_t)size_bytes);
+        memcpy(token.data(), data, static_cast<size_t>(size_bytes));
     }
     return buffer;
 }
@@ -79,7 +73,6 @@ Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes, void
     Buffer stagingBuffer = createAndFillBuffer(*this, BufferPreset::STAGING, size_bytes, data);
     Buffer outputBuffer = CreateRawBuffer(preset, size_bytes);
     TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
-    
     cmd.Begin();
     cmd.CopyBufferRegion(stagingBuffer.vkBuffer, outputBuffer.vkBuffer, size_bytes);
     cmd.End();

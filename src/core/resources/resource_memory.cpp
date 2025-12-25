@@ -6,6 +6,7 @@ MemoryChunkData::MemoryChunkData(VkDeviceMemory mem, VkDevice d):
     mappedptr(nullptr),
     mappings(0),
     vkMemory(mem),
+    childCount(0),
     device(d)
 {}
 
@@ -45,7 +46,8 @@ Memory::Memory(VkDeviceMemory mem, VkDevice device, uint32_t size):
 Memory::Memory(Memory* parent, uint32_t offset, uint32_t size) {
     assert(parent->size_bytes > offset + size);
 
-    vkMemory = vkMemory;
+    vkDevice = VK_NULL_HANDLE;
+    vkMemory = parent->vkMemory;
     mapData = parent->mapData;
     this->offset = parent->offset + offset;
     size_bytes = size;
@@ -59,7 +61,8 @@ Memory::Memory():
     mapData(nullptr),
     offset(0),
     map(std::nullopt)
-{}
+{
+}
 
 Memory& Memory::operator=(Memory&& other) noexcept {
     if (&other == this)
@@ -76,18 +79,19 @@ Memory& Memory::operator=(Memory&& other) noexcept {
     other.size_bytes = 0;
     other.mapData = nullptr;
     other.vkMemory = VK_NULL_HANDLE;
+    other.vkDevice = VK_NULL_HANDLE;
     other.offset = 0;
-
     return *this;
 }
 
 Memory::Memory(Memory&& other) noexcept {
-    *this = std::move(other);
+    *this = std::move(other); 
 }
 
 Memory::~Memory() {
     Unmap();
     if (vkDevice != VK_NULL_HANDLE) {
+        assert(mapData != nullptr);
         assert(mapData->childCount == 0);
         assert(mapData->mappings == 0);
         delete mapData;

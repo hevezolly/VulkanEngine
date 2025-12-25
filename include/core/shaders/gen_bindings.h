@@ -42,8 +42,34 @@ BLOCK
 
     static MemoryChunk<VkDescriptorSetLayoutBinding> FillLayoutBindings(RenderContext& context) {
         auto chunk = context.Get<Allocator>().Allocate<VkDescriptorSetLayoutBinding>(size());
+        
+        // ToVkShaderStage(s), nullptr};
         uint32_t counter = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++] = {b, dt, dc, ToVkShaderStage(s), nullptr};  
+        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].binding = b;  
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+
+        counter = 0;
+        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].descriptorType = dt;  
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+
+        counter = 0;
+        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].descriptorCount = dc;  
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+
+        counter = 0;
+        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].stageFlags = ToVkShaderStage(s);  
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+
+        counter = 0;
+        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].pImmutableSamplers = nullptr;  
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
@@ -55,11 +81,9 @@ BLOCK
         actualCount = 0;
         #define WRAPPER(t, n, b, s, dc, dt, info) \
         uint32_t index = UINT32_MAX; \
-        for (uint32_t i = 0; i < actualCount; i++) { \
-            if (chunk[i].type == t) {index = i; break;} \ 
-        } \  
+        for (uint32_t i = 0; i < actualCount; i++) { if (chunk[i].type == dt) {index = i; break;} } \
         if (index == UINT32_MAX) {index = actualCount++;} \
-        chunk[index].type = t; chunk[index].descriptorCount += dc; \ 
+        chunk[index].type = dt; chunk[index].descriptorCount += dc;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
@@ -69,7 +93,7 @@ BLOCK
     MemoryChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set) {
         Allocator& allocator = context.Get<Allocator>();
         auto writes = allocator.Allocate<VkWriteDescriptorSet>(size());
-        uint32_t idex;
+        uint32_t index;
 
         index = 0;
         #define WRAPPER(t, n, b, s, dc, dt, info) writes[index++].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -115,13 +139,12 @@ BLOCK
                 writes[i].pTexelBufferView = nullptr; \
                 VkDescriptorBufferInfo* bufferInfo = allocator.Allocate<VkDescriptorBufferInfo>(dc).data; \
                 for (int descriptor = 0; descriptor < dc; descriptor++) { \
-                    bufferInfo[descriptor].buffer = name[descriptor].vkBuffer; \
+                    bufferInfo[descriptor].buffer = n [descriptor].vkBuffer; \
                     bufferInfo[descriptor].offset = 0; \
                     bufferInfo[descriptor].range = VK_WHOLE_SIZE; \
                 } \
                 writes[i].pBufferInfo = bufferInfo; \
-            } else constexpr { \
-                static_assert(false, "Not implemented") \
+            } else { \
             } \
         }
         #include "define_shader_bindings.h"

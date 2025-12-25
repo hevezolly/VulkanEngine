@@ -90,7 +90,6 @@ void main() {
         {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
     };
     r.vertexBuffer = context.Get<Resources>().CreateBuffer<Vertex>(BufferPreset::VERTEX, vertices);
-
     std::vector<uint16_t> indices = {
         0, 1, 2, 2, 3, 0
     };

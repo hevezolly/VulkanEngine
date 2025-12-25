@@ -37,8 +37,8 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept {
     vkDevice = other.vkDevice;
     size_bytes = other.size_bytes;
     memory = std::move(other.memory);
-    other.vkBuffer = nullptr;
-    other.vkDevice = nullptr;
+    other.vkBuffer = VK_NULL_HANDLE;
+    other.vkDevice = VK_NULL_HANDLE;
 
     return *this;
 }
