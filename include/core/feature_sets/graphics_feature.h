@@ -50,7 +50,6 @@ struct API GraphicsPipelineBuilder {
     std::vector<VkDescriptorSetLayout> descriptorLayouts;
 
     //TODO: rework
-    VkPipelineLayoutCreateInfo pipelineLayout;
     VkAttachmentDescription colorAttachment;
     VkAttachmentReference colorAttachmentRef;
     VkSubpassDescription subpass;
@@ -89,6 +88,7 @@ struct API GraphicsPipelineBuilder {
     template<typename T>
     GraphicsPipelineBuilder& AddLayout() {
         descriptorLayouts.push_back(getDescriptors().GetLayout<T>());
+        return *this;
     }
 
     Ref<GraphicsPipeline> Build();

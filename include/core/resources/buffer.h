@@ -10,6 +10,7 @@ struct API BufferPreset {
     static const BufferPreset VERTEX;
     static const BufferPreset INDEX;
     static const BufferPreset STAGING;
+    static const BufferPreset UNIFORM;
 };
 
 inline BufferPreset& operator |=(BufferPreset& lhs, BufferPreset rhs) {

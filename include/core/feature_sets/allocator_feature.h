@@ -18,7 +18,12 @@ struct MemoryChunk {
         return *(data + index);
     }
     
-    operator MemoryChunk<char>() const {return {static_cast<char*>(data), size * sizeof(T)}} 
+    operator MemoryChunk<char>() {
+        MemoryChunk<char> result;
+        result.data = reinterpret_cast<char*>(data);
+        result.size = size * sizeof(T);
+        return result;
+    }
 
     struct Iterator {
         // Iterator traits (required for STL compatibility pre-C++20)

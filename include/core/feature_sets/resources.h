@@ -22,9 +22,15 @@ struct API Resources: FeatureSet,
     }
 
     template <typename T>
+    Ref<Buffer> CreateBuffer(BufferPreset preset, uint32_t elementCount) {
+        return context.New<Buffer>(std::move(CreateRawBuffer(preset, elementCount * sizeof(T))));
+    }
+    
+    template <typename T>
     Ref<Buffer> CreateBuffer(BufferPreset preset, std::vector<T>& elements) {
         return context.New<Buffer>(std::move(CreateRawBuffer(preset, elements.size() * sizeof(T), elements.data())));
     }
+
 
     virtual void OnMessage(InitMsg*);
 

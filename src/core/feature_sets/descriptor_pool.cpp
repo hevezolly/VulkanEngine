@@ -76,6 +76,7 @@ SpecializedDescriptorSet SpecializedDescriptorPool::Allocate() {
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &layout;
     VK(vkAllocateDescriptorSets(pool.context->device(), &allocInfo, &set));
+    availableInstances--;
 
     return SpecializedDescriptorSet(set, this);
 }

@@ -3,8 +3,13 @@
 #include <shader_source.h>
 #include <present_feature.h>
 #include <graphics_feature.h>
+#include <descriptor_pool.h>
 #include <command_pool.h>
 #include <resources.h>
+#include <allocator_feature.h>
+#include <chrono>
+#include <glm/gtc/matrix_transform.hpp>
+#include <thread>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -36,6 +41,12 @@ struct ShaderInput {
 };
 */
 
+struct UniformData {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
 struct _Resources {
     std::vector<GraphicsCommandBuffer> commandBuffers;
     Refs<Semaphore> imgAvailableSemaphores;
@@ -58,12 +69,18 @@ _Resources PrepareResources(
     vertexSource.stage = Stage::Vertex;
     vertexSource.source = 
 R"(#version 450
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} ubo;
+
 layout(location = 0) in vec2 in_position;
 layout(location = 1) in vec3 in_color;
 layout(location = 0) out vec3 fragColor;
 
 void main() {
-    gl_Position = vec4(in_position, 0.0, 1.0);
+    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_position, 0.0, 1.0);
     fragColor = in_color;
 })";
 
@@ -85,18 +102,15 @@ void main() {
     ShaderBinary vertexBin = compiler.FromSource(vertexSource);
     ShaderBinary fragmentBin = compiler.FromSource(fragmentSource);
 
-    LOG("shaders compiled")
-
     r.pipeline = context
         .Get<GraphicsFeature>().GraphicsPipeline()
         .SetVertex<Vertex>()
+        .AddLayout<ShaderInput>()
         .AddShaderStage(Stage::Vertex, vertexBin)
         .AddShaderStage(Stage::Fragment, fragmentBin)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
         .Build();
-
-    LOG("pipeline built")
 
     std::vector<Vertex> vertices = {
         {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
@@ -107,24 +121,21 @@ void main() {
     r.vertexBuffer = context.Get<Resources>().CreateBuffer<Vertex>(BufferPreset::VERTEX, vertices);
 
     std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0
+        0, 2, 1, 2, 0, 3
     };
     r.indexBuffer = context.Get<Resources>().CreateBuffer<uint16_t>(BufferPreset::INDEX, indices);
-
-    LOG("buffers created")
     
     r.imgAvailableSemaphores = context.Get<Synchronization>().CreateSemaphores(framesInFlight);
-    LOG("image available semaphores")
     r.inFlightFences = context.Get<Synchronization>().CreateFences(framesInFlight, true);
-    LOG("in flight fences")
     r.renderFinish = context.Get<Synchronization>().CreateSemaphores(
         context.Get<PresentFeature>().swapChain->images.size());
-    LOG("render finish fences")
-
     r.commandBuffers.reserve(framesInFlight);
 
     for (int i = 0; i < framesInFlight; i++) {
         r.commandBuffers.push_back(context.Get<CommandPool>().CreateGraphicsBuffer());
+        r.uniformBuffers.push_back(context.Get<Resources>()
+            .CreateBuffer<UniformData>(BufferPreset::UNIFORM, 1));
+        
     }
 
     return r;
@@ -135,7 +146,8 @@ void RecordCommandBuffer(
     Ref<Buffer> vertexBuffer,
     Ref<Buffer> indexBuffer,
     Ref<GraphicsPipeline> pipeline, 
-    Ref<FrameBuffer> frameBuffer
+    Ref<FrameBuffer> frameBuffer,
+    VkDescriptorSet descriptorSet
 ) {
     cmd.Begin();
     cmd.BeginRenderPass(pipeline, frameBuffer);
@@ -158,6 +170,7 @@ void RecordCommandBuffer(
     vkCmdBindVertexBuffers(cmd.buffer, 0, 1, &vertexBuffer->vkBuffer, &offset);
 
     vkCmdBindIndexBuffer(cmd.buffer, indexBuffer->vkBuffer, 0, VkIndexType::VK_INDEX_TYPE_UINT16);
+    vkCmdBindDescriptorSets(cmd.buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, 1, &descriptorSet, 0, nullptr);
 
     vkCmdDrawIndexed(cmd.buffer, indexBuffer->count<uint16_t>(), 1, 0, 0, 0);
 
@@ -165,26 +178,52 @@ void RecordCommandBuffer(
     cmd.End();
 }
 
+VkDescriptorSet UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    SwapChain* swapChain = context.Get<PresentFeature>().swapChain;
+    UniformData d{};
+    d.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    d.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    d.proj = glm::perspective(glm::radians(45.0f), swapChain->extent.width / (float) swapChain->extent.height, 0.1f, 10.0f);
+    
+    d.proj[1][1] *= -1;
+
+    memcpy(uniformBuffer.memory.PersistentMap().data(), &d, sizeof(d));
+
+    ShaderInput input{};
+    input.transforms = &uniformBuffer;
+
+    return context.Get<Descriptors>().UpdateDescriptorSet(input);
+} 
+
 void DrawFrame(
     RenderContext& context,
     _Resources& r,
     uint32_t frameId
 ) {
-    LOG("begin frame " << frameId)
     Ref<Fence> inFlight = r.inFlightFences[frameId];
     inFlight->Wait();
     inFlight->Reset();
 
+    context.Send(BeginFrameMsg{frameId});
+
     Ref<Semaphore> imgAvailable = r.imgAvailableSemaphores[frameId];
 
     uint32_t imageIndex = context.Get<PresentFeature>().AcquireNextImage(imgAvailable);
-    LOG("acquire next image "<< imageIndex)
 
     GraphicsCommandBuffer& cmd = r.commandBuffers[frameId];
 
+    VkDescriptorSet set = UpdateShaderData(context, *r.uniformBuffers[frameId]);
+
     cmd.Reset();
     RecordCommandBuffer(cmd, r.vertexBuffer, r.indexBuffer, r.pipeline, 
-        context.Get<PresentFeature>().GetFrameBuffer(imageIndex, r.pipeline->renderPass));
+        context.Get<PresentFeature>().GetFrameBuffer(imageIndex, r.pipeline->renderPass),
+        set
+    );
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
 
@@ -212,6 +251,8 @@ void Run() {
            .Initialize();
     volkLoadInstance(context.vkInstance);
 
+    context.Get<Descriptors>().Preallocate<ShaderInput>(3);
+
     const uint32_t framesInFlight = 3;
 
 
@@ -221,12 +262,10 @@ void Run() {
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
-        uint32_t frameId = (currentFrame++) % framesInFlight;
-        context.Send(BeginFrameMsg{frameId});
         DrawFrame(
             context, 
             resources,
-            frameId
+            (currentFrame++) % framesInFlight
         );
     }
 }

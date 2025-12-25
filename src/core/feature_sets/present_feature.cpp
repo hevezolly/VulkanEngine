@@ -56,7 +56,6 @@ Ref<FrameBuffer> PresentFeature::GetFrameBuffer(uint32_t swapChainImage, VkRende
         swapChain->images[static_cast<size_t>(swapChainImage)].view,
         renderPass
     );
-    LOG("get swap chain frame buffer. size: " << swapChainFrameBuffers.size())
     return result;
 }
 

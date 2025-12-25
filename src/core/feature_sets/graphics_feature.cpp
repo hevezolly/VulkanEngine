@@ -48,13 +48,6 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     blendingCreateInfo.blendConstants[2] = 0.0f;
     blendingCreateInfo.blendConstants[3] = 0.0f;
 
-    pipelineLayout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    pipelineLayout.setLayoutCount = 0;
-    pipelineLayout.pSetLayouts = nullptr;
-    pipelineLayout.pushConstantRangeCount = 0;
-    pipelineLayout.pPushConstantRanges = nullptr;
-    pipelineLayout.flags = 0;
-
     colorAttachment = {};
     colorAttachment.format = context.Get<PresentFeature>().swapChain->format;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -166,6 +159,13 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     Ref<GraphicsPipeline> pipeline = context->New<GraphicsPipeline>();
     pipeline->context = context;
 
+    VkPipelineLayoutCreateInfo pipelineLayout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    pipelineLayout.setLayoutCount = descriptorLayouts.size();
+    pipelineLayout.pSetLayouts = descriptorLayouts.data();
+    pipelineLayout.pushConstantRangeCount = 0;
+    pipelineLayout.pPushConstantRanges = nullptr;
+    pipelineLayout.flags = 0;
+
     VK(vkCreatePipelineLayout(
         context->device(), 
         &pipelineLayout, 
@@ -253,13 +253,13 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::operator=(GraphicsPipelineBuil
     scissor = std::move(other.scissor);
     vertexAttributes = std::move(other.vertexAttributes);
     vertexDescriptions = std::move(other.vertexDescriptions);
+    descriptorLayouts = std::move(other.descriptorLayouts);
     inputAssembly = other.inputAssembly;
     rasterization = other.rasterization;
     multisampling = other.multisampling;
     blending = other.blending;
     blendingCreateInfo = other.blendingCreateInfo;
     context = other.context;
-    pipelineLayout = other.pipelineLayout;
     colorAttachment = other.colorAttachment;
     colorAttachmentRef = other.colorAttachmentRef;
     subpass = other.subpass;

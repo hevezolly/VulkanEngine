@@ -20,6 +20,13 @@ const BufferPreset BufferPreset::STAGING = {
     convert(QueueType::Transfer)
 };
 
+const BufferPreset BufferPreset::UNIFORM = {
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    convert(QueueType::Graphics)
+};
+
 Buffer::Buffer(VkDevice device, VkBuffer buffer, Memory&& mem):
     memory(std::move(mem)),
     vkBuffer(buffer),

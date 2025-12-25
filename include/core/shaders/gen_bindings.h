@@ -150,6 +150,8 @@ BLOCK
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
+
+        return writes;
     }
 
 };

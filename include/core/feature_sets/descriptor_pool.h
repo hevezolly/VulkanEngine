@@ -62,23 +62,24 @@ struct Descriptors : FeatureSet,
 
     template<typename T>
     void Preallocate(uint32_t countInstances = 1) {
+        std::type_index id = getTypeId<T>();
 
-        assert(countInstances >= 1)
+        assert(countInstances >= 1);
 
         uint32_t countDescriptors = 0;
-        MemoryChunk<VkDescriptorPoolSize> sizes = FillDescriptorSizes(context, countDescriptors);
+        MemoryChunk<VkDescriptorPoolSize> sizes = T::FillDescriptorSizes(context, countDescriptors);
         
         for (int i = 0; i < countDescriptors; i++) {
-            sizes[i]->descriptorCount *= countInstances;
+            sizes[i].descriptorCount *= countInstances;
         }
 
         if (_descriptorPools.find(id) == _descriptorPools.end())
-            _descriptorPools[id] = std::vector<Ref<SpecializedDescriptorPool>>;
+            _descriptorPools[id] = std::vector<Ref<SpecializedDescriptorPool>>{};
 
         Ref<SpecializedDescriptorPool> pool = CreateDescriptorPool(
             countInstances, countDescriptors, GetLayout<T>(), sizes);
 
-        _descriptorPools.push_back(pool);
+        _descriptorPools[id].push_back(pool);
 
         Deallocate(sizes, true);
     }
@@ -96,11 +97,11 @@ struct Descriptors : FeatureSet,
             MemoryChunk<VkDescriptorSetLayoutBinding> bindings = T::FillLayoutBindings(context);
 
             VkDescriptorSetLayoutCreateInfo createInfo {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-            createInfo.bindingCount = bindings.count;
+            createInfo.bindingCount = bindings.size;
             createInfo.flags = 0;
             createInfo.pBindings = bindings.data;
 
-            vkCreateDescriptorSetLayout(device(), &createInfo, nullptr, &_layouts[i]);
+            vkCreateDescriptorSetLayout(device(), &createInfo, nullptr, &_layouts[id]);
             Deallocate(bindings, true);
         }
 
@@ -108,10 +109,11 @@ struct Descriptors : FeatureSet,
     }
 
     template<typename T>
+
     VkDescriptorSet UpdateDescriptorSet(T& values) {
         std::type_index id = getTypeId<T>();
 
-        Ref<SpecializedDescriptorPool> selectedPool = Ref::Null();
+        Ref<SpecializedDescriptorPool> selectedPool = Ref<SpecializedDescriptorPool>::Null();
 
         if (_descriptorPools.find(id) != _descriptorPools.end()) {
             for (int i = 0; i < _descriptorPools[id].size(); i++) {
@@ -121,7 +123,7 @@ struct Descriptors : FeatureSet,
         }
 
         if (selectedPool.isNull()) {
-            Preallocate();
+            Preallocate<T>();
             selectedPool = _descriptorPools[id].back();
         }
 
