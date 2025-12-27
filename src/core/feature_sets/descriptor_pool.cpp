@@ -133,7 +133,7 @@ Ref<SpecializedDescriptorPool> Descriptors::CreateDescriptorPool(
     uint32_t countInstances,
     uint32_t countDescriptors,
     VkDescriptorSetLayout layout,
-    MemoryChunk<VkDescriptorPoolSize> sizes
+    MemChunk<VkDescriptorPoolSize> sizes
 ) {
     return context.New<SpecializedDescriptorPool>(countInstances, layout, countDescriptors, sizes.data);
 }

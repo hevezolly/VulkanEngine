@@ -3,10 +3,16 @@
 
 #define PREALLOCATED_SIZE 10240
 
+enum struct AllocationType {
+    Bump,
+    Heap
+};
+
 template<typename T>
-struct MemoryChunk {
+struct MemChunk {
     T* data;
     uint32_t size;
+    AllocationType allocType;
 
     T& operator[](int index) {
         assert(index >= 0 && index < size);
@@ -18,10 +24,11 @@ struct MemoryChunk {
         return *(data + index);
     }
     
-    operator MemoryChunk<char>() {
-        MemoryChunk<char> result;
+    operator MemChunk<char>() {
+        MemChunk<char> result;
         result.data = reinterpret_cast<char*>(data);
         result.size = size * sizeof(T);
+        result.allocType = allocType;
         return result;
     }
 
@@ -70,7 +77,7 @@ struct MemoryChunk {
     Iterator end() { return Iterator(data + size); } 
 };
 
-using RawMemChunk = MemoryChunk<char>;
+using RawMemChunk = MemChunk<char>;
 
 struct Allocator: FeatureSet,
     CanHandle<InitMsg>,
@@ -85,7 +92,7 @@ struct Allocator: FeatureSet,
     virtual void OnMessage(BeginFrameMsg*);
 
     template<typename T>
-    MemoryChunk<T> Allocate(uint32_t count = 1) {
+    MemChunk<T> BumpAllocate(uint32_t count = 1) {
         assert(count > 0);
         size_t alignment = alignof(T);
         size_t allocationSize = sizeof(T) * count;
@@ -95,11 +102,27 @@ struct Allocator: FeatureSet,
         freeOffset = alignedOffset + allocationSize;
         T* ptr = reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(chunk)+ alignedOffset); 
         memset(ptr, 0, allocationSize);
-        return MemoryChunk<T>{ptr, count};
+        return MemChunk<T>{ptr, count, AllocationType::Bump};
     }
 
     template<typename T>
-    void Free(MemoryChunk<T> borrowed, bool force = false) {
+    MemChunk<T> HeapAllocate(uint32_t count = 1) {
+        assert(count > 0);
+        size_t alignment = alignof(T);
+        size_t allocationSize = sizeof(T) * count;
+
+        T* ptr = static_cast<T*>(malloc(allocatedSize));
+        return MemChunk<T>{ptr, count, AllocationType::Heap};
+    }
+
+    template<typename T>
+    void Free(MemChunk<T> borrowed, bool force = false) {
+
+        if (borrowed.allocType == AllocationType::Heap) {
+            free(borrowed.data);
+            return;
+        }
+
         uintptr_t b = reinterpret_cast<uintptr_t>(borrowed.data);
         uintptr_t c = reinterpret_cast<uintptr_t>(chunk);
         assert(b >= c);
@@ -109,7 +132,10 @@ struct Allocator: FeatureSet,
     }
 
 private:
+
     char* chunk;
     size_t allocatedSize;
     uintptr_t freeOffset;
+
+
 };

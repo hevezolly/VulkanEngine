@@ -7,6 +7,7 @@
 #include <image.h>
 #include <frame_buffer.h>
 #include <synchronization.h>
+#include <image_usage.h>
 
 struct API SwapChainInitializer {
     std::vector<VkFormat> desiredFormats = {VK_FORMAT_B8G8R8A8_SRGB};

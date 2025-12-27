@@ -1,7 +1,7 @@
 #pragma once
 #include <common.h>
 
-enum struct API Stage {
+enum API Stage {
     Fragment = VK_SHADER_STAGE_FRAGMENT_BIT,
     Vertex = VK_SHADER_STAGE_VERTEX_BIT,
     Compute = VK_SHADER_STAGE_COMPUTE_BIT

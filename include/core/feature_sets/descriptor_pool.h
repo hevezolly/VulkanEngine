@@ -67,7 +67,7 @@ struct Descriptors : FeatureSet,
         assert(countInstances >= 1);
 
         uint32_t countDescriptors = 0;
-        MemoryChunk<VkDescriptorPoolSize> sizes = T::FillDescriptorSizes(context, countDescriptors);
+        MemChunk<VkDescriptorPoolSize> sizes = T::FillDescriptorSizes(context, countDescriptors);
         
         for (int i = 0; i < countDescriptors; i++) {
             sizes[i].descriptorCount *= countInstances;
@@ -94,7 +94,7 @@ struct Descriptors : FeatureSet,
 
             _layouts[id] = VK_NULL_HANDLE;
 
-            MemoryChunk<VkDescriptorSetLayoutBinding> bindings = T::FillLayoutBindings(context);
+            MemChunk<VkDescriptorSetLayoutBinding> bindings = T::FillLayoutBindings(context);
 
             VkDescriptorSetLayoutCreateInfo createInfo {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
             createInfo.bindingCount = bindings.size;
@@ -133,7 +133,7 @@ struct Descriptors : FeatureSet,
         allocatedSets[frameId].push_back(selectedPool->Allocate());
 
         VkDescriptorSet set = allocatedSets[frameId].back().vkSet;
-        MemoryChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(context, set);
+        MemChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(context, set);
 
         vkUpdateDescriptorSets(device(), writes.size, writes.data, 0, nullptr);
 
@@ -150,7 +150,7 @@ private:
     void Deallocate(RawMemChunk memory, bool force=false);
     VkDevice device();
     Ref<SpecializedDescriptorPool> CreateDescriptorPool(
-        uint32_t, uint32_t, VkDescriptorSetLayout, MemoryChunk<VkDescriptorPoolSize> sizes);
+        uint32_t, uint32_t, VkDescriptorSetLayout, MemChunk<VkDescriptorPoolSize> sizes);
     std::unordered_map<std::type_index, VkDescriptorSetLayout> _layouts;
     std::unordered_map<std::type_index, std::vector<Ref<SpecializedDescriptorPool>>> _descriptorPools;
 

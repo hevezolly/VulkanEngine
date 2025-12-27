@@ -4,6 +4,8 @@
 #include <buffer.h>
 #include <handles.h>
 #include <utility>
+#include <image.h>
+#include <image_usage.h>
 
 struct API Resources: FeatureSet,
     CanHandle<InitMsg>
@@ -31,6 +33,17 @@ struct API Resources: FeatureSet,
         return context.New<Buffer>(std::move(CreateRawBuffer(preset, elements.size() * sizeof(T), elements.data())));
     }
 
+    Image CreateRawImage(ImageDescription& dsecription, ImageUsage usage);
+
+    Image LoadRawImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
+
+    inline Ref<Image> CreateImage(ImageDescription& dsecription, ImageUsage usage) {
+        return context.New<Image>(std::move(CreateRawImage(dsecription, usage)));
+    }
+
+    inline Ref<Image> LoadImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED) {
+        return context.New<Image>(std::move(LoadRawImage(usage, path, format)));
+    }
 
     virtual void OnMessage(InitMsg*);
 

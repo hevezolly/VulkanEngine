@@ -40,8 +40,8 @@ BLOCK
         return value;
     }
 
-    static MemoryChunk<VkDescriptorSetLayoutBinding> FillLayoutBindings(RenderContext& context) {
-        auto chunk = context.Get<Allocator>().Allocate<VkDescriptorSetLayoutBinding>(size());
+    static MemChunk<VkDescriptorSetLayoutBinding> FillLayoutBindings(RenderContext& context) {
+        auto chunk = context.Get<Allocator>().BumpAllocate<VkDescriptorSetLayoutBinding>(size());
         
         // ToVkShaderStage(s), nullptr};
         uint32_t counter = 0;
@@ -76,8 +76,8 @@ BLOCK
         return chunk;
     }
 
-    static MemoryChunk<VkDescriptorPoolSize> FillDescriptorSizes(RenderContext& context, uint32_t& actualCount) {
-        auto chunk = context.Get<Allocator>().Allocate<VkDescriptorPoolSize>(size());
+    static MemChunk<VkDescriptorPoolSize> FillDescriptorSizes(RenderContext& context, uint32_t& actualCount) {
+        auto chunk = context.Get<Allocator>().BumpAllocate<VkDescriptorPoolSize>(size());
         actualCount = 0;
         #define WRAPPER(t, n, b, s, dc, dt, info) \
         uint32_t index = UINT32_MAX; \
@@ -90,9 +90,9 @@ BLOCK
         return chunk;
     }
 
-    MemoryChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set) {
+    MemChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set) {
         Allocator& allocator = context.Get<Allocator>();
-        auto writes = allocator.Allocate<VkWriteDescriptorSet>(size());
+        auto writes = allocator.BumpAllocate<VkWriteDescriptorSet>(size());
         uint32_t index;
 
         index = 0;
@@ -137,7 +137,7 @@ BLOCK
             if constexpr (info == BUFFER_INFO) { \
                 writes[i].pImageInfo = nullptr; \
                 writes[i].pTexelBufferView = nullptr; \
-                VkDescriptorBufferInfo* bufferInfo = allocator.Allocate<VkDescriptorBufferInfo>(dc).data; \
+                VkDescriptorBufferInfo* bufferInfo = allocator.BumpAllocate<VkDescriptorBufferInfo>(dc).data; \
                 for (int descriptor = 0; descriptor < dc; descriptor++) { \
                     bufferInfo[descriptor].buffer = n [descriptor].vkBuffer; \
                     bufferInfo[descriptor].offset = 0; \

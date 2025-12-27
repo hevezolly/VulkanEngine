@@ -79,7 +79,8 @@ target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glslang/glslang/Public
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/glm/
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/glm
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/stb
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

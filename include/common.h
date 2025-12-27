@@ -36,8 +36,8 @@ name& operator=(name&&) = delete;
 enum struct API QueueType {
     Graphics,
     Transfer,
-    Compute,
     Present,
+    Compute,
     None
 };
 
@@ -78,14 +78,6 @@ inline QueueTypes operator | (const QueueType lhs, const QueueType rhs) {
     r |= rhs;
     return r;
 }
-
-enum ImageUsage: VkFlags {
-    ColorAttachment = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-    TransferDst = VK_IMAGE_USAGE_TRANSFER_DST_BIT
-};
-
-inline ImageUsage operator |(ImageUsage, ImageUsage);
-inline ImageUsage operator &(ImageUsage, ImageUsage);
 
 #define VK(call) {\
 auto __result = (call);\

@@ -6,6 +6,7 @@
 #include <common.h>
 #include <feature_set.h>
 #include <messages.h>
+#include <allocator_feature.h>
 
 template<typename T>
 struct QueuesDescriptor {
@@ -56,9 +57,11 @@ struct API Device: FeatureSet,
     QueueFamiliesDescriptor queueFamilies;
     QueuesDescriptor<VkQueue> queues;
 
-    void FillQueueUsages(QueueTypes tupes, std::vector<uint32_t>* data);
+    MemChunk<uint32_t> FillQueueUsages(QueueTypes tupes, uint32_t& actualCount);
 
     using FeatureSet::FeatureSet;
     virtual void OnMessage(InitMsg*);
     virtual void OnMessage(DestroyMsg*);
+
+
 };

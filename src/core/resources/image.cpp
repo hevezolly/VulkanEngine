@@ -8,8 +8,8 @@ referencedImage(image)
 {
     VkImageViewCreateInfo createInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     createInfo.image = image->vkImage;
-    createInfo.viewType = image->depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D;
-    createInfo.format = image->format;
+    createInfo.viewType = image->description.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D;
+    createInfo.format = image->description.format;
     createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -51,37 +51,44 @@ ImageView::~ImageView() {
     }
 }
 
-Image::Image(VkImage readyImage, VkDevice device, VkFormat format, uint32_t width, uint32_t height, uint32_t depth)
+Image::Image(
+    VkImage readyImage, 
+    VkDevice vkDevice,
+    ImageDescription& description
+):  vkImage(readyImage),
+    description(description),
+    memory(std::nullopt),
+    device(VK_NULL_HANDLE)
 {
-    vkImage = readyImage;
-    this->format = format;
-    this->width = width;
-    this->height = height;
-    this->depth = depth;
-    memory = VK_NULL_HANDLE;
-    this->device = device;
-    dispose = false;
-    view = new ImageView(device, this);
+    view = new ImageView(vkDevice, this);
+}
+
+Image::Image(
+    VkImage img, 
+    VkDevice vkDevice, 
+    Memory&& memory, 
+    ImageDescription& description
+):  vkImage(img),
+    description(description),
+    memory(std::move(memory)),
+    device(vkDevice)
+{
+    vkBindImageMemory(vkDevice, img, memory.vkMemory, memory.offset);
+    view = new ImageView(vkDevice, this);
 }
 
 Image& Image::operator=(Image&& other) noexcept {
     if (&other == this)
         return *this;
 
-    dispose = other.dispose;
+    memory = std::move(other.memory);
     device = other.device;
-    memory = other.memory;
     vkImage = other.vkImage;
     view = other.view;
     view->referencedImage = this;
-    format = other.format;
-    width = other.width;
-    height = other.height;
-    depth = other.depth;
-
-    other.dispose = false;
+    description = other.description;
     other.device = VK_NULL_HANDLE;
-    other.memory = VK_NULL_HANDLE;
+    other.memory = std::nullopt;
     other.vkImage = VK_NULL_HANDLE;
     other.view = nullptr;
 
@@ -95,14 +102,7 @@ Image::Image(Image&& other) noexcept {
 Image::~Image() {
     delete view;
 
-    if (!dispose) {
-        return;
-    }
-
     if (device != VK_NULL_HANDLE) {
         vkDestroyImage(device, vkImage, nullptr);
-    }
-    if (memory != VK_NULL_HANDLE) {
-        vkFreeMemory(device, memory, nullptr);
     }
 }

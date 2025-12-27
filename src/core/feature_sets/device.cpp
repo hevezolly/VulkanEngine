@@ -226,7 +226,9 @@ void Device::OnMessage(DestroyMsg* m) {
     }
 }
 
-void Device::FillQueueUsages(QueueTypes types, std::vector<uint32_t>* data) {
+MemChunk<uint32_t> Device::FillQueueUsages(QueueTypes types, uint32_t& actualCount) {
+    actualCount = 0;
+    MemChunk<uint32_t> data = context.Get<Allocator>().BumpAllocate<uint32_t>(static_cast<uint32_t>(QueueType::None));
     for (QueueType type = (QueueType)0; (int)type < (int)QueueType::None; type = (QueueType)((int)type + 1)) {
         if ((types & type) == 0)
             continue;
@@ -235,9 +237,10 @@ void Device::FillQueueUsages(QueueTypes types, std::vector<uint32_t>* data) {
         if (!queue.has_value())
             continue;
 
-        if (std::find(data->begin(), data->end(), queue.value()) != data->end())
+        if (std::find(data.data, data.data + actualCount, queue.value()) != data.data + actualCount)
             continue;
 
-        data->push_back(queue.value());
+        data[actualCount++] = queue.value();
     }
+    return data;
 }

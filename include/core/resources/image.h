@@ -1,7 +1,16 @@
 #pragma once
 
-#include <volk.h>
 #include <common.h>
+#include <resource_memory.h>
+#include <optional>
+#include <glm.hpp>
+
+struct API ImageDescription {
+    VkFormat format;
+    uint32_t width;
+    uint32_t height;
+    uint32_t depth=1;
+};
 
 struct API Image;
 
@@ -19,20 +28,16 @@ private:
 
 struct API Image {
     VkImage vkImage;
-    VkFormat format;
-    uint32_t width;
-    uint32_t height;
-    uint32_t depth;
+    ImageDescription description;
 
     ImageView* view;
 
-    Image(VkImage readyImage, VkDevice device, VkFormat format, uint32_t width, uint32_t height, uint32_t depth = 1);
-    // Image(VkDevice, VkFormat, uint32_t width, uint32_t height, uint32_t depth = 1);
+    Image(VkImage readyImage, VkDevice device, ImageDescription& description);
+    Image(VkImage img, VkDevice device, Memory&& memory, ImageDescription& description);
     
     RULE_5(Image)
 
 private:
-    bool dispose = false;
     VkDevice device = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
+    std::optional<Memory> memory;
 };
