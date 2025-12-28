@@ -1,5 +1,11 @@
 
 file(GLOB EXAMPLE_FILES *.cpp)
+set(SOURCE_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+set(DESTINATION_RESOURCES "${CMAKE_CURRENT_BINARY_DIR}/resources")
+
+if(EXISTS "${SOURCE_RESOURCES}")
+    file(COPY "${SOURCE_RESOURCES}/" DESTINATION "${DESTINATION_RESOURCES}")
+endif()
 
 foreach (tgt_full ${EXAMPLE_FILES})
 
@@ -18,6 +24,10 @@ foreach (tgt_full ${EXAMPLE_FILES})
         string(TOUPPER ${cfg} OUTPUTCONFIG_UP)
         set_target_properties(${tgt} PROPERTIES 
             RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UP} ${CMAKE_BINARY_DIR}/${cfg}/bin/examples/${tgt})
+    
+        if(EXISTS "${SOURCE_RESOURCES}")
+            file(COPY "${SOURCE_RESOURCES}/" DESTINATION ${CMAKE_BINARY_DIR}/${cfg}/bin/examples/${tgt}/resources)
+        endif()
     endforeach()
 
     if (WIN32 AND BUILD_SHARED_LIBS)

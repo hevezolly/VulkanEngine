@@ -1,5 +1,5 @@
-#include <registry.h>
 #include <render_context.h>
+#include <registry.h>
 #include <fstream>
 #include <iostream>
 #include <filesystem>
@@ -28,6 +28,7 @@ Registry::Registry(RenderContext& ctx, const char* resourcesFolder):
     FeatureSet(ctx)
 {
     resourcesBase = std::string(resourcesFolder);
+    LOG(resourcesBase)
     if (resourcesBase.size() > 0)
         resourcesBase += FS_SEP;
     fixSeparators(resourcesBase.data(), resourcesBase.size());
@@ -73,6 +74,8 @@ RawImageData Registry::LoadImage(const char* path, int forceNumberOfComponents) 
 
     data.data = stbi_load(name.data, &data.x, &data.y, &data.num_components, forceNumberOfComponents);
     
+    assert(data.data != nullptr);
+
     if (forceNumberOfComponents != 0)
         data.num_components = forceNumberOfComponents;
     

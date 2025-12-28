@@ -1,6 +1,6 @@
 #ifdef BLOCK
-#include <glm/glm.hpp>
 #include <common.h>
+#include <glm/glm.hpp>
 #include <vector>
 
 #ifndef BLOCK_NAME

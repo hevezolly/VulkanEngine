@@ -63,6 +63,18 @@ uint32_t PresentFeature::swapChainSize() {
     return swapChain->images.size();
 }
 
+void UpdateSwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR vkSurface, SwapChainSupport& swapChainSupport) 
+{
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, vkSurface, &swapChainSupport.capabilities);
+    swapChainSupport.surfaceFormats = std::move(vkCollect<VkSurfaceFormatKHR>(
+        vkGetPhysicalDeviceSurfaceFormatsKHR, device, vkSurface 
+    ));
+
+    swapChainSupport.presentModes = std::move(vkCollect<VkPresentModeKHR>(
+        vkGetPhysicalDeviceSurfacePresentModesKHR, device, vkSurface
+    ));
+}
+
 void PresentFeature::recreateSwapChain() {
 
     int width = 0, height = 0;
@@ -75,6 +87,9 @@ void PresentFeature::recreateSwapChain() {
     vkDeviceWaitIdle(context.device());
     swapChainFrameBuffers.Clear();
     delete swapChain;
+
+    UpdateSwapChainSupport(context.Get<Device>().vkPhysicalDevice, window->vkSurface, swapChainSupport);
+
     swapChain = new SwapChain(&context, swapChainArgs);
 }
 
@@ -82,7 +97,7 @@ uint32_t PresentFeature::AcquireNextImage(Ref<Semaphore> imageReady) {
     uint32_t nextImage = 0;
     VkResult result = vkAcquireNextImageKHR(context.device(), swapChain->swapChain, UINT64_MAX, imageReady->vk, VK_NULL_HANDLE, &nextImage);
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         recreateSwapChain();
         return AcquireNextImage(imageReady);
     }
@@ -118,14 +133,8 @@ void PresentFeature::OnMessage(PresentMsg* m) {
 }
 
 void PresentFeature::OnMessage(CheckDeviceAppropriateMsg* m) {
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m->device, window->vkSurface, &swapChainSupport.capabilities);
-    swapChainSupport.surfaceFormats = std::move(vkCollect<VkSurfaceFormatKHR>(
-        vkGetPhysicalDeviceSurfaceFormatsKHR, m->device, window->vkSurface 
-    ));
 
-    swapChainSupport.presentModes = std::move(vkCollect<VkPresentModeKHR>(
-        vkGetPhysicalDeviceSurfacePresentModesKHR, m->device, window->vkSurface
-    ));
+    UpdateSwapChainSupport(m->device, window->vkSurface, swapChainSupport);
 
     bool supported = swapChainSupport.surfaceFormats.size() > 0 && swapChainSupport.presentModes.size() > 0;
 

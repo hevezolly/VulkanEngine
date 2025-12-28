@@ -125,6 +125,11 @@ struct API RenderContext {
         return r;
     }
 
+    template<typename T>
+    Ref<T> Register(T&& movedVal) {
+        return New<T>(std::move(movedVal));
+    }
+
     template<typename T, typename... Args>
     Refs<T> NewRefs(uint32_t size, Args&&... args) {
 

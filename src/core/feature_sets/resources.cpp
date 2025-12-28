@@ -4,6 +4,9 @@
 #include <command_pool.h>
 #include <registry.h>
 
+Ref<Buffer> Resources::newBuffer(Buffer&& buff) {
+    return context.New<Buffer>(std::move(buff));
+}
 
 uint32_t findMemType(
     VkMemoryRequirements requirements, 
@@ -85,7 +88,7 @@ Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes, void
     return outputBuffer;
 }
 
-Image Resources::CreateRawImage(ImageDescription& description, ImageUsage usage) {
+Image Resources::CreateRawImage(const ImageDescription& description, ImageUsage usage) {
     VkImage image;
     VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     imageInfo.imageType = description.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
@@ -93,8 +96,9 @@ Image Resources::CreateRawImage(ImageDescription& description, ImageUsage usage)
     imageInfo.extent.height = description.height;
     imageInfo.extent.depth = description.depth;
     imageInfo.mipLevels = 1;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.arrayLayers = 1;
-    imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    imageInfo.format = description.format;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = static_cast<VkImageUsageFlags>(usage);
@@ -104,8 +108,7 @@ Image Resources::CreateRawImage(ImageDescription& description, ImageUsage usage)
     imageInfo.sharingMode = usedQueuesCount > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.queueFamilyIndexCount = usedQueuesCount;
     imageInfo.pQueueFamilyIndices = usedQueues.data;
-    
-    VkImage image;
+
     VK(vkCreateImage(context.device(), &imageInfo, nullptr, &image));
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(context.device(), image, &memRequirements);
@@ -152,7 +155,7 @@ int getStbiForceComponents(VkFormat format)
         case VK_FORMAT_R8G8_SSCALED:
             return 2; 
         case VK_FORMAT_R8G8_UINT:
-            return ; 
+            return 2; 
         case VK_FORMAT_R8G8_SINT:
             return 2; 
         case VK_FORMAT_R8G8_SRGB:
@@ -227,9 +230,9 @@ VkFormat getFormatFromNativeComponents(int components)
         case 2:
             return VK_FORMAT_R8G8_UNORM;
         case 3:
-            return VK_FORMAT_R8G8B8_UNORM;
+            return VK_FORMAT_R8G8B8_SRGB;
         case 4:
-            return VK_FORMAT_R8G8B8A8_UNORM;
+            return VK_FORMAT_R8G8B8A8_SRGB;
         default:
             assert(false);
     }
@@ -249,14 +252,22 @@ Image Resources::LoadRawImage(ImageUsage usage, const char* path, VkFormat forma
     description.height = imageData.y;
     description.depth = 1;
     description.format = format;
+
+    LOG(description.width _S_ description.height)
     
-    Image result = CreateRawImage(description, usage);
+    Image result = CreateRawImage(description, usage | ImageUsage::TransferDst);
     Buffer stagingBuffer = createAndFillBuffer(*this, BufferPreset::STAGING, imageData.size(), imageData.data);
-
     imageData.Free();
-
     TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
+    
     cmd.Begin();
+
+    cmd.ImageBarrier(result, 
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+        VK_ACCESS_TRANSFER_WRITE_BIT, 
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT
+    );
     
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -266,7 +277,7 @@ Image Resources::LoadRawImage(ImageUsage usage, const char* path, VkFormat forma
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.mipLevel = 0;
     region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 0;
+    region.imageSubresource.layerCount = 1;
 
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {
@@ -278,9 +289,47 @@ Image Resources::LoadRawImage(ImageUsage usage, const char* path, VkFormat forma
     vkCmdCopyBufferToImage(cmd.buffer, 
         stagingBuffer.vkBuffer, result.vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
+
     cmd.End();
     context.Get<CommandPool>().Submit(cmd);
+
     vkQueueWaitIdle(context.Get<Device>().queues.get(QueueType::Transfer));
 
+    return result;
+}
 
+Ref<Image> Resources::CreateImage(const ImageDescription& dsecription, ImageUsage usage) {
+    return context.Register(CreateRawImage(dsecription, usage));
+}
+
+Ref<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFormat format) {
+    return context.Register(LoadRawImage(usage, path, format));
+}
+
+Sampler Resources::CreateRawSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode) {
+    VkSamplerCreateInfo samplerInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+
+    samplerInfo.magFilter = filter.magFilter;
+    samplerInfo.minFilter = filter.minFilter;
+    samplerInfo.addressModeU = addressMode.uMode;
+    samplerInfo.addressModeV = addressMode.vMode;
+    samplerInfo.addressModeW = addressMode.wMode;
+
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    VkSampler sampler;
+    VK(vkCreateSampler(context.device(), &samplerInfo, nullptr, &sampler));
+
+    return Sampler(sampler, context.device());
+}
+
+Ref<Sampler> Resources::CreateSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode) {
+    return context.Register(CreateRawSampler(filter, addressMode));
 }

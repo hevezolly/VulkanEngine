@@ -6,6 +6,7 @@
 #include <synchronization.h>
 #include <resources.h>
 #include <descriptor_pool.h>
+#include <registry.h>
 
 
 static VkResult checkLayersSupport(std::vector<const char*>& layers) {
@@ -42,7 +43,8 @@ RenderContext::RenderContext(): _handling(false) {
         .WithFeature<CommandPool>()
         .WithFeature<Synchronization>()
         .WithFeature<Resources>()
-        .WithFeature<Descriptors>();
+        .WithFeature<Descriptors>()
+        .WithFeature<Registry>();
 }
 
 void RenderContext::Initialize() {

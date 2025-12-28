@@ -11,20 +11,24 @@
 #error "BLOCK_NAME must be defined"
 #endif
 
-#define BUFFER_INFO 0
-#define IMAGE_INFO 1
-#define TEXEL_BUFFER_VIEW_INFO 2
+#define BUFFER_INFO 0x1
+#define IMAGE_INFO 0x2
+#define TEXEL_BUFFER_VIEW_INFO 0x4
+#define INCLUDES_SAMPLER 0x8
+#define INCLUDES_IMAGE 0x10
 
 struct BLOCK_NAME {
 
-#define WRAPPER(t, n, b, s, dc, dt, info) t n;
+#define DEFINITION
+#define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) t n;
 #include "define_shader_bindings.h"
 BLOCK
 #undef WRAPPER
+#undef DEFINITION
 
     static constexpr uint32_t size() {
         uint32_t value = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) value++;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) value++;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
@@ -33,7 +37,7 @@ BLOCK
 
     static constexpr uint32_t count(VkDescriptorType type) {
         uint32_t value = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) value += (dt == type ? 1 : 0);
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) value += (dt == type ? 1 : 0);
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
@@ -45,31 +49,31 @@ BLOCK
         
         // ToVkShaderStage(s), nullptr};
         uint32_t counter = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].binding = b;  
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) chunk[counter++].binding = b;  
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         counter = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].descriptorType = dt;  
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) chunk[counter++].descriptorType = dt;  
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         counter = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].descriptorCount = dc;  
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) chunk[counter++].descriptorCount = dc;  
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         counter = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].stageFlags = ToVkShaderStage(s);  
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) chunk[counter++].stageFlags = ToVkShaderStage(s);  
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         counter = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) chunk[counter++].pImmutableSamplers = nullptr;  
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) chunk[counter++].pImmutableSamplers = nullptr;  
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
@@ -79,8 +83,9 @@ BLOCK
     static MemChunk<VkDescriptorPoolSize> FillDescriptorSizes(RenderContext& context, uint32_t& actualCount) {
         auto chunk = context.Get<Allocator>().BumpAllocate<VkDescriptorPoolSize>(size());
         actualCount = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) \
-        uint32_t index = UINT32_MAX; \
+        uint32_t index; 
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) \
+        index = UINT32_MAX; \
         for (uint32_t i = 0; i < actualCount; i++) { if (chunk[i].type == dt) {index = i; break;} } \
         if (index == UINT32_MAX) {index = actualCount++;} \
         chunk[index].type = dt; chunk[index].descriptorCount += dc;
@@ -96,55 +101,69 @@ BLOCK
         uint32_t index;
 
         index = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) writes[index++].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) writes[index++].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         index = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) writes[index++].dstSet = set;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) writes[index++].dstSet = set;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         index = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) writes[index++].dstBinding = b;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) writes[index++].dstBinding = b;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         index = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) writes[index++].descriptorType = dt;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) writes[index++].descriptorType = dt;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         index = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) writes[index++].descriptorCount = dc;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) writes[index++].descriptorCount = dc;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         index = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) writes[index++].dstArrayElement = 0;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) writes[index++].dstArrayElement = 0;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
 
         index = 0;
-        #define WRAPPER(t, n, b, s, dc, dt, info) { \
+        #define WRAPPER(t, n, b, s, dc, dt, buffer_value, image_value, sampler_value, info) { \
             uint32_t i = index++; \
-            if constexpr (info == BUFFER_INFO) { \
+            if constexpr (((info) & BUFFER_INFO) == BUFFER_INFO) { \
                 writes[i].pImageInfo = nullptr; \
                 writes[i].pTexelBufferView = nullptr; \
                 VkDescriptorBufferInfo* bufferInfo = allocator.BumpAllocate<VkDescriptorBufferInfo>(dc).data; \
-                for (int descriptor = 0; descriptor < dc; descriptor++) { \
-                    bufferInfo[descriptor].buffer = n [descriptor].vkBuffer; \
-                    bufferInfo[descriptor].offset = 0; \
-                    bufferInfo[descriptor].range = VK_WHOLE_SIZE; \
+                for (int __descriptor = 0; __descriptor < dc; __descriptor++) { \
+                    bufferInfo[__descriptor].buffer = buffer_value; \
+                    bufferInfo[__descriptor].offset = 0; \
+                    bufferInfo[__descriptor].range = VK_WHOLE_SIZE; \
                 } \
                 writes[i].pBufferInfo = bufferInfo; \
-            } else { \
+            } else if constexpr (((info) & IMAGE_INFO) == IMAGE_INFO) { \
+                writes[i].pTexelBufferView = nullptr; \
+                writes[i].pBufferInfo = nullptr; \
+                VkDescriptorImageInfo* imageInfo = allocator.BumpAllocate<VkDescriptorImageInfo>(dc).data; \
+                for (int __descriptor = 0; __descriptor < dc; __descriptor++) { \
+                    imageInfo[__descriptor].sampler = nullptr; \
+                    imageInfo[__descriptor].imageView = nullptr; \
+                    imageInfo[__descriptor].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED; \
+                    if constexpr (((info) & INCLUDES_SAMPLER) == INCLUDES_SAMPLER) imageInfo[__descriptor].sampler = sampler_value; \
+                    if constexpr (((info) & INCLUDES_IMAGE) == INCLUDES_IMAGE) { \
+                        imageInfo[__descriptor].imageView = image_value; \
+                        imageInfo[__descriptor].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; \
+                    } \
+                } \
+                writes[i].pImageInfo = imageInfo; \
             } \
         }
         #include "define_shader_bindings.h"
@@ -161,6 +180,8 @@ BLOCK
 #undef BUFFER_INFO
 #undef IMAGE_INFO
 #undef TEXEL_BUFFER_VIEW_INFO
+#undef INCLUDES_SAMPLER
+#undef INCLUDES_IMAGE
 
 #undef BLOCK
 #endif

@@ -54,11 +54,12 @@ ImageView::~ImageView() {
 Image::Image(
     VkImage readyImage, 
     VkDevice vkDevice,
-    ImageDescription& description
+    const ImageDescription& description
 ):  vkImage(readyImage),
     description(description),
     memory(std::nullopt),
-    device(VK_NULL_HANDLE)
+    device(VK_NULL_HANDLE),
+    state{VK_IMAGE_LAYOUT_UNDEFINED, 0}
 {
     view = new ImageView(vkDevice, this);
 }
@@ -67,13 +68,14 @@ Image::Image(
     VkImage img, 
     VkDevice vkDevice, 
     Memory&& memory, 
-    ImageDescription& description
+    const ImageDescription& description
 ):  vkImage(img),
     description(description),
     memory(std::move(memory)),
-    device(vkDevice)
+    device(vkDevice),
+    state{VK_IMAGE_LAYOUT_UNDEFINED, 0}
 {
-    vkBindImageMemory(vkDevice, img, memory.vkMemory, memory.offset);
+    vkBindImageMemory(vkDevice, img, this->memory.value().vkMemory, memory.offset);
     view = new ImageView(vkDevice, this);
 }
 
@@ -85,6 +87,7 @@ Image& Image::operator=(Image&& other) noexcept {
     device = other.device;
     vkImage = other.vkImage;
     view = other.view;
+    state = other.state;
     view->referencedImage = this;
     description = other.description;
     other.device = VK_NULL_HANDLE;

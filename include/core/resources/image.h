@@ -3,7 +3,7 @@
 #include <common.h>
 #include <resource_memory.h>
 #include <optional>
-#include <glm.hpp>
+#include <glm/glm.hpp>
 
 struct API ImageDescription {
     VkFormat format;
@@ -26,14 +26,19 @@ private:
     VkDevice device;
 };
 
+struct ResourceState {
+    VkImageLayout currentLayout;
+    VkAccessFlags currentAccess;
+};
+
 struct API Image {
     VkImage vkImage;
     ImageDescription description;
-
+    ResourceState state;
     ImageView* view;
 
-    Image(VkImage readyImage, VkDevice device, ImageDescription& description);
-    Image(VkImage img, VkDevice device, Memory&& memory, ImageDescription& description);
+    Image(VkImage readyImage, VkDevice device, const ImageDescription& description);
+    Image(VkImage img, VkDevice device, Memory&& memory, const ImageDescription& description);
     
     RULE_5(Image)
 

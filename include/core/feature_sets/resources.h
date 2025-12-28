@@ -6,6 +6,7 @@
 #include <utility>
 #include <image.h>
 #include <image_usage.h>
+#include <sampler.h>
 
 struct API Resources: FeatureSet,
     CanHandle<InitMsg>
@@ -20,33 +21,34 @@ struct API Resources: FeatureSet,
     
     template <typename T>
     Ref<Buffer> CreateBuffer(BufferPreset preset, uint32_t elements_count, T* data) {
-        return context.New<Buffer>(std::move(CreateRawBuffer(preset, elements_count * sizeof(T), data)));
+        return newBuffer(std::move(CreateRawBuffer(preset, elements_count * sizeof(T), data)));
     }
 
     template <typename T>
     Ref<Buffer> CreateBuffer(BufferPreset preset, uint32_t elementCount) {
-        return context.New<Buffer>(std::move(CreateRawBuffer(preset, elementCount * sizeof(T))));
+        return newBuffer(std::move(CreateRawBuffer(preset, elementCount * sizeof(T))));
     }
     
     template <typename T>
     Ref<Buffer> CreateBuffer(BufferPreset preset, std::vector<T>& elements) {
-        return context.New<Buffer>(std::move(CreateRawBuffer(preset, elements.size() * sizeof(T), elements.data())));
+        return newBuffer(std::move(CreateRawBuffer(preset, elements.size() * sizeof(T), elements.data())));
     }
 
-    Image CreateRawImage(ImageDescription& dsecription, ImageUsage usage);
+    Image CreateRawImage(const ImageDescription& dsecription, ImageUsage usage);
 
     Image LoadRawImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
 
-    inline Ref<Image> CreateImage(ImageDescription& dsecription, ImageUsage usage) {
-        return context.New<Image>(std::move(CreateRawImage(dsecription, usage)));
-    }
+    Sampler CreateRawSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode);
 
-    inline Ref<Image> LoadImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED) {
-        return context.New<Image>(std::move(LoadRawImage(usage, path, format)));
-    }
+    Ref<Sampler> CreateSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode);
+
+    Ref<Image> CreateImage(const ImageDescription& dsecription, ImageUsage usage);
+
+    Ref<Image> LoadImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
 
     virtual void OnMessage(InitMsg*);
 
 private:
+    Ref<Buffer> newBuffer(Buffer&&);
     VkPhysicalDeviceMemoryProperties vkMemProperties;
 };

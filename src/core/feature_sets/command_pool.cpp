@@ -232,3 +232,34 @@ void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, Ref<
 void GraphicsCommandBuffer::EndRenderPass() {
     vkCmdEndRenderPass(buffer);
 }
+
+void TransferCommandBuffer::ImageBarrier(Image& img, VkImageLayout newLayout, VkAccessFlags access, VkPipelineStageFlags srcStage, VkPipelineStageFlags destStage) {
+
+    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    barrier.oldLayout = img.state.currentLayout;
+    barrier.newLayout = newLayout;
+
+    barrier.image = img.vkImage;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    barrier.srcAccessMask = img.state.currentAccess;
+    barrier.dstAccessMask = access;
+
+    vkCmdPipelineBarrier(buffer,
+        srcStage, destStage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+
+    img.state.currentAccess = access;
+    img.state.currentLayout = newLayout;
+}

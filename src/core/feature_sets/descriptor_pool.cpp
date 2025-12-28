@@ -1,6 +1,14 @@
 #include <descriptor_pool.h>
 #include <render_context.h>
 
+void __deallocate(RenderContext* context, RawMemChunk memory, bool force) {
+    context->Get<Allocator>().Free(memory, force);
+}
+
+VkDevice __device(RenderContext* context) {
+    return context->device();
+}
+
 DescriptorPool::DescriptorPool(
     RenderContext* c, 
     uint32_t count,
@@ -35,20 +43,22 @@ DescriptorPool::~DescriptorPool() {
     context = nullptr;
 }
 
-SpecializedDescriptorSet& SpecializedDescriptorSet::operator=(SpecializedDescriptorSet&& other) noexcept {
+DescriptorSet& DescriptorSet::operator=(DescriptorSet&& other) noexcept {
     if (&other == this)
         return *this;
 
     vkSet = other.vkSet;
     pool = other.pool;
+    context = other.context;
 
     other.pool = nullptr;
     other.vkSet = VK_NULL_HANDLE;
+    other.context = nullptr;
 
     return *this;
 }
 
-SpecializedDescriptorSet::SpecializedDescriptorSet(SpecializedDescriptorSet&& other) noexcept {
+DescriptorSet::DescriptorSet(DescriptorSet&& other) noexcept {
     *this = std::move(other);
 }
 
@@ -65,7 +75,7 @@ void SpecializedDescriptorPool::OnReturnOne(VkDescriptorSet set)
     availableInstances++;
 }
 
-SpecializedDescriptorSet SpecializedDescriptorPool::Allocate() {
+DescriptorSet SpecializedDescriptorPool::Allocate() {
     assert(!empty());
     
     VkDescriptorSet set;
@@ -78,7 +88,7 @@ SpecializedDescriptorSet SpecializedDescriptorPool::Allocate() {
     VK(vkAllocateDescriptorSets(pool.context->device(), &allocInfo, &set));
     availableInstances--;
 
-    return SpecializedDescriptorSet(set, this);
+    return DescriptorSet(set, this, pool.context);
 }
 
 bool SpecializedDescriptorPool::empty() {
@@ -98,7 +108,7 @@ maxInstances(countInstances),
 layout(l)
 {}
 
-SpecializedDescriptorSet::~SpecializedDescriptorSet() {
+DescriptorSet::~DescriptorSet() {
     if (pool == nullptr)
         return;
 
@@ -109,14 +119,6 @@ void Descriptors::OnMessage(DestroyMsg*) {
     for (auto p : _layouts) {
         vkDestroyDescriptorSetLayout(context.device(), p.second, nullptr); 
     }
-}
-
-VkDevice Descriptors::device() {
-    return context.device();
-}
-
-void Descriptors::Deallocate(RawMemChunk memory, bool force) {
-    context.Get<Allocator>().Free(memory, force);
 }
 
 void Descriptors::OnMessage(EarlyDestroyMsg*) {

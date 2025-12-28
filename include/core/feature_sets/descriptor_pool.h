@@ -17,19 +17,32 @@ private:
     RenderContext* context;
 };
 
-struct SpecializedDescriptorSet {
+void API __deallocate(RenderContext*, RawMemChunk memory, bool force=false);
+VkDevice API __device(RenderContext*);
+
+struct API DescriptorSet {
     VkDescriptorSet vkSet;
 
-    SpecializedDescriptorSet(VkDescriptorSet set, SpecializedDescriptorPool* p): 
-        vkSet(set), pool(p) {}
+    DescriptorSet(VkDescriptorSet set, SpecializedDescriptorPool* p, RenderContext* ctx): 
+        vkSet(set), pool(p), context(ctx) {}
 
-    RULE_5(SpecializedDescriptorSet)
+    template<typename T>
+    void Update(T& value) {
+        MemChunk<VkWriteDescriptorSet> writes = value.CollectDescriptorWrites(*context, vkSet);
+
+        vkUpdateDescriptorSets(__device(context), writes.size, writes.data, 0, nullptr);
+
+        __deallocate(context, writes, true);
+    }
+
+    RULE_5(DescriptorSet)
 
 private: 
     SpecializedDescriptorPool* pool;
+    RenderContext* context;
 };
 
-struct SpecializedDescriptorPool 
+struct API SpecializedDescriptorPool 
 {
     SpecializedDescriptorPool(
         RenderContext*, 
@@ -42,9 +55,9 @@ struct SpecializedDescriptorPool
     RULE_NO(SpecializedDescriptorPool)
 
     bool empty();
-    SpecializedDescriptorSet Allocate();
+    DescriptorSet Allocate();
     
-    friend SpecializedDescriptorSet;
+    friend DescriptorSet;
 private:
     void OnReturnOne(VkDescriptorSet set);
     VkDescriptorSetLayout layout;
@@ -53,7 +66,7 @@ private:
     uint32_t maxInstances;
 };
 
-struct Descriptors : FeatureSet,
+struct API Descriptors : FeatureSet,
     CanHandle<DestroyMsg>,
     CanHandle<EarlyDestroyMsg>,
     CanHandle<BeginFrameMsg>
@@ -81,7 +94,7 @@ struct Descriptors : FeatureSet,
 
         _descriptorPools[id].push_back(pool);
 
-        Deallocate(sizes, true);
+        __deallocate(&context, sizes, true);
     }
 
     template<typename T>
@@ -101,16 +114,16 @@ struct Descriptors : FeatureSet,
             createInfo.flags = 0;
             createInfo.pBindings = bindings.data;
 
-            vkCreateDescriptorSetLayout(device(), &createInfo, nullptr, &_layouts[id]);
-            Deallocate(bindings, true);
+            vkCreateDescriptorSetLayout(__device(&context), &createInfo, nullptr, &_layouts[id]);
+            __deallocate(&context, bindings, true);
         }
 
         return _layouts[id];
     }
 
     template<typename T>
-
-    VkDescriptorSet UpdateDescriptorSet(T& values) {
+    DescriptorSet CreateDescriptorSet() 
+    {
         std::type_index id = getTypeId<T>();
 
         Ref<SpecializedDescriptorPool> selectedPool = Ref<SpecializedDescriptorPool>::Null();
@@ -127,19 +140,20 @@ struct Descriptors : FeatureSet,
             selectedPool = _descriptorPools[id].back();
         }
 
+        return selectedPool->Allocate();
+    }
+
+    template<typename T>
+    VkDescriptorSet UpdateDescriptorSet(T& values) 
+    {
         if (allocatedSets.size() < frameId + 1)
             allocatedSets.resize(frameId + 1);
 
-        allocatedSets[frameId].push_back(selectedPool->Allocate());
+        allocatedSets[frameId].push_back(CreateDescriptorSet<T>());
 
-        VkDescriptorSet set = allocatedSets[frameId].back().vkSet;
-        MemChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(context, set);
-
-        vkUpdateDescriptorSets(device(), writes.size, writes.data, 0, nullptr);
-
-        Deallocate(writes, true);
-
-        return set;
+        DescriptorSet& set = allocatedSets[frameId].back();
+        set.Update(values);
+        return set.vkSet;
     }
 
     virtual void OnMessage(DestroyMsg*);
@@ -147,13 +161,11 @@ struct Descriptors : FeatureSet,
     virtual void OnMessage(EarlyDestroyMsg*);
 
 private:
-    void Deallocate(RawMemChunk memory, bool force=false);
-    VkDevice device();
     Ref<SpecializedDescriptorPool> CreateDescriptorPool(
         uint32_t, uint32_t, VkDescriptorSetLayout, MemChunk<VkDescriptorPoolSize> sizes);
     std::unordered_map<std::type_index, VkDescriptorSetLayout> _layouts;
     std::unordered_map<std::type_index, std::vector<Ref<SpecializedDescriptorPool>>> _descriptorPools;
 
-    std::vector<std::vector<SpecializedDescriptorSet>> allocatedSets;
+    std::vector<std::vector<DescriptorSet>> allocatedSets;
     uint32_t frameId;
 };

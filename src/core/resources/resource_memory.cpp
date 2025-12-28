@@ -158,3 +158,15 @@ MemoryMapToken Memory::Map(uint32_t size, uint32_t o) {
 MemoryMapToken Memory::Map() {
     return MemoryMapToken(mapData, offset, size_bytes);
 }
+
+void MemoryChunkData::Flush(uint32_t offset, uint32_t size) {
+    VkMappedMemoryRange range{VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE};
+    range.memory = vkMemory;
+    range.offset = offset;
+    range.size = size;
+    VK(vkFlushMappedMemoryRanges(device, 1, &range));
+}
+
+void Memory::Flush() {
+    mapData->Flush(offset, size_bytes);
+}

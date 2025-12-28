@@ -3,7 +3,7 @@
 #include <feature_set.h>
 #include <allocator_feature.h>
 
-struct RawImageData 
+struct API RawImageData 
 {
     unsigned char* data;
     int x;

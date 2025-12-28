@@ -1,3 +1,4 @@
+#define THROW_ON_UNDESIRED_SWAPCHAIN
 #include <iostream>
 #include <render_context.h>
 #include <shader_source.h>
@@ -8,13 +9,17 @@
 #include <resources.h>
 #include <allocator_feature.h>
 #include <chrono>
+#define GLM_FORCE_RADIANS
 #include <glm/gtc/matrix_transform.hpp>
 #include <thread>
+#include <stable_frame_rate.h>
+#include <registry.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
 VEC2(position, 0) \
-VEC3(color, 1)
+VEC3(color, 1) \
+VEC2(uv, 2)
 #include <gen_vertex_data.h>
 
 /*
@@ -22,6 +27,7 @@ expands to:
 struct Vertex {
     glm::vec2 position;
     glm::vec3 color;
+    glm::vec2 uv;
 
     //... other required binding information
 };
@@ -29,13 +35,16 @@ struct Vertex {
 
 #define BLOCK_NAME ShaderInput
 #define BLOCK \
-UNIFORM_BUFFER(transforms, 0, Stage::Vertex)
+UNIFORM_BUFFER(transforms, 0, Stage::Vertex) \
+IMAGE_SAMPLER(img, 1, Stage::Fragment)
 #include <gen_bindings.h>
 
 /*
 expands to:
 struct ShaderInput {
     Buffer* transforms;
+    ImageView* img;
+    Sampler* img_sampler;
 
     //... other required binding information
 };
@@ -53,9 +62,12 @@ struct _Resources {
     Refs<Semaphore> renderFinish;
     Refs<Fence> inFlightFences;
     Refs<Buffer> uniformBuffers;
+    Refs<DescriptorSet> descriptorSets;
     Ref<GraphicsPipeline> pipeline;
     Ref<Buffer> vertexBuffer;
     Ref<Buffer> indexBuffer;
+    Ref<Image> image;
+    Ref<Sampler> sampler;
 };
 
 _Resources PrepareResources(
@@ -77,11 +89,14 @@ layout(binding = 0) uniform UniformBufferObject {
 
 layout(location = 0) in vec2 in_position;
 layout(location = 1) in vec3 in_color;
+layout(location = 2) in vec2 uv;
 layout(location = 0) out vec3 fragColor;
+layout(location = 1) out vec2 uv_out;
 
 void main() {
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_position, 0.0, 1.0);
     fragColor = in_color;
+    uv_out = uv;
 })";
 
     ShaderSource fragmentSource;
@@ -89,12 +104,14 @@ void main() {
     fragmentSource.stage = Stage::Fragment;
     fragmentSource.source = 
 R"(#version 450
+layout(binding = 1) uniform sampler2D tex;
 
 layout(location = 0) in vec3 fragColor;
+layout(location = 1) in vec2 uv;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    outColor = vec4(fragColor, 1);
+    outColor = texture(tex, uv);
 }
 )";
 
@@ -113,10 +130,10 @@ void main() {
         .Build();
 
     std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0, 0}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1, 0}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1, 1}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0, 1}}
     };
     r.vertexBuffer = context.Get<Resources>().CreateBuffer<Vertex>(BufferPreset::VERTEX, vertices);
 
@@ -131,12 +148,41 @@ void main() {
         context.Get<PresentFeature>().swapChain->images.size());
     r.commandBuffers.reserve(framesInFlight);
 
+    r.image = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
+
+    r.sampler = context.Get<Resources>().CreateSampler(SamplerFilter::LINEAR, SamplerAddressMode::REPEAT);
+
+    r.uniformBuffers.reserve(framesInFlight);
     for (int i = 0; i < framesInFlight; i++) {
         r.commandBuffers.push_back(context.Get<CommandPool>().CreateGraphicsBuffer());
         r.uniformBuffers.push_back(context.Get<Resources>()
             .CreateBuffer<UniformData>(BufferPreset::UNIFORM, 1));
         
+        r.descriptorSets.push_back(
+            context.Register(std::move(context.Get<Descriptors>()
+            .CreateDescriptorSet<ShaderInput>())));
+        
+        ShaderInput data{};
+        data.transforms = &r.uniformBuffers.back();
+        data.img = r.image->view;
+        data.img_sampler = &r.sampler;
+
+        r.descriptorSets.back()->Update(data);
     }
+      
+    r.commandBuffers[0].Begin();
+
+    r.commandBuffers[0].ImageBarrier(
+        *r.image, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_ACCESS_SHADER_READ_BIT, 
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+    r.commandBuffers[0].End();
+
+    context.Get<CommandPool>().Submit(r.commandBuffers[0]);
+    vkQueueWaitIdle(context.Get<Device>().queues.get(QueueType::Graphics));
 
     return r;
 }
@@ -178,7 +224,7 @@ void RecordCommandBuffer(
     cmd.End();
 }
 
-VkDescriptorSet UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
+void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     auto currentTime = std::chrono::high_resolution_clock::now();
@@ -193,11 +239,6 @@ VkDescriptorSet UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) 
     d.proj[1][1] *= -1;
 
     memcpy(uniformBuffer.memory.PersistentMap().data(), &d, sizeof(d));
-
-    ShaderInput input{};
-    input.transforms = &uniformBuffer;
-
-    return context.Get<Descriptors>().UpdateDescriptorSet(input);
 } 
 
 void DrawFrame(
@@ -211,13 +252,19 @@ void DrawFrame(
 
     context.Send(BeginFrameMsg{frameId});
 
+    bool menuActive = true;
+
     Ref<Semaphore> imgAvailable = r.imgAvailableSemaphores[frameId];
 
     uint32_t imageIndex = context.Get<PresentFeature>().AcquireNextImage(imgAvailable);
 
     GraphicsCommandBuffer& cmd = r.commandBuffers[frameId];
 
-    VkDescriptorSet set = UpdateShaderData(context, *r.uniformBuffers[frameId]);
+    UpdateShaderData(context, *r.uniformBuffers[frameId]);
+
+    vkDeviceWaitIdle(context.device());
+
+    VkDescriptorSet set = r.descriptorSets[frameId]->vkSet;
 
     cmd.Reset();
     RecordCommandBuffer(cmd, r.vertexBuffer, r.indexBuffer, r.pipeline, 
@@ -242,23 +289,24 @@ void Run() {
 
     WindowInitializer windowDescription{};
     SwapChainInitializer swapChainDescription{};
+    swapChainDescription.desiredPresentMode = {VK_PRESENT_MODE_IMMEDIATE_KHR};
     windowDescription.width = 800;
     windowDescription.height = 600;
     windowDescription.hint = "VkEngine";
     RenderContext context;
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .WithFeature<GraphicsFeature>()
+           .WithFeature<StableFPS>(60)
+           .WithFeature<Registry>("resources")
            .Initialize();
     volkLoadInstance(context.vkInstance);
 
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
-    const uint32_t framesInFlight = 3;
-
-
+    const uint32_t framesInFlight = 1;
 
     _Resources resources = PrepareResources(context, framesInFlight);
-
+    glfwSwapInterval(1);
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();

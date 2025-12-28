@@ -15,6 +15,7 @@ struct MemoryChunkData {
     MemoryChunkData(VkDeviceMemory memory, VkDevice device); 
 
     void Map(uint32_t offset, uint32_t size);
+    void Flush(uint32_t offset, uint32_t size);
     void Unmap();
 };
 
@@ -42,6 +43,7 @@ struct API Memory {
     void Unmap();
     Memory();
     Memory(Memory* parent, uint32_t offset, uint32_t size);
+    void Flush();
 
     RULE_5(Memory)
     

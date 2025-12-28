@@ -8,12 +8,12 @@ FrameBuffer::FrameBuffer(RenderContext* context, ImageView* image, VkRenderPass 
     framebufferInfo.renderPass = renderPass;
     framebufferInfo.attachmentCount = 1;
     framebufferInfo.pAttachments = &image->vkImageView;
-    framebufferInfo.width = image->referencedImage->width;
-    framebufferInfo.height = image->referencedImage->height;
+    framebufferInfo.width = image->referencedImage->description.width;
+    framebufferInfo.height = image->referencedImage->description.height;
     framebufferInfo.layers = 1;
     framebufferInfo.flags = 0;
-    width = image->referencedImage->width;
-    height = image->referencedImage->height;
+    width = image->referencedImage->description.width;
+    height = image->referencedImage->description.height;
 
     
     VK(vkCreateFramebuffer(context->device(), &framebufferInfo, nullptr, &frameBuffer))
