@@ -120,7 +120,7 @@ void main() {
     ShaderBinary fragmentBin = compiler.FromSource(fragmentSource);
 
     r.pipeline = context
-        .Get<GraphicsFeature>().GraphicsPipeline()
+        .Get<GraphicsFeature>().NewGraphicsPipeline()
         .SetVertex<Vertex>()
         .AddLayout<ShaderInput>()
         .AddShaderStage(Stage::Vertex, vertexBin)

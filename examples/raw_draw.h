@@ -57,7 +57,7 @@ void main() {
     LOG("shaders compiled")
 
     r.pipeline = context
-        .Get<GraphicsFeature>().GraphicsPipeline()
+        .Get<GraphicsFeature>().NewGraphicsPipeline()
         .AddShaderStage(Stage::Vertex, vertexBin)
         .AddShaderStage(Stage::Fragment, fragmentBin)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)

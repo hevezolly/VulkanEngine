@@ -18,3 +18,15 @@ inline Stage operator & (Stage lhs, Stage rhs) {
 inline VkShaderStageFlagBits ToVkShaderStage(Stage stage) {
     return static_cast<VkShaderStageFlagBits>(stage);
 }
+
+enum struct API LoadOp {
+    Load = VK_ATTACHMENT_LOAD_OP_LOAD,
+    Clear = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    Any = VK_ATTACHMENT_LOAD_OP_DONT_CARE
+};
+
+inline void ResolveAttachmentInitialLayout(VkImageLayout& layout, VkAttachmentLoadOp loadOp, VkAttachmentLoadOp stencilLoadOp) {
+    if ((loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || loadOp == VK_ATTACHMENT_LOAD_OP_DONT_CARE) &&
+        (stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || stencilLoadOp == VK_ATTACHMENT_LOAD_OP_DONT_CARE))
+        layout = VK_IMAGE_LAYOUT_UNDEFINED;
+}

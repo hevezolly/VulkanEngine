@@ -73,7 +73,7 @@ void main() {
     LOG("shaders compiled")
 
     r.pipeline = context
-        .Get<GraphicsFeature>().GraphicsPipeline()
+        .Get<GraphicsFeature>().NewGraphicsPipeline()
         .SetVertex<Vertex>()
         .AddShaderStage(Stage::Vertex, vertexBin)
         .AddShaderStage(Stage::Fragment, fragmentBin)

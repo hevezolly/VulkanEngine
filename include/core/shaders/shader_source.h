@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include <common.h>
-#include <shader_stage.h>
+#include <shader_common.h>
 
 
 struct API ShaderSource

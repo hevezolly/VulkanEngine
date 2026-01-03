@@ -2,7 +2,8 @@
 #include <glm/glm.hpp>
 #include <common.h>
 #include <vector>
-#include <shader_stage.h>
+#include <image.h>
+#include <shader_common.h>
 #include <buffer.h>
 #include <allocator_feature.h>
 #include <render_context.h>
@@ -184,4 +185,5 @@ BLOCK
 #undef INCLUDES_IMAGE
 
 #undef BLOCK
+#undef BLOCK_NAME
 #endif

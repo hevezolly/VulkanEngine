@@ -127,8 +127,9 @@ struct Allocator: FeatureSet,
         uintptr_t c = reinterpret_cast<uintptr_t>(chunk);
         assert(b >= c);
         uintptr_t chunkStart = b - c;
+
         if (force || (sizeof(T) * borrowed.size + chunkStart == freeOffset))
-            freeOffset = chunkStart;
+            freeOffset = std::min(chunkStart, freeOffset);
     }
 
 private:

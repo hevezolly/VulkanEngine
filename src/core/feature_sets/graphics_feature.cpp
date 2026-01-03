@@ -9,8 +9,6 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    
-
     rasterization = {VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
     rasterization.depthClampEnable = VK_FALSE;
     rasterization.depthBiasEnable = VK_FALSE;
@@ -48,24 +46,10 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     blendingCreateInfo.blendConstants[2] = 0.0f;
     blendingCreateInfo.blendConstants[3] = 0.0f;
 
-    colorAttachment = {};
-    colorAttachment.format = context.Get<PresentFeature>().swapChain->format;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    colorAttachmentRef = {};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    dsState = std::nullopt;
 
     subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
@@ -79,7 +63,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
 
     VK(vkCreateShaderModule(context->device(), &moduleInfo, nullptr, &vkModule))
 
-    shaderModules.push_back(vkModule);
+    shaderModules.emplace_back(vkModule, context->device());
     
     VkPipelineShaderStageCreateInfo stageInfo{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     stageInfo.stage = ToVkShaderStage(stage);
@@ -156,6 +140,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetAlphaBlending(BlendMethod& 
 
 
 Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
+    assert(dsState.has_value() == dsRef.has_value());
     Ref<GraphicsPipeline> pipeline = context->New<GraphicsPipeline>();
     pipeline->context = context;
 
@@ -173,17 +158,24 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
         &pipeline->layout
     ));
 
+    //TODO: fix
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependency.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+
+    subpass.colorAttachmentCount = colorAttachmentRef.size();
+    subpass.pColorAttachments = colorAttachmentRef.data();
+    subpass.pDepthStencilAttachment = nullptr;
+    if (dsRef.has_value())
+        subpass.pDepthStencilAttachment = &dsRef.value();
 
     VkRenderPassCreateInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.attachmentCount = attachments.size();
+    renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
     renderPassInfo.dependencyCount = 1;
@@ -227,6 +219,8 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     pipelineInfo.pRasterizationState = &rasterization;
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = nullptr;
+    if (dsState.has_value())
+        pipelineInfo.pDepthStencilState = &dsState.value();
     pipelineInfo.pColorBlendState = &blendingCreateInfo;
     pipelineInfo.pDynamicState = &dynamicStateInfo;
     pipelineInfo.layout = pipeline->layout;
@@ -243,41 +237,6 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     ));
 
     return pipeline;
-}
-
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::operator=(GraphicsPipelineBuilder&& other) noexcept {
-    shaderModules = std::move(other.shaderModules);
-    stages = std::move(other.stages);
-    dynamicStates = std::move(other.dynamicStates);
-    viewport = std::move(other.viewport);
-    scissor = std::move(other.scissor);
-    vertexAttributes = std::move(other.vertexAttributes);
-    vertexDescriptions = std::move(other.vertexDescriptions);
-    descriptorLayouts = std::move(other.descriptorLayouts);
-    inputAssembly = other.inputAssembly;
-    rasterization = other.rasterization;
-    multisampling = other.multisampling;
-    blending = other.blending;
-    blendingCreateInfo = other.blendingCreateInfo;
-    context = other.context;
-    colorAttachment = other.colorAttachment;
-    colorAttachmentRef = other.colorAttachmentRef;
-    subpass = other.subpass;
-
-    other.context = nullptr;
-
-    return *this;
-}
-
-GraphicsPipelineBuilder::GraphicsPipelineBuilder(GraphicsPipelineBuilder&& other) noexcept {
-    *this = std::move(other);
-}
-
-GraphicsPipelineBuilder::~GraphicsPipelineBuilder() {
-    for (int i = 0; i < shaderModules.size(); i++) {
-        vkDestroyShaderModule(context->device(), shaderModules[i], nullptr);
-    }
-    shaderModules.clear();
 }
 
 GraphicsPipeline::GraphicsPipeline() {}
@@ -312,7 +271,7 @@ GraphicsPipeline::~GraphicsPipeline() {
     context = nullptr;
 }
 
-GraphicsPipelineBuilder GraphicsFeature::GraphicsPipeline() {
+GraphicsPipelineBuilder GraphicsFeature::NewGraphicsPipeline() {
     return GraphicsPipelineBuilder(context);
 }
 

@@ -7,6 +7,8 @@
 #include <handles.h>
 #include <frame_buffer.h>
 #include <descriptor_pool.h>
+#include <allocator_feature.h>
+#include <shader_module.h>
 
 struct API BlendMethod {
     VkBlendFactor src;
@@ -34,7 +36,7 @@ private:
 
 struct API GraphicsPipelineBuilder {
     
-    std::vector<VkShaderModule> shaderModules;
+    std::vector<ShaderModule> shaderModules;
     std::vector<VkPipelineShaderStageCreateInfo> stages;
     std::vector<VkDynamicState> dynamicStates;
     std::optional<VkViewport> viewport;
@@ -49,9 +51,10 @@ struct API GraphicsPipelineBuilder {
     std::vector<VkVertexInputAttributeDescription> vertexAttributes;
     std::vector<VkDescriptorSetLayout> descriptorLayouts;
 
-    //TODO: rework
-    VkAttachmentDescription colorAttachment;
-    VkAttachmentReference colorAttachmentRef;
+    std::vector<VkAttachmentDescription> attachments;
+    std::vector<VkAttachmentReference> colorAttachmentRef;
+    std::optional<VkPipelineDepthStencilStateCreateInfo> dsState;
+    std::optional<VkAttachmentReference> dsRef;
     VkSubpassDescription subpass;
 
     GraphicsPipelineBuilder& AddShaderStage(Stage stage, ShaderBinary& binary);
@@ -91,9 +94,33 @@ struct API GraphicsPipelineBuilder {
         return *this;
     }
 
-    Ref<GraphicsPipeline> Build();
+    template<typename T>
+    GraphicsPipelineBuilder& SetAttachments(const T::Formats& formats) {
+        attachments.clear();
+        T::GetAttachmentDescriptions(attachments, formats);
+        colorAttachmentRef.clear();
+        T::GetColorAttachmentReferences(colorAttachmentRef);
 
-    RULE_5(GraphicsPipelineBuilder)
+        if (T::size_depth_stencil() > 0) {
+            dsRef = T::GetDepthStencilAttachmentReference();
+            if (!dsState.has_value()) {
+                dsState = VkPipelineDepthStencilStateCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+                dsState.value().depthTestEnable = VK_TRUE;
+                dsState.value().depthWriteEnable = VK_TRUE;
+                dsState.value().depthCompareOp = VK_COMPARE_OP_LESS;
+                dsState.value().depthBoundsTestEnable = VK_FALSE;
+                dsState.value().minDepthBounds = 0.0f;
+                dsState.value().maxDepthBounds = 1.0f; 
+                dsState.value().stencilTestEnable = VK_FALSE;
+                dsState.value().front = {}; 
+                dsState.value().back = {};
+            }
+        }
+
+        return *this;
+    }
+
+    Ref<GraphicsPipeline> Build();
 
     friend struct GraphicsFeature;
 
@@ -110,7 +137,12 @@ struct API GraphicsFeature: FeatureSet,
 
     using FeatureSet::FeatureSet;
 
-    GraphicsPipelineBuilder GraphicsPipeline();
+    GraphicsPipelineBuilder NewGraphicsPipeline();
+
+    template<typename T>
+    FrameBuffer CreateFrameBuffer(GraphicsPipeline& pipeline) {
+        
+    }
 
     virtual void OnMessage(CollectRequiredQueueTypesMsg*);
 };

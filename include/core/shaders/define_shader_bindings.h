@@ -1,5 +1,8 @@
 #ifdef UNIFORM_BUFFER
 #undef UNIFORM_BUFFER
+#undef IMAGE
+#undef IMAGE_SAMPLER
+#undef SAMPLER
 #endif
 
 #ifdef WRAPPER
