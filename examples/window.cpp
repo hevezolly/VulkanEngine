@@ -14,7 +14,6 @@ void RunEngine() {
     std::cout << "before context" << std::endl;
     RenderContext context;
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
-           .WithFeature<GraphicsFeature>()
            .Initialize();
     std::cout << "after context" << std::endl;
     

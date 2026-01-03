@@ -7,7 +7,7 @@ ShaderModule::~ShaderModule() {
     }
 }
 
-ShaderModule& ShaderModule::operator=(ShaderModule&& other) {
+ShaderModule& ShaderModule::operator=(ShaderModule&& other) noexcept {
     if (this == &other)
         return *this;
 
@@ -20,6 +20,6 @@ ShaderModule& ShaderModule::operator=(ShaderModule&& other) {
     return *this;
 }
 
-ShaderModule::ShaderModule(ShaderModule&& other) {
+ShaderModule::ShaderModule(ShaderModule&& other) noexcept {
     *this = std::move(other);
 }

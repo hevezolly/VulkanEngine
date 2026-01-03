@@ -278,3 +278,7 @@ GraphicsPipelineBuilder GraphicsFeature::NewGraphicsPipeline() {
 void GraphicsFeature::OnMessage(CollectRequiredQueueTypesMsg* m){
     m->requiredTypes |= QueueType::Graphics;
 }
+
+Allocator& GraphicsFeature::getAllocator() {
+    return context.Get<Allocator>();
+}

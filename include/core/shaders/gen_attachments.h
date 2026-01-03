@@ -50,8 +50,7 @@ public:
 
     static void GetAttachmentDescriptions(std::vector<VkAttachmentDescription>& data, const Formats& formats) {
         uint32_t initialSize = data.size();
-        data.Resize(initialSize + size());
-        MemChunk<VkAttachmentDescription> data = allocator.BumpAllocate(size());
+        data.resize(initialSize + size());
         uint32_t index;
 
         index = initialSize;
@@ -78,8 +77,6 @@ public:
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
-
-        return data;
     }
 
     static void GetColorAttachmentReferences(std::vector<VkAttachmentReference>& data) {
@@ -98,12 +95,10 @@ public:
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
-
-        return data;
     }
 
     static VkAttachmentReference GetDepthStencilAttachmentReference() {
-        assert(size_depth_stencil() > 0)
+        assert(size_depth_stencil() > 0);
         VkAttachmentReference result{};
         uint32_t attachmentIndex;
 
@@ -122,13 +117,13 @@ public:
 
     void FillAttachments(VkImageView* views) {
         uint32_t index = 0;
-        #define WRAPPER(name, sc, lo, so, slo, sso, ol) views[index++]=name##.vkImageView;
+        #define WRAPPER(n, sc, lo, so, slo, sso, ol) views[index++]=n##->vkImageView;
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
     }
 
-    void width() {
+    uint32_t width() {
         uint32_t index = 0;
         #define WRAPPER(name, sc, lo, so, slo, sso, ol) return name->referencedImage->description.width;
         #include <define_attachments.h>
@@ -136,7 +131,7 @@ public:
         #include <reset_attachment_defines.h>
     }
 
-    void height() {
+    uint32_t height() {
         uint32_t index = 0;
         #define WRAPPER(name, sc, lo, so, slo, sso, ol) return name->referencedImage->description.height;
         #include <define_attachments.h>
@@ -164,9 +159,6 @@ private:
 
         return maxlAfterWrapper <= 1;
     }
-
-    static_assert(layoutCorrect(), "INITIAL_LAYOUT or FINAL_LAYOUT placements are incorrect");
-
 };
 
 #include <define_attachments.h>

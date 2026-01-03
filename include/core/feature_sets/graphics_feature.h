@@ -95,7 +95,7 @@ struct API GraphicsPipelineBuilder {
     }
 
     template<typename T>
-    GraphicsPipelineBuilder& SetAttachments(const T::Formats& formats) {
+    GraphicsPipelineBuilder& SetAttachments(const typename T::Formats& formats) {
         attachments.clear();
         T::GetAttachmentDescriptions(attachments, formats);
         colorAttachmentRef.clear();
@@ -140,9 +140,18 @@ struct API GraphicsFeature: FeatureSet,
     GraphicsPipelineBuilder NewGraphicsPipeline();
 
     template<typename T>
-    FrameBuffer CreateFrameBuffer(GraphicsPipeline& pipeline) {
-        
+    FrameBuffer CreateFrameBuffer(T& args, GraphicsPipeline& pipeline) {
+        Allocator& a = getAllocator();
+        MemChunk<VkImageView> views = a.BumpAllocate<VkImageView>(T::size());
+        args.FillAttachments(views.data);
+        FrameBuffer result(&context, pipeline.renderPass, views.data, views.size, args.width(), args.height());
+        a.Free(views);
+        return result;
     }
 
     virtual void OnMessage(CollectRequiredQueueTypesMsg*);
+
+private:
+    Allocator& getAllocator();
 };
+

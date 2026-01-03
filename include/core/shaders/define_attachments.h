@@ -16,11 +16,11 @@
 #endif
 
 #ifndef COLOR_WRAPPER
-#define COLOR_WRAPPER(...) WRAPPER(__VA_ARGS__)
+#define COLOR_WRAPPER(a1, a2, a3, a4, a5, a6, a7) WRAPPER(a1, a2, a3, a4, a5, a6, a7)
 #endif
 
 #ifndef DS_WRAPPER
-#define DS_WRAPPER(...) WRAPPER(__VA_ARGS__)
+#define DS_WRAPPER(a1, a2, a3, a4, a5, a6, a7) WRAPPER(a1, a2, a3, a4, a5, a6, a7)
 #endif
 
 #ifdef WRAPPER

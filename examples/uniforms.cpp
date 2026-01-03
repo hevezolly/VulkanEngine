@@ -50,6 +50,24 @@ struct ShaderInput {
 };
 */
 
+#define BLOCK_NAME Attachments
+#define BLOCK \
+COLOR(color, LoadOp::Clear) FINAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+#include <gen_attachments.h>
+
+/*
+expands to:
+struct ShaderInput {
+    ImageView* color;
+
+    struct Formats {
+        VkFormat color;
+    };
+
+    //... other required binding information
+};
+*/
+
 struct UniformData {
     glm::mat4 model;
     glm::mat4 view;
@@ -63,6 +81,7 @@ struct _Resources {
     Refs<Fence> inFlightFences;
     Refs<Buffer> uniformBuffers;
     Refs<DescriptorSet> descriptorSets;
+    Refs<FrameBuffer> frameBuffers;
     Ref<GraphicsPipeline> pipeline;
     Ref<Buffer> vertexBuffer;
     Ref<Buffer> indexBuffer;
@@ -123,6 +142,7 @@ void main() {
         .Get<GraphicsFeature>().NewGraphicsPipeline()
         .SetVertex<Vertex>()
         .AddLayout<ShaderInput>()
+        .SetAttachments<Attachments>(Attachments::Formats{context.Get<PresentFeature>().swapChain->format})
         .AddShaderStage(Stage::Vertex, vertexBin)
         .AddShaderStage(Stage::Fragment, fragmentBin)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
@@ -168,6 +188,12 @@ void main() {
         data.img_sampler = &r.sampler;
 
         r.descriptorSets.back()->Update(data);
+    }
+
+    for (int i = 0; i < context.Get<PresentFeature>().swapChain->images.size(); i++) {
+        Attachments attachments;
+        attachments.color = context.Get<PresentFeature>().swapChain->images[i].view;
+        r.frameBuffers.push_back(context.Register(context.Get<GraphicsFeature>().CreateFrameBuffer(attachments, *r.pipeline)));
     }
       
     r.commandBuffers[0].Begin();
@@ -268,8 +294,7 @@ void DrawFrame(
 
     cmd.Reset();
     RecordCommandBuffer(cmd, r.vertexBuffer, r.indexBuffer, r.pipeline, 
-        context.Get<PresentFeature>().GetFrameBuffer(imageIndex, r.pipeline->renderPass),
-        set
+        r.frameBuffers[imageIndex], set
     );
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
