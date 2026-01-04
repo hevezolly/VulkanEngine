@@ -6,8 +6,7 @@ PresentFeature::PresentFeature(
     RenderContext& context,
     const WindowInitializer& windowArgs, 
     const SwapChainInitializer& swapChainArgs): 
-FeatureSet(context), 
-swapChainFrameBuffers(context)
+FeatureSet(context)
 {
     this->windowArgs = windowArgs;
     this->swapChainArgs = swapChainArgs;
@@ -51,14 +50,6 @@ void PresentFeature::OnMessage(DestroyMsg*) {
     glfwTerminate();
 }
 
-Ref<FrameBuffer> PresentFeature::GetFrameBuffer(uint32_t swapChainImage, VkRenderPass renderPass) {
-    Ref<FrameBuffer> result = swapChainFrameBuffers.Get(
-        swapChain->images[static_cast<size_t>(swapChainImage)].view,
-        renderPass
-    );
-    return result;
-}
-
 uint32_t PresentFeature::swapChainSize() {
     return swapChain->images.size();
 }
@@ -85,7 +76,6 @@ void PresentFeature::recreateSwapChain() {
     }
 
     vkDeviceWaitIdle(context.device());
-    swapChainFrameBuffers.Clear();
     delete swapChain;
 
     UpdateSwapChainSupport(context.Get<Device>().vkPhysicalDevice, window->vkSurface, swapChainSupport);
@@ -143,4 +133,8 @@ void PresentFeature::OnMessage(CheckDeviceAppropriateMsg* m) {
 
 void PresentFeature::OnMessage(CollectRequiredQueueTypesMsg* m) {
     m->requiredTypes |= QueueType::Present;
+}
+
+VkExtent2D PresentFeature::swapChainExtent() {
+    return {swapChain->images[0].description.width, swapChain->images[0].description.height};
 }

@@ -244,3 +244,32 @@ MemChunk<uint32_t> Device::FillQueueUsages(QueueTypes types, uint32_t& actualCou
     }
     return data;
 }
+
+bool Device::CheckFormatSupported(VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
+    auto it = formatSupport.find(format);
+    if (it == formatSupport.end()) {
+
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(vkPhysicalDevice, format, &props);
+        formatSupport[format] = {props.linearTilingFeatures, props.optimalTilingFeatures};
+        
+        it = formatSupport.find(format);
+    }
+
+    if (tiling == VK_IMAGE_TILING_LINEAR)
+        return (it->second.first & features) == features;
+
+    if (tiling == VK_IMAGE_TILING_OPTIMAL)
+        return (it->second.second & features) == features;
+
+    return false;
+}
+
+VkFormat Device::SelectSupportedFormat(std::initializer_list<VkFormat> formats, VkImageTiling tiling, VkFormatFeatureFlags features) {
+    for (auto format : formats) {
+        if (CheckFormatSupported(format, tiling, features))
+            return format;
+    }
+
+    return VK_FORMAT_UNDEFINED;
+}

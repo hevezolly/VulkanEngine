@@ -38,8 +38,8 @@ RenderContext::RenderContext(): _handling(false) {
 #ifdef ENABLE_VULKAN_VALIDATION
     this->WithFeature<DebuggingFeature>();
 #endif
-    this->WithFeature<Device>()
-        .WithFeature<Allocator>()
+    this->WithFeature<Allocator>()
+        .WithFeature<Device>()
         .WithFeature<CommandPool>()
         .WithFeature<Synchronization>()
         .WithFeature<Resources>()
@@ -91,26 +91,6 @@ void RenderContext::Initialize() {
 
     Send<EarlyInitMsg>(nullptr, true);
     Send<InitMsg>(nullptr, true);
-}
-
-RenderContext& RenderContext::operator=(RenderContext&& other) noexcept {
-
-    if (&other == this)
-        return *this;
-
-    vkInstance = other.vkInstance;
-    _initOrder = std::move(other._initOrder);
-    _features = std::move(other._features);
-    _featureInitOrder = std::move(other._featureInitOrder);
-    _messageHandlers = std::move(other._messageHandlers);
-    _messages = std::move(other._messages);
-    other.vkInstance = VK_NULL_HANDLE;
-
-    return *this;
-}
-
-RenderContext::RenderContext(RenderContext&& other) noexcept {
-    *this = std::move(other);
 }
 
 VkDevice RenderContext::device() {

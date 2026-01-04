@@ -70,7 +70,7 @@ struct API RenderContext {
 
     void Initialize();
 
-    RULE_5(RenderContext)
+    RULE_NO(RenderContext)
 
     template<typename T, typename... CallArgs>
     RenderContext& WithFeature(CallArgs&&... args) {

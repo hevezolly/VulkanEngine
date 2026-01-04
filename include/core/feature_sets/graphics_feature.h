@@ -23,10 +23,6 @@ struct API GraphicsPipeline {
 
     GraphicsPipeline();
 
-    Ref<FrameBuffer> CreateFrameBuffer(ImageView* image) {
-        return context->New<FrameBuffer>(context, image, renderPass);
-    }
-
     RULE_5(GraphicsPipeline)
 
     friend struct GraphicsPipelineBuilder;
@@ -140,11 +136,13 @@ struct API GraphicsFeature: FeatureSet,
     GraphicsPipelineBuilder NewGraphicsPipeline();
 
     template<typename T>
-    FrameBuffer CreateFrameBuffer(T& args, GraphicsPipeline& pipeline) {
+    FrameBuffer CreateFrameBuffer(T& args, VkRenderPass renderPass) {
         Allocator& a = getAllocator();
         MemChunk<VkImageView> views = a.BumpAllocate<VkImageView>(T::size());
-        args.FillAttachments(views.data);
-        FrameBuffer result(&context, pipeline.renderPass, views.data, views.size, args.width(), args.height());
+        MemChunk<VkClearValue> clearVals = a.BumpAllocate<VkClearValue>(T::size());
+        args.FillAttachments(views.data, clearVals.data);
+        FrameBuffer result(&context, renderPass, views.data, clearVals.data, views.size, args.width(), args.height());
+        a.Free(clearVals);
         a.Free(views);
         return result;
     }

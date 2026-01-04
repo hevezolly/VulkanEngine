@@ -10,7 +10,7 @@
 struct API TransferCommandBuffer {
     VkCommandBuffer buffer;
     
-    TransferCommandBuffer(VkCommandBuffer buffer, VkDevice device, VkCommandPool pool, bool transient);
+    TransferCommandBuffer(VkCommandBuffer buffer, RenderContext* context, VkCommandPool pool, bool transient);
     
     virtual QueueType queueType();
 
@@ -26,7 +26,7 @@ struct API TransferCommandBuffer {
     
 protected:
     bool transient;
-    VkDevice vkDevice;
+    RenderContext* context;
     VkCommandPool vkCommandPool;
 };
 

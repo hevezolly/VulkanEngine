@@ -3,7 +3,8 @@
 FrameBuffer::FrameBuffer(
     RenderContext* context,
     VkRenderPass pass, 
-    VkImageView* vkView, 
+    VkImageView* vkView,
+    VkClearValue* vkClearVals,
     uint32_t count, 
     uint32_t width, 
     uint32_t height
@@ -20,27 +21,29 @@ FrameBuffer::FrameBuffer(
     framebufferInfo.flags = 0;
     this->width = width;
     this->height = height;
-
-    
+    this->size = count;
+    clearValues.reserve(count);
+    for (int i = 0; i < count; i++) {
+        clearValues.push_back(vkClearVals[i]);
+    }
+        
     VK(vkCreateFramebuffer(context->device(), &framebufferInfo, nullptr, &frameBuffer))
 }
-
-FrameBuffer::FrameBuffer(RenderContext* context, ImageView* image, VkRenderPass renderPass):
-    FrameBuffer(context, renderPass, &image->vkImageView, static_cast<uint32_t>(1), image->referencedImage->description.width, image->referencedImage->description.height)
-{}
 
 FrameBuffer& FrameBuffer::operator=(FrameBuffer&& other) noexcept {
     if (this == &other)
         return *this;
 
+    clearValues = std::move(other.clearValues);
     context = other.context;
     frameBuffer = other.frameBuffer;
     width = other.width;
+    size = other.size;
     height = other.height;
     other.context = nullptr;
     other.frameBuffer = VK_NULL_HANDLE;
 
-    return *this;
+    return *this;    
 }
 
 FrameBuffer::FrameBuffer(FrameBuffer&& other) noexcept {

@@ -1,8 +1,39 @@
-#include "Image.h"
+#include <image.h>
 #include <common.h>
 #include <iostream>
 
-ImageView::ImageView(VkDevice device, Image* image):
+void formatDepthStencilSupport(VkFormat format, bool& depth, bool& stencil) {
+    depth = format == VK_FORMAT_D16_UNORM ||
+            format == VK_FORMAT_X8_D24_UNORM_PACK32 ||
+            format == VK_FORMAT_D32_SFLOAT ||
+            format == VK_FORMAT_D16_UNORM_S8_UINT ||
+            format == VK_FORMAT_D24_UNORM_S8_UINT ||
+            format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+    stencil = format == VK_FORMAT_S8_UINT ||
+              format == VK_FORMAT_D16_UNORM_S8_UINT ||
+              format == VK_FORMAT_D24_UNORM_S8_UINT ||
+              format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+}
+
+VkImageAspectFlags getAspect(VkFormat format) {
+    bool supportsDepth;
+    bool supportsStencil;
+    formatDepthStencilSupport(format, supportsDepth, supportsStencil);
+
+    if (!supportsDepth && !supportsStencil)
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkImageAspectFlags aspect = 0;
+    if (supportsDepth)
+        aspect |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (supportsStencil)
+        aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    
+    return aspect;
+}
+
+ImageView::ImageView(VkDevice device, const Image* image, VkImageAspectFlags aspect):
 device(device),
 referencedImage(image)
 {
@@ -15,7 +46,7 @@ referencedImage(image)
     createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    createInfo.subresourceRange.aspectMask = aspect;
     createInfo.subresourceRange.baseMipLevel = 0;
     createInfo.subresourceRange.levelCount = 1;
     createInfo.subresourceRange.baseArrayLayer = 0;
@@ -61,7 +92,12 @@ Image::Image(
     device(VK_NULL_HANDLE),
     state{VK_IMAGE_LAYOUT_UNDEFINED, 0}
 {
-    view = new ImageView(vkDevice, this);
+    auto aspect = getAspect(description.format);
+    if ((aspect & VK_IMAGE_ASPECT_COLOR_BIT) == VK_IMAGE_ASPECT_COLOR_BIT)
+        clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    else 
+        clearValue.depthStencil = {1.0f, 0};
+    view = new ImageView(vkDevice, this, aspect);
 }
 
 Image::Image(
@@ -76,7 +112,12 @@ Image::Image(
     state{VK_IMAGE_LAYOUT_UNDEFINED, 0}
 {
     vkBindImageMemory(vkDevice, img, this->memory.value().vkMemory, memory.offset);
-    view = new ImageView(vkDevice, this);
+    auto aspect = getAspect(description.format);
+    if ((aspect & VK_IMAGE_ASPECT_COLOR_BIT) == VK_IMAGE_ASPECT_COLOR_BIT)
+        clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    else 
+        clearValue.depthStencil = {1.0f, 0};
+    view = new ImageView(vkDevice, this, aspect);
 }
 
 Image& Image::operator=(Image&& other) noexcept {
@@ -88,6 +129,7 @@ Image& Image::operator=(Image&& other) noexcept {
     vkImage = other.vkImage;
     view = other.view;
     state = other.state;
+    clearValue = other.clearValue;
     view->referencedImage = this;
     description = other.description;
     other.device = VK_NULL_HANDLE;
@@ -104,7 +146,6 @@ Image::Image(Image&& other) noexcept {
 
 Image::~Image() {
     delete view;
-
     if (device != VK_NULL_HANDLE) {
         vkDestroyImage(device, vkImage, nullptr);
     }

@@ -25,6 +25,7 @@ private:
     std::vector<GraphicsCommandBuffer> _commandBuffers;
     Refs<Fence> _waitFences;
     Refs<Semaphore> _presentReady;
+    Refs<FrameBuffer> _frameBuffers;
     VkRenderPass renderPass;
     uint32_t currentFrame;
     bool readyToRender;

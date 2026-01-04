@@ -7,6 +7,7 @@
 #include <feature_set.h>
 #include <messages.h>
 #include <allocator_feature.h>
+#include <unordered_map>
 
 template<typename T>
 struct QueuesDescriptor {
@@ -63,5 +64,9 @@ struct API Device: FeatureSet,
     virtual void OnMessage(InitMsg*);
     virtual void OnMessage(DestroyMsg*);
 
+    bool CheckFormatSupported(VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features);
+    VkFormat SelectSupportedFormat(std::initializer_list<VkFormat>, VkImageTiling tiling, VkFormatFeatureFlags features);
 
+private: 
+    std::unordered_map<VkFormat, std::pair<VkFormatFeatureFlags, VkFormatFeatureFlags>> formatSupport;
 };

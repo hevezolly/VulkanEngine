@@ -45,14 +45,13 @@ struct API PresentFeature: FeatureSet,
     virtual void OnMessage(CollectRequiredQueueTypesMsg*);
 
     uint32_t AcquireNextImage(Ref<Semaphore> imageReady);
-    Ref<FrameBuffer> GetFrameBuffer(uint32_t swapChainImage, VkRenderPass renderPass);
+    VkExtent2D swapChainExtent();
 
     uint32_t swapChainSize();
 
 private: 
     WindowInitializer windowArgs;
     SwapChainInitializer swapChainArgs;
-    DistinctStorage<FrameBuffer, FrameBuffer_CtorArgs> swapChainFrameBuffers;
 
     void recreateSwapChain();
 };

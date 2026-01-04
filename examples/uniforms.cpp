@@ -17,7 +17,7 @@
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
-VEC2(position, 0) \
+VEC3(position, 0) \
 VEC3(color, 1) \
 VEC2(uv, 2)
 #include <gen_vertex_data.h>
@@ -25,7 +25,7 @@ VEC2(uv, 2)
 /*
 expands to:
 struct Vertex {
-    glm::vec2 position;
+    glm::vec3 position;
     glm::vec3 color;
     glm::vec2 uv;
 
@@ -52,7 +52,8 @@ struct ShaderInput {
 
 #define BLOCK_NAME Attachments
 #define BLOCK \
-COLOR(color, LoadOp::Clear) FINAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+COLOR(color, LoadOp::Clear) FINAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) \
+DEPTH(depth, LoadOp::Clear) 
 #include <gen_attachments.h>
 
 /*
@@ -86,6 +87,7 @@ struct _Resources {
     Ref<Buffer> vertexBuffer;
     Ref<Buffer> indexBuffer;
     Ref<Image> image;
+    Ref<Image> depth;
     Ref<Sampler> sampler;
 };
 
@@ -106,14 +108,14 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
-layout(location = 0) in vec2 in_position;
+layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_color;
 layout(location = 2) in vec2 uv;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 uv_out;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_position, 0.0, 1.0);
+    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_position, 1.0);
     fragColor = in_color;
     uv_out = uv;
 })";
@@ -138,27 +140,46 @@ void main() {
     ShaderBinary vertexBin = compiler.FromSource(vertexSource);
     ShaderBinary fragmentBin = compiler.FromSource(fragmentSource);
 
+    VkFormat dsFormat = context.Get<Device>().SelectSupportedFormat(
+        {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+    r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
+        ImageUsage::DepthStencil);
+    r.image = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
+
+
     r.pipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
         .SetVertex<Vertex>()
         .AddLayout<ShaderInput>()
-        .SetAttachments<Attachments>(Attachments::Formats{context.Get<PresentFeature>().swapChain->format})
+        .SetAttachments<Attachments>(Attachments::Formats{
+            context.Get<PresentFeature>().swapChain->format,
+            r.depth->description.format
+        })
         .AddShaderStage(Stage::Vertex, vertexBin)
         .AddShaderStage(Stage::Fragment, fragmentBin)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
         .Build();
 
-    std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0, 0}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1, 0}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1, 1}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0, 1}}
+    std::vector<Vertex> vertices {
+        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+        {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
     };
     r.vertexBuffer = context.Get<Resources>().CreateBuffer<Vertex>(BufferPreset::VERTEX, vertices);
 
     std::vector<uint16_t> indices = {
-        0, 2, 1, 2, 0, 3
+        0, 2, 1, 2, 0, 3,
+        4, 6, 5, 6, 4, 7
     };
     r.indexBuffer = context.Get<Resources>().CreateBuffer<uint16_t>(BufferPreset::INDEX, indices);
     
@@ -167,8 +188,6 @@ void main() {
     r.renderFinish = context.Get<Synchronization>().CreateSemaphores(
         context.Get<PresentFeature>().swapChain->images.size());
     r.commandBuffers.reserve(framesInFlight);
-
-    r.image = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
 
     r.sampler = context.Get<Resources>().CreateSampler(SamplerFilter::LINEAR, SamplerAddressMode::REPEAT);
 
@@ -193,7 +212,10 @@ void main() {
     for (int i = 0; i < context.Get<PresentFeature>().swapChain->images.size(); i++) {
         Attachments attachments;
         attachments.color = context.Get<PresentFeature>().swapChain->images[i].view;
-        r.frameBuffers.push_back(context.Register(context.Get<GraphicsFeature>().CreateFrameBuffer(attachments, *r.pipeline)));
+        attachments.depth = r.depth->view;
+        r.frameBuffers.push_back(context.Register(
+            context.Get<GraphicsFeature>().CreateFrameBuffer(attachments, r.pipeline->renderPass))
+        );
     }
       
     r.commandBuffers[0].Begin();

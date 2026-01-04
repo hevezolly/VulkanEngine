@@ -10,6 +10,8 @@
 #error "BLOCK_NAME must be defined"
 #endif
 
+#define FUNC_NAME(r) __##BLOCK_NAME##r
+
 //WRAPPER(name, sample_count, loadOp, storeOp, stenciLoadOp, stencilStoreOp, optimalLayout)
 
 struct BLOCK_NAME {
@@ -115,9 +117,11 @@ public:
         return result;
     }
 
-    void FillAttachments(VkImageView* views) {
+    void FillAttachments(VkImageView* views, VkClearValue* clearValues) {
         uint32_t index = 0;
-        #define WRAPPER(n, sc, lo, so, slo, sso, ol) views[index++]=n##->vkImageView;
+        #define WRAPPER(n, sc, lo, so, slo, sso, ol) \
+        views[index]=n##->vkImageView; \
+        clearValues[index++]=n##->referencedImage->clearValue;
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
@@ -139,9 +143,7 @@ public:
         #include <reset_attachment_defines.h>
     }
 
-private: 
-
-    static constexpr bool layoutCorrect() {
+    static constexpr bool check_layout_correctness() {
 
         uint32_t maxlAfterWrapper = 0;
 
@@ -159,7 +161,11 @@ private:
 
         return maxlAfterWrapper <= 1;
     }
+
 };
+
+static_assert(BLOCK_NAME::check_layout_correctness(), "INITIAL_LAYOUT and FINAL_LAYOUT are placed incorrectly");
+static_assert(BLOCK_NAME::size_depth_stencil() <= 1, "only one depthstencil is supported");
 
 #include <define_attachments.h>
 #include <reset_attachment_defines.h>

@@ -1,17 +1,18 @@
 #include <command_pool.h>
 #include <render_context.h>
 #include <graphics_feature.h>
+#include <allocator_feature.h>
 
 TransferCommandBuffer::~TransferCommandBuffer() {
-    if (!transient || vkDevice == VK_NULL_HANDLE)
+    if (!transient || context==nullptr)
         return;
 
-    vkFreeCommandBuffers(vkDevice, vkCommandPool, 1, &buffer);
+    vkFreeCommandBuffers(context->device(), vkCommandPool, 1, &buffer);
 }
 
-TransferCommandBuffer::TransferCommandBuffer(VkCommandBuffer b, VkDevice device, VkCommandPool pool, bool t):
+TransferCommandBuffer::TransferCommandBuffer(VkCommandBuffer b, RenderContext* c, VkCommandPool pool, bool t):
     transient(t),
-    vkDevice(device),
+    context(c),
     vkCommandPool(pool),
     buffer(b)
 {}
@@ -21,12 +22,12 @@ TransferCommandBuffer& TransferCommandBuffer::operator=(TransferCommandBuffer&& 
         return *this;
 
     buffer = other.buffer;
-    vkDevice = other.vkDevice;
+    context = other.context;
     vkCommandPool = other.vkCommandPool;
     transient = other.transient;
 
     other.buffer = VK_NULL_HANDLE;
-    other.vkDevice = VK_NULL_HANDLE;
+    other.context = nullptr;
     other.vkCommandPool = VK_NULL_HANDLE;
 
     return *this;
@@ -184,14 +185,14 @@ GraphicsCommandBuffer CommandPool::CreateGraphicsBuffer() {
     VkCommandBuffer buffer;
     CreateBuffer(context.device(), graphicsCommandPool, &buffer);
 
-    return GraphicsCommandBuffer(buffer, context.device(), graphicsCommandPool, false);
+    return GraphicsCommandBuffer(buffer, &context, graphicsCommandPool, false);
 }
 
 TransferCommandBuffer CommandPool::CreateTransferBuffer(bool transient) {
     VkCommandBuffer buffer;
     VkCommandPool pool = transient ? transientTransferCommandPool : transferCommandPool;
     CreateBuffer(context.device(), pool, &buffer);
-    return TransferCommandBuffer(buffer, context.device(), pool, transient);
+    return TransferCommandBuffer(buffer, &context, pool, transient);
 }
 
 void TransferCommandBuffer::Begin() {
@@ -220,9 +221,8 @@ void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, Ref<
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = {frameBuffer->width, frameBuffer->height};
 
-    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    renderPassInfo.clearValueCount = frameBuffer->clearValues.size();
+    renderPassInfo.pClearValues = frameBuffer->clearValues.data();
 
     vkCmdBeginRenderPass(buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 

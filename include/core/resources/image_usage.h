@@ -3,6 +3,7 @@
 
 enum ImageUsage: VkFlags {
     ColorAttachment = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    DepthStencil = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
     TransferDst = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
     Sampled = VK_IMAGE_USAGE_SAMPLED_BIT,
 };

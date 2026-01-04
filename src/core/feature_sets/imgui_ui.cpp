@@ -8,6 +8,13 @@ static void check_vk_result(VkResult err)
     VK(err)
 }
 
+#define BLOCK_NAME UiAttachments
+#define BLOCK \
+COLOR(color, LoadOp::Load) \
+INITIAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) FINAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+#include <gen_attachments.h>
+
+
 void ImguiUI::OnMessage(InitMsg*) {
 
     const uint32_t framesInFlight = 3;
@@ -32,22 +39,19 @@ void ImguiUI::OnMessage(InitMsg*) {
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE}
     }, true);
 
-    VkAttachmentDescription attachment = {};
-    attachment.format = context.Get<PresentFeature>().swapChain->format;
-    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    VkAttachmentReference color_attachment = {};
-    color_attachment.attachment = 0;
-    color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    std::vector<VkAttachmentDescription> attachments;
+    std::vector<VkAttachmentReference> attachmentRefs;
+    UiAttachments::GetAttachmentDescriptions(attachments, 
+        UiAttachments::Formats {
+            context.Get<PresentFeature>().swapChain->format
+        }
+    );
+    UiAttachments::GetColorAttachmentReferences(attachmentRefs);
+
     VkSubpassDescription subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment;
+    subpass.colorAttachmentCount = attachmentRefs.size();
+    subpass.pColorAttachments = attachmentRefs.data();
     VkSubpassDependency dependency = {};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
@@ -57,8 +61,8 @@ void ImguiUI::OnMessage(InitMsg*) {
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     VkRenderPassCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    info.attachmentCount = 1;
-    info.pAttachments = &attachment;
+    info.attachmentCount = attachments.size();
+    info.pAttachments = attachments.data();
     info.subpassCount = 1;
     info.pSubpasses = &subpass;
     info.dependencyCount = 1;
@@ -116,8 +120,16 @@ void ImguiUI::OnMessage(PresentMsg* m) {
 
     _commandBuffers[currentFrame].Reset();
     _commandBuffers[currentFrame].Begin();
+    
+    for (int i = _frameBuffers.size(); i <= m->swapChainIndex; i++) {
 
-    Ref<FrameBuffer> frameBuffer = context.Get<PresentFeature>().GetFrameBuffer(m->swapChainIndex, renderPass);
+        UiAttachments a;
+        a.color = context.Get<PresentFeature>().swapChain->images[i].view;
+        _frameBuffers.push_back(
+            context.Register(context.Get<GraphicsFeature>().CreateFrameBuffer(a, renderPass)));
+    }
+
+    Ref<FrameBuffer> frameBuffer = _frameBuffers[m->swapChainIndex];
 
     VkRenderPassBeginInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     renderPassInfo.renderPass = renderPass;

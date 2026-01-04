@@ -80,14 +80,14 @@ struct MemChunk {
 using RawMemChunk = MemChunk<char>;
 
 struct Allocator: FeatureSet,
-    CanHandle<InitMsg>,
+    CanHandle<EarlyInitMsg>,
     CanHandle<DestroyMsg>,
     CanHandle<BeginFrameMsg>
 {
 
     Allocator(RenderContext& context, uint32_t preallocatedSize=PREALLOCATED_SIZE);
 
-    virtual void OnMessage(InitMsg*);
+    virtual void OnMessage(EarlyInitMsg*);
     virtual void OnMessage(DestroyMsg*);
     virtual void OnMessage(BeginFrameMsg*);
 
@@ -96,7 +96,7 @@ struct Allocator: FeatureSet,
         assert(count > 0);
         size_t alignment = alignof(T);
         size_t allocationSize = sizeof(T) * count;
-        uintptr_t alignedOffset = freeOffset + (alignment - freeOffset % alignment) % alignment; 
+        uintptr_t alignedOffset = freeOffset + (alignment - freeOffset % alignment) % alignment;
         assert(alignedOffset + allocationSize <= allocatedSize);
 
         freeOffset = alignedOffset + allocationSize;

@@ -7,7 +7,7 @@ Allocator::Allocator(RenderContext& ctx, uint32_t preallocatedSize):
     freeOffset(0) 
 {}
 
-void Allocator::OnMessage(InitMsg*) {
+void Allocator::OnMessage(EarlyInitMsg*) {
     chunk = static_cast<char*>(malloc(allocatedSize));
 }
 

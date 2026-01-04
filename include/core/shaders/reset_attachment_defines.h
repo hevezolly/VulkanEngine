@@ -10,6 +10,10 @@
 #undef WRAPPER
 #endif
 
+#ifdef CLEAR_WRAPPER
+#undef CLEAR_WRAPPER
+#endif
+
 #ifdef COLOR_WRAPPER
 #undef COLOR_WRAPPER
 #endif
