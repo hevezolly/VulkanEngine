@@ -55,7 +55,6 @@ Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes) {
     VK(vkCreateBuffer(context.device(), &bufferInfo, nullptr, &buffer));
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(context.device(), buffer, &memRequirements);
-    assert(memRequirements.size == size_bytes);
     Buffer result = Buffer(context.device(), buffer, AllocateMemory(memRequirements, preset.memoryProperties));
     context.Get<Allocator>().Free(usedQueues);
     return result;
