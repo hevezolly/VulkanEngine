@@ -60,9 +60,11 @@ DEPTH(depth, LoadOp::Clear)
 expands to:
 struct ShaderInput {
     ImageView* color;
+    ImageView* depthl
 
     struct Formats {
         VkFormat color;
+        VkFormat depth;
     };
 
     //... other required binding information
@@ -344,7 +346,7 @@ void Run() {
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .WithFeature<GraphicsFeature>()
            .WithFeature<StableFPS>(60)
-           .WithFeature<Registry>("resources")
+           .WithFeature<Registry>("examples/resources")
            .Initialize();
     volkLoadInstance(context.vkInstance);
 
