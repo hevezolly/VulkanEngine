@@ -195,7 +195,7 @@ struct API RenderContext {
 
     template<typename T>
     void Send(T&& message, bool bottomToTop=false) {
-        T copy = message;
+        T copy = std::move(message);
         Send(&copy, bottomToTop);
     }
     

@@ -4,7 +4,6 @@
 #include <feature_set.h>
 #include <window.h>
 #include <swap_chain.h>
-#include <distinct_storage.h>
 #include <frame_buffer.h>
 #include <messages.h>
 

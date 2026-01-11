@@ -32,6 +32,14 @@ struct MemChunk {
         return result;
     }
 
+    static constexpr MemChunk Null() {
+        return {
+            nullptr,
+            0,
+            AllocationType::Heap
+        };
+    } 
+
     struct Iterator {
         // Iterator traits (required for STL compatibility pre-C++20)
         using iterator_category = std::forward_iterator_tag; //

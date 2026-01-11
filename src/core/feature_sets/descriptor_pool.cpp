@@ -122,13 +122,15 @@ void Descriptors::OnMessage(DestroyMsg*) {
 }
 
 void Descriptors::OnMessage(EarlyDestroyMsg*) {
-    allocatedSets.clear();
+    _allocatedDescriptors.clear();
 }
 
 void Descriptors::OnMessage(BeginFrameMsg* m) {
     frameId = m->inFlightFrame;
-    if (allocatedSets.size() > frameId)
-        allocatedSets[frameId].clear();
+    if (_allocatedDescriptors.size() > frameId) {
+        for (auto& pair : _allocatedDescriptors[frameId])
+            pair.second.Reset();
+    }
 }
 
 Ref<SpecializedDescriptorPool> Descriptors::CreateDescriptorPool(

@@ -15,6 +15,7 @@ void Allocator::OnMessage(DestroyMsg*) {
     free(chunk);
 }
 
-void Allocator::OnMessage(BeginFrameMsg*) {
-    freeOffset = 0;
+void Allocator::OnMessage(BeginFrameMsg* m) {
+    if (m->inFlightFrame == 0)
+        freeOffset = 0;
 }

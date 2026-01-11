@@ -32,7 +32,6 @@ Buffer::Buffer(VkDevice device, VkBuffer buffer, Memory&& mem):
     vkBuffer(buffer),
     vkDevice(device)
 {
-    size_bytes = memory.size_bytes;
     vkBindBufferMemory(vkDevice, vkBuffer, memory.vkMemory, memory.offset);
 }
 
@@ -42,7 +41,6 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept {
 
     vkBuffer = other.vkBuffer;
     vkDevice = other.vkDevice;
-    size_bytes = other.size_bytes;
     memory = std::move(other.memory);
     other.vkBuffer = VK_NULL_HANDLE;
     other.vkDevice = VK_NULL_HANDLE;
@@ -59,4 +57,8 @@ Buffer::~Buffer() {
         vkDestroyBuffer(vkDevice, vkBuffer, nullptr);
         vkDevice = VK_NULL_HANDLE;
     }
+}
+
+uint32_t Buffer::size_bytes() {
+    return memory.size_bytes;
 }

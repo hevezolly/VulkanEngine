@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <allocator_feature.h>
 #include <handles.h>
+#include <object_pool.h>
 
 struct DescriptorPool 
 {
@@ -144,16 +145,21 @@ struct API Descriptors : FeatureSet,
     }
 
     template<typename T>
-    VkDescriptorSet UpdateDescriptorSet(T& values) 
+    DescriptorSet& BorrowDescriptorSet(T& values) 
     {
-        if (allocatedSets.size() < frameId + 1)
-            allocatedSets.resize(frameId + 1);
+        if (_allocatedDescriptors.size() < frameId + 1)
+            _allocatedDescriptors.resize(frameId + 1);
 
-        allocatedSets[frameId].push_back(CreateDescriptorSet<T>());
+        std::type_index id = getTypeId<T>();
 
-        DescriptorSet& set = allocatedSets[frameId].back();
-        set.Update(values);
-        return set.vkSet;
+        ObjectPool<DescriptorSet>& pool = _allocatedDescriptors[frameId][id];
+
+        if (pool.isEmpty())
+            pool.Insert(CreateDescriptorSet<T>());
+
+        DescriptorSet& set = pool.BorrowAndForget();
+        set.Update<T>(values);
+        return set;
     }
 
     virtual void OnMessage(DestroyMsg*);
@@ -165,7 +171,8 @@ private:
         uint32_t, uint32_t, VkDescriptorSetLayout, MemChunk<VkDescriptorPoolSize> sizes);
     std::unordered_map<std::type_index, VkDescriptorSetLayout> _layouts;
     std::unordered_map<std::type_index, std::vector<Ref<SpecializedDescriptorPool>>> _descriptorPools;
+    
+    std::vector<std::unordered_map<std::type_index, ObjectPool<DescriptorSet>>> _allocatedDescriptors;
 
-    std::vector<std::vector<DescriptorSet>> allocatedSets;
     uint32_t frameId;
 };

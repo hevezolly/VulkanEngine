@@ -1,6 +1,7 @@
 #pragma once
 #include <common.h>
 #include <resource_memory.h>
+#include <resource_id.h>
 
 struct API BufferPreset {
     VkBufferUsageFlags usageFlags; 
@@ -47,14 +48,15 @@ inline BufferPreset operator |(BufferPreset lhs, VkMemoryPropertyFlagBits rhs) {
 struct API Buffer {
     Memory memory;
     VkBuffer vkBuffer;
-    uint32_t size_bytes;
-
+    uint32_t size_bytes();
+    
     Buffer(VkDevice device, VkBuffer buffer, Memory&& memory);
-
+    
     template<typename T>
     uint32_t count() {
-        return size_bytes / sizeof(T);
+        return size_bytes() / sizeof(T);
     }
+
 
     RULE_5(Buffer)
 
