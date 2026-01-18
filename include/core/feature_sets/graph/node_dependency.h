@@ -3,7 +3,7 @@
 #include <resource_id.h>
 
 struct API NodeDependency {
-    ResourceId type;
+    ResourceId resource;
     VkPipelineStageFlagBits stage;
     VkImageLayout layout;
 };

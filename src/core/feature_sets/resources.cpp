@@ -4,10 +4,6 @@
 #include <command_pool.h>
 #include <registry.h>
 
-Ref<Buffer> Resources::newBuffer(Buffer&& buff) {
-    return context.New<Buffer>(std::move(buff));
-}
-
 uint32_t findMemType(
     VkMemoryRequirements requirements, 
     VkMemoryPropertyFlags properties,
@@ -24,6 +20,9 @@ uint32_t findMemType(
 }
 
 void Resources::OnMessage(InitMsg*) {
+    _buffers.type = ResourceType::Buffer;
+    _images.type = ResourceType::Image;
+    _samplers.type = ResourceType::Sampler;
     vkGetPhysicalDeviceMemoryProperties(
         context.Get<Device>().vkPhysicalDevice, &vkMemProperties);
 }
@@ -40,28 +39,32 @@ Memory Resources::AllocateMemory(VkMemoryRequirements requirements, VkMemoryProp
     return Memory(mem, context.device(), requirements.size);
 }
 
-Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes) {
+Buffer createStandaloneBuffer(RenderContext& c, BufferPreset preset, uint32_t size_bytes) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size_bytes;
     bufferInfo.usage = preset.usageFlags;
     uint32_t usedQueuesCount;
-    MemChunk<uint32_t> usedQueues = context.Get<Device>().FillQueueUsages(preset.usedQueues, usedQueuesCount);
+    MemChunk<uint32_t> usedQueues = c.Get<Device>().FillQueueUsages(preset.usedQueues, usedQueuesCount);
     bufferInfo.sharingMode = usedQueuesCount > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
     bufferInfo.queueFamilyIndexCount = usedQueuesCount;
     bufferInfo.pQueueFamilyIndices = usedQueues.data;
     VkBuffer buffer;
 
-    VK(vkCreateBuffer(context.device(), &bufferInfo, nullptr, &buffer));
+    VK(vkCreateBuffer(c.device(), &bufferInfo, nullptr, &buffer));
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(context.device(), buffer, &memRequirements);
-    Buffer result = Buffer(context.device(), buffer, AllocateMemory(memRequirements, preset.memoryProperties));
-    context.Get<Allocator>().Free(usedQueues);
+    vkGetBufferMemoryRequirements(c.device(), buffer, &memRequirements);
+    Buffer result = Buffer(c, buffer, c.Get<Resources>().AllocateMemory(memRequirements, preset.memoryProperties));
+    c.Get<Allocator>().Free(usedQueues);
     return result;
-}   
+}
 
-Buffer createAndFillBuffer(Resources& r, BufferPreset preset, uint32_t size_bytes, void* data) {
-    Buffer buffer = r.CreateRawBuffer(preset, size_bytes);
+ResourceRef<Buffer> Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes) {
+    return Register(createStandaloneBuffer(context, preset, size_bytes));
+}
+
+Buffer createAndFillBuffer(RenderContext& context, BufferPreset preset, uint32_t size_bytes, void* data) {
+    Buffer buffer = createStandaloneBuffer(context, preset, size_bytes);
     {
         auto token = buffer.memory.Map();
         memcpy(token.data(), data, static_cast<size_t>(size_bytes));
@@ -69,17 +72,20 @@ Buffer createAndFillBuffer(Resources& r, BufferPreset preset, uint32_t size_byte
     return buffer;
 }
 
-Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes, void* data) {
+ResourceRef<Buffer> Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes, void* data) {
 
     if ((preset.memoryProperties & (BufferPreset::STAGING.memoryProperties)) == 
-        (BufferPreset::STAGING.memoryProperties))
-        return createAndFillBuffer(*this, preset, size_bytes, data);
+        (BufferPreset::STAGING.memoryProperties)) {
 
-    Buffer stagingBuffer = createAndFillBuffer(*this, BufferPreset::STAGING, size_bytes, data);
-    Buffer outputBuffer = CreateRawBuffer(preset, size_bytes);
+        ResourceId id = _buffers.Insert(createAndFillBuffer(context, preset, size_bytes, data));
+        return {id, &_buffers};
+    }
+
+    Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, size_bytes, data);
+    ResourceRef<Buffer> outputBuffer = CreateRawBuffer(preset, size_bytes);
     TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
     cmd.Begin();
-    cmd.CopyBufferRegion(stagingBuffer.vkBuffer, outputBuffer.vkBuffer, size_bytes);
+    cmd.CopyBufferRegion(stagingBuffer.vkBuffer, outputBuffer->vkBuffer, size_bytes);
     cmd.End();
     context.Get<CommandPool>().Submit(cmd);
     vkQueueWaitIdle(context.Get<Device>().queues.get(QueueType::Transfer));
@@ -87,7 +93,7 @@ Buffer Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes, void
     return outputBuffer;
 }
 
-Image Resources::CreateRawImage(const ImageDescription& description, ImageUsage usage) {
+ResourceRef<Image> Resources::CreateImage(const ImageDescription& description, ImageUsage usage) {
     VkImage image;
     VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     imageInfo.imageType = description.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
@@ -112,9 +118,9 @@ Image Resources::CreateRawImage(const ImageDescription& description, ImageUsage 
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(context.device(), image, &memRequirements);
     
-    Image result = Image(image, context.device(), 
+    ResourceRef<Image> result = Register(Image(image, context, 
         AllocateMemory(memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), 
-        description);
+        description));
 
     context.Get<Allocator>().Free(usedQueues);
     return result;
@@ -237,7 +243,7 @@ VkFormat getFormatFromNativeComponents(int components)
     }
 }
 
-Image Resources::LoadRawImage(ImageUsage usage, const char* path, VkFormat format) {
+ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFormat format) {
 
     int forceComponents = getStbiForceComponents(format);
 
@@ -254,14 +260,14 @@ Image Resources::LoadRawImage(ImageUsage usage, const char* path, VkFormat forma
 
     LOG(description.width _S_ description.height)
     
-    Image result = CreateRawImage(description, usage | ImageUsage::TransferDst);
-    Buffer stagingBuffer = createAndFillBuffer(*this, BufferPreset::STAGING, imageData.size(), imageData.data);
+    ResourceRef<Image> result = CreateImage(description, usage | ImageUsage::TransferDst);
+    Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, imageData.size(), imageData.data);
     imageData.Free();
     TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
     
     cmd.Begin();
 
-    cmd.ImageBarrier(result, 
+    cmd.ImageBarrier(*result, 
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
         VK_ACCESS_TRANSFER_WRITE_BIT, 
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -286,7 +292,7 @@ Image Resources::LoadRawImage(ImageUsage usage, const char* path, VkFormat forma
     };
 
     vkCmdCopyBufferToImage(cmd.buffer, 
-        stagingBuffer.vkBuffer, result.vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        stagingBuffer.vkBuffer, result->vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
 
     cmd.End();
@@ -297,15 +303,7 @@ Image Resources::LoadRawImage(ImageUsage usage, const char* path, VkFormat forma
     return result;
 }
 
-Ref<Image> Resources::CreateImage(const ImageDescription& dsecription, ImageUsage usage) {
-    return context.Register(CreateRawImage(dsecription, usage));
-}
-
-Ref<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFormat format) {
-    return context.Register(LoadRawImage(usage, path, format));
-}
-
-Sampler Resources::CreateRawSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode) {
+ResourceRef<Sampler> Resources::CreateSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode) {
     VkSamplerCreateInfo samplerInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 
     samplerInfo.magFilter = filter.magFilter;
@@ -326,9 +324,31 @@ Sampler Resources::CreateRawSampler(const SamplerFilter& filter, const SamplerAd
     VkSampler sampler;
     VK(vkCreateSampler(context.device(), &samplerInfo, nullptr, &sampler));
 
-    return Sampler(sampler, context.device());
+    return {_samplers.Insert(Sampler(sampler, context)), &_samplers};
 }
 
-Ref<Sampler> Resources::CreateSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode) {
-    return context.Register(CreateRawSampler(filter, addressMode));
+void Resources::OnMessage(DestroyMsg*) {
+    _buffers.clear();
+    _samplers.clear();
+    _images.clear();
+}
+
+
+
+
+void Resources::DestroyImmediate(ResourceId resource) {
+
+    switch (resource.type())
+    {
+    case ResourceType::Buffer:
+        _buffers.TryRemove(resource);
+        break;
+    case ResourceType::Image:
+        _images.TryRemove(resource);
+        break;
+    case ResourceType::Sampler:
+        _samplers.TryRemove(resource);
+    default:
+        break;
+    }
 }

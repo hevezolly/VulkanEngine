@@ -8,6 +8,7 @@
 #include <frame_buffer.h>
 #include <synchronization.h>
 #include <image_usage.h>
+#include <resource_storage.h>
 
 struct API SwapChainInitializer {
     std::vector<VkFormat> desiredFormats = {VK_FORMAT_B8G8R8A8_SRGB};
@@ -26,7 +27,7 @@ struct API SwapChain
     VkColorSpaceKHR colorSpace;
     VkPresentModeKHR presentMode;
     ImageUsage imageUsage;
-    std::vector<Image> images;
+    ResourceRefs<Image> images;
 
     SwapChain(RenderContext* context, const SwapChainInitializer& args);
 

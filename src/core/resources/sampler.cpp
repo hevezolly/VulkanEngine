@@ -1,4 +1,7 @@
 #include <sampler.h>
+#include <render_context.h>
+#include <resources.h>
+
 
 const SamplerFilter SamplerFilter::LINEAR = {
     VkFilter::VK_FILTER_LINEAR,
@@ -28,14 +31,19 @@ const SamplerAddressMode SamplerAddressMode::MIRROR_REPEAT = {
     VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT
 };
 
+Sampler::Sampler(VkSampler sampler, RenderContext& ctx):
+vkSampler(sampler), context(&ctx) {
+
+}
+
 Sampler& Sampler::operator=(Sampler&& other) noexcept {
     if (this == &other)
         return *this;
 
     vkSampler = other.vkSampler;
-    device = other.device;
+    context = other.context;
 
-    other.device = VK_NULL_HANDLE;
+    other.context = nullptr;
     other.vkSampler = VK_NULL_HANDLE;    
 
     return *this;
@@ -46,8 +54,8 @@ Sampler::Sampler(Sampler&& other) noexcept {
 }
 
 Sampler::~Sampler() {
-    if (device != VK_NULL_HANDLE) {
-        vkDestroySampler(device, vkSampler, nullptr);
-        device = VK_NULL_HANDLE;
+    if (context != nullptr) {
+        vkDestroySampler(context->device(), vkSampler, nullptr);
+        context = nullptr;
     }
 }

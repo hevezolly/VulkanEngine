@@ -128,7 +128,9 @@ private:
 };
 
 struct API GraphicsFeature: FeatureSet,
-    CanHandle<CollectRequiredQueueTypesMsg>
+    CanHandle<CollectRequiredQueueTypesMsg>,
+    CanHandle<BeginFrameMsg>,
+    CanHandle<DestroyMsg>
 {
 
     using FeatureSet::FeatureSet;
@@ -136,7 +138,7 @@ struct API GraphicsFeature: FeatureSet,
     GraphicsPipelineBuilder NewGraphicsPipeline();
 
     template<typename T>
-    FrameBuffer CreateFrameBuffer(T& args, VkRenderPass renderPass) {
+    const FrameBuffer& CreateFrameBuffer(T& args, VkRenderPass renderPass) {
         Allocator& a = getAllocator();
         MemChunk<VkImageView> views = a.BumpAllocate<VkImageView>(T::size());
         MemChunk<VkClearValue> clearVals = a.BumpAllocate<VkClearValue>(T::size());
@@ -144,12 +146,26 @@ struct API GraphicsFeature: FeatureSet,
         FrameBuffer result(&context, renderPass, views.data, clearVals.data, views.size, args.width(), args.height());
         a.Free(clearVals);
         a.Free(views);
-        return result;
+        
+        if (_frameBuffers.size() <= currentFrame) {
+            _frameBuffers.resize(currentFrame + 1);
+        }
+
+        _frameBuffers[currentFrame].push_back(std::make_unique<FrameBuffer>(std::move(result)));
+        
+        return *_frameBuffers[currentFrame].back();
     }
 
+    virtual void OnMessage(BeginFrameMsg*);
+
     virtual void OnMessage(CollectRequiredQueueTypesMsg*);
+    
+    virtual void OnMessage(DestroyMsg*);
 
 private:
     Allocator& getAllocator();
+
+    uint32_t currentFrame;
+    std::vector<std::vector<std::unique_ptr<FrameBuffer>>> _frameBuffers; 
 };
 

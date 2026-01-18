@@ -213,16 +213,16 @@ void TransferCommandBuffer::Reset() {
     vkResetCommandBuffer(buffer, 0);
 }
 
-void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, Ref<FrameBuffer> frameBuffer) {
+void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, const FrameBuffer& frameBuffer) {
     VkRenderPassBeginInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     renderPassInfo.renderPass = pipeline->renderPass;
-    renderPassInfo.framebuffer = frameBuffer->frameBuffer;
+    renderPassInfo.framebuffer = frameBuffer.frameBuffer;
 
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = {frameBuffer->width, frameBuffer->height};
+    renderPassInfo.renderArea.extent = {frameBuffer.width, frameBuffer.height};
 
-    renderPassInfo.clearValueCount = frameBuffer->clearValues.size();
-    renderPassInfo.pClearValues = frameBuffer->clearValues.data();
+    renderPassInfo.clearValueCount = frameBuffer.clearValues.size();
+    renderPassInfo.pClearValues = frameBuffer.clearValues.data();
 
     vkCmdBeginRenderPass(buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 

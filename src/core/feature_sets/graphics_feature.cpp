@@ -282,3 +282,16 @@ void GraphicsFeature::OnMessage(CollectRequiredQueueTypesMsg* m){
 Allocator& GraphicsFeature::getAllocator() {
     return context.Get<Allocator>();
 }
+
+void GraphicsFeature::OnMessage(BeginFrameMsg* m) {
+    currentFrame = m->inFlightFrame;
+
+    if (_frameBuffers.size() > currentFrame) {
+        _frameBuffers[currentFrame].clear();
+    }
+}
+
+void GraphicsFeature::OnMessage(DestroyMsg*) {
+    currentFrame = 0;
+    _frameBuffers.clear();
+}

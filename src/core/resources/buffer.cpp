@@ -1,5 +1,7 @@
 #include <buffer.h>
 #include <cassert>
+#include <render_context.h>
+#include <resources.h>
 
 const BufferPreset BufferPreset::VERTEX = {
     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -27,12 +29,12 @@ const BufferPreset BufferPreset::UNIFORM = {
     QueueType::Graphics | QueueType::Compute
 };
 
-Buffer::Buffer(VkDevice device, VkBuffer buffer, Memory&& mem):
+Buffer::Buffer(RenderContext& ctx, VkBuffer buffer, Memory&& mem):
     memory(std::move(mem)),
     vkBuffer(buffer),
-    vkDevice(device)
+    context(&ctx)
 {
-    vkBindBufferMemory(vkDevice, vkBuffer, memory.vkMemory, memory.offset);
+    vkBindBufferMemory(ctx.device(), vkBuffer, memory.vkMemory, memory.offset);
 }
 
 Buffer& Buffer::operator=(Buffer&& other) noexcept {
@@ -40,10 +42,10 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept {
         return *this;
 
     vkBuffer = other.vkBuffer;
-    vkDevice = other.vkDevice;
+    context = other.context;
     memory = std::move(other.memory);
     other.vkBuffer = VK_NULL_HANDLE;
-    other.vkDevice = VK_NULL_HANDLE;
+    other.context = nullptr;
 
     return *this;
 }
@@ -53,9 +55,9 @@ Buffer::Buffer(Buffer&& other) noexcept {
 }
 
 Buffer::~Buffer() {
-    if (vkDevice != VK_NULL_HANDLE) {
-        vkDestroyBuffer(vkDevice, vkBuffer, nullptr);
-        vkDevice = VK_NULL_HANDLE;
+    if (context != nullptr) {
+        vkDestroyBuffer(context->device(), vkBuffer, nullptr);
+        context = nullptr;
     }
 }
 

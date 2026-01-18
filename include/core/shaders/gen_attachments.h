@@ -5,6 +5,7 @@
 #include <shader_common.h>
 #include <allocator_feature.h>
 #include <render_context.h>
+#include <resource_storage.h>
 
 #ifndef BLOCK_NAME
 #error "BLOCK_NAME must be defined"
@@ -16,7 +17,7 @@
 
 struct BLOCK_NAME {
 
-#define WRAPPER(name, sc, lo, so, slo, sso, ol) ImageView* name;
+#define WRAPPER(name, sc, lo, so, slo, sso, ol) ResourceRef<Image> name;
 #include <define_attachments.h>
 BLOCK
 #include <reset_attachment_defines.h>
@@ -120,8 +121,8 @@ public:
     void FillAttachments(VkImageView* views, VkClearValue* clearValues) {
         uint32_t index = 0;
         #define WRAPPER(n, sc, lo, so, slo, sso, ol) \
-        views[index]=n##->vkImageView; \
-        clearValues[index++]=n##->referencedImage->clearValue;
+        views[index]=n##->view->vkImageView; \
+        clearValues[index++]=n##->clearValue;
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
@@ -129,7 +130,7 @@ public:
 
     uint32_t width() {
         uint32_t index = 0;
-        #define WRAPPER(name, sc, lo, so, slo, sso, ol) return name->referencedImage->description.width;
+        #define WRAPPER(name, sc, lo, so, slo, sso, ol) return name->description.width;
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
@@ -137,7 +138,7 @@ public:
 
     uint32_t height() {
         uint32_t index = 0;
-        #define WRAPPER(name, sc, lo, so, slo, sso, ol) return name->referencedImage->description.height;
+        #define WRAPPER(name, sc, lo, so, slo, sso, ol) return name->description.height;
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>

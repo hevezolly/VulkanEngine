@@ -7,6 +7,7 @@
 #include <render_context.h>
 #include <present_feature.h>
 #include <graphics_feature.h>
+#include <resources.h>
 
 static VkSurfaceFormatKHR SelectFormat(
     const SwapChainInitializer& args, 
@@ -152,7 +153,7 @@ SwapChain::SwapChain(RenderContext* context, const SwapChainInitializer& args) {
     description.format = format;
     
     for (auto img: premadeImages) {
-        images.emplace_back(img, device->device, description);
+        images.push_back(context->Get<Resources>().Register(Image(img, *context, description)));
     }
 }
 
@@ -180,7 +181,14 @@ SwapChain::SwapChain(SwapChain&& other) noexcept {
 
 SwapChain::~SwapChain() {
     if (context) {
+        
+        Resources& r = context->Get<Resources>();
+        for (auto image: images) {
+            r.DestroyImmediate(image);
+        }
         images.clear();
+
         vkDestroySwapchainKHR(context->device(), swapChain, nullptr);
     }
 }
+

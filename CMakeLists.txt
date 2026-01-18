@@ -68,6 +68,7 @@ target_link_libraries(VulkanEngine PUBLIC
 target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/collections
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/resources
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/pipelines
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/shaders

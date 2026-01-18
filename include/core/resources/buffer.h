@@ -3,6 +3,8 @@
 #include <resource_memory.h>
 #include <resource_id.h>
 
+struct RenderContext;
+
 struct API BufferPreset {
     VkBufferUsageFlags usageFlags; 
     VkMemoryPropertyFlags memoryProperties;
@@ -50,7 +52,7 @@ struct API Buffer {
     VkBuffer vkBuffer;
     uint32_t size_bytes();
     
-    Buffer(VkDevice device, VkBuffer buffer, Memory&& memory);
+    Buffer(RenderContext& context, VkBuffer buffer, Memory&& memory);
     
     template<typename T>
     uint32_t count() {
@@ -61,5 +63,5 @@ struct API Buffer {
     RULE_5(Buffer)
 
 private:
-    VkDevice vkDevice;
+    RenderContext* context;
 };

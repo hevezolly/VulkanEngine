@@ -7,6 +7,8 @@
 #include <buffer.h>
 #include <allocator_feature.h>
 #include <render_context.h>
+#include <resource_id.h>
+#include <resource_storage.h>
 
 #ifndef BLOCK_NAME
 #error "BLOCK_NAME must be defined"
@@ -33,6 +35,18 @@ BLOCK
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
+        return value;
+    }
+
+    static constexpr uint32_t size_resources() {
+        uint32_t value = 0;
+
+        #define DEFINITION
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) value++;
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef DEFINITION
         return value;
     }
 
@@ -94,6 +108,21 @@ BLOCK
         BLOCK
         #undef WRAPPER
         return chunk;
+    }
+
+    bool FillUsedResources(ResourceId* idData) {
+        #define DEFINITION
+        uint32_t index = 0;
+        bool same = true;
+        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) \
+        same &= idData[index] == n##.id; \
+        if (!same) idData[index++] = n##.id;
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef DEFINITION
+
+        return same;
     }
 
     MemChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set) {

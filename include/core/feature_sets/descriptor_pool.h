@@ -4,6 +4,7 @@
 #include <allocator_feature.h>
 #include <handles.h>
 #include <object_pool.h>
+#include <resource_id.h>
 
 struct DescriptorPool 
 {
@@ -20,20 +21,30 @@ private:
 
 void API __deallocate(RenderContext*, RawMemChunk memory, bool force=false);
 VkDevice API __device(RenderContext*);
+Allocator& API __get_alloc(RenderContext*);
 
 struct API DescriptorSet {
     VkDescriptorSet vkSet;
 
     DescriptorSet(VkDescriptorSet set, SpecializedDescriptorPool* p, RenderContext* ctx): 
-        vkSet(set), pool(p), context(ctx) {}
+        vkSet(set), pool(p), context(ctx), currentIds(MemChunk<ResourceId>::Null()) {}
 
     template<typename T>
     void Update(T& value) {
-        MemChunk<VkWriteDescriptorSet> writes = value.CollectDescriptorWrites(*context, vkSet);
 
-        vkUpdateDescriptorSets(__device(context), writes.size, writes.data, 0, nullptr);
+        if (currentIds.size != T::size_resources()) {
+            __deallocate(context, currentIds);
+            currentIds = __get_alloc(context).HeapAllocate<ResourceId>(T::size_resources());
+        }
 
-        __deallocate(context, writes, true);
+        if (!value.FillUsedResources(currentIds.data)) {
+
+            MemChunk<VkWriteDescriptorSet> writes = value.CollectDescriptorWrites(*context, vkSet);
+    
+            vkUpdateDescriptorSets(__device(context), writes.size, writes.data, 0, nullptr);
+    
+            __deallocate(context, writes, true);
+        }
     }
 
     RULE_5(DescriptorSet)
@@ -41,6 +52,7 @@ struct API DescriptorSet {
 private: 
     SpecializedDescriptorPool* pool;
     RenderContext* context;
+    MemChunk<ResourceId> currentIds;
 };
 
 struct API SpecializedDescriptorPool 
@@ -76,7 +88,7 @@ struct API Descriptors : FeatureSet,
 
     template<typename T>
     void Preallocate(uint32_t countInstances = 1) {
-        std::type_index id = getTypeId<T>();
+        TypeId id = getTypeId<T>();
 
         assert(countInstances >= 1);
 
@@ -100,11 +112,11 @@ struct API Descriptors : FeatureSet,
 
     template<typename T>
     VkDescriptorSetLayout GetLayout() {
-        std::type_index id = getTypeId<T>();
+        TypeId id = getTypeId<T>();
 
         if (_layouts.find(id) == _layouts.end()) {
             
-            std::type_index id = getTypeId<T>();
+            TypeId id = getTypeId<T>();
 
             _layouts[id] = VK_NULL_HANDLE;
 
@@ -125,7 +137,7 @@ struct API Descriptors : FeatureSet,
     template<typename T>
     DescriptorSet CreateDescriptorSet() 
     {
-        std::type_index id = getTypeId<T>();
+        TypeId id = getTypeId<T>();
 
         Ref<SpecializedDescriptorPool> selectedPool = Ref<SpecializedDescriptorPool>::Null();
 
@@ -150,9 +162,12 @@ struct API Descriptors : FeatureSet,
         if (_allocatedDescriptors.size() < frameId + 1)
             _allocatedDescriptors.resize(frameId + 1);
 
-        std::type_index id = getTypeId<T>();
+        TypeId id = getTypeId<T>();
 
-        ObjectPool<DescriptorSet>& pool = _allocatedDescriptors[frameId][id];
+        if (!_allocatedDescriptors[frameId])
+            _allocatedDescriptors[frameId] = std::make_unique<std::unordered_map<TypeId, ObjectPool<DescriptorSet>>>();
+
+        ObjectPool<DescriptorSet>& pool = (*_allocatedDescriptors[frameId])[id];
 
         if (pool.isEmpty())
             pool.Insert(CreateDescriptorSet<T>());
@@ -169,10 +184,10 @@ struct API Descriptors : FeatureSet,
 private:
     Ref<SpecializedDescriptorPool> CreateDescriptorPool(
         uint32_t, uint32_t, VkDescriptorSetLayout, MemChunk<VkDescriptorPoolSize> sizes);
-    std::unordered_map<std::type_index, VkDescriptorSetLayout> _layouts;
-    std::unordered_map<std::type_index, std::vector<Ref<SpecializedDescriptorPool>>> _descriptorPools;
+    std::unordered_map<TypeId, VkDescriptorSetLayout> _layouts;
+    std::unordered_map<TypeId, std::vector<Ref<SpecializedDescriptorPool>>> _descriptorPools;
     
-    std::vector<std::unordered_map<std::type_index, ObjectPool<DescriptorSet>>> _allocatedDescriptors;
+    std::vector<std::unique_ptr<std::unordered_map<TypeId, ObjectPool<DescriptorSet>>>> _allocatedDescriptors;
 
     uint32_t frameId;
 };

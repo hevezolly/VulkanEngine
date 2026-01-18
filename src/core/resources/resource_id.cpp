@@ -1,31 +1,46 @@
 #include <resource_id.h>
 
-static const uint32_t TYPE_BITS = 1;
-static const uint32_t CHILDREN_BITS = 8;
-static const uint32_t ID_BITS = 32 - TYPE_BITS - CHILDREN_BITS;
-
-static const uint32_t CHILDREN_MASK = ((0xffffffff >> TYPE_BITS) & (0xffffffff << ID_BITS));
-
-std::size_t std::hash<ResourceId>::operator()(const ResourceId& i) const {
-    return std::hash<uint32_t>{}(i.id);
+std::size_t std::hash<ResourceId>::operator()(const ResourceId& i) const noexcept {
+    return std::hash<uint64_t>{}(i.id);
 }
 
-bool ResourceId::operator==(ResourceId other) {
+bool ResourceId::operator==(const ResourceId& other) const {
         return id == other.id;
     }
 
-bool ResourceId::operator!=(ResourceId other) {
-    return !(id == other.id);
+bool ResourceId::operator!=(const ResourceId& other) const {
+    return !(*this == other);
 }
 
-ResourceType ResourceId::type() {
-    return static_cast<ResourceType>((id >> (ID_BITS + CHILDREN_BITS)) & TYPE_BITS);
+ResourceType ResourceId::type() const {
+    return static_cast<ResourceType>((id >> (
+        ResourceIdLimits::ID_BITS + ResourceIdLimits::GENERATION_BITS)) &
+        ResourceIdLimits::TYPE_BITS);
 }
 
-bool ResourceId::isChild() {
-    return (((id & CHILDREN_MASK) >> ID_BITS)) > 0; 
+uint32_t ResourceId::index() const {
+    return static_cast<uint32_t>((id & ~ResourceIdLimits::GENERATION_MASK) & 0xffffffff);
 }
 
-ResourceId ResourceId::parent() {
-    return {id & ~CHILDREN_MASK};
+uint32_t ResourceId::generation() const {
+    return static_cast<uint32_t>(((id & ResourceIdLimits::GENERATION_MASK) >> ResourceIdLimits::ID_BITS) & 0xffffffff);
+}
+
+ResourceId ResourceId::Compose(ResourceType type, uint32_t id, uint32_t generation) {
+    uint64_t typeBits = static_cast<uint64_t>(type);
+    assert(typeBits < ResourceIdLimits::RESOURCE_TYPES_COUNT);
+    
+    uint64_t result = typeBits << (ResourceIdLimits::SIZE - ResourceIdLimits::TYPE_BITS) | 
+                      static_cast<uint64_t>(generation) << (ResourceIdLimits::ID_BITS) |
+                      id;
+
+    return {result};
+}
+
+ResourceId ResourceId::NextGeneration() const {
+    assert(generation() < ResourceIdLimits::GENERATION_COUNT - 1);
+
+    uint64_t result = id | (generation() + 1) << ResourceIdLimits::ID_BITS;
+    
+    return {result};
 }

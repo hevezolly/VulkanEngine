@@ -120,24 +120,18 @@ void ImguiUI::OnMessage(PresentMsg* m) {
 
     _commandBuffers[currentFrame].Reset();
     _commandBuffers[currentFrame].Begin();
-    
-    for (int i = _frameBuffers.size(); i <= m->swapChainIndex; i++) {
 
-        UiAttachments a;
-        a.color = context.Get<PresentFeature>().swapChain->images[i].view;
-        _frameBuffers.push_back(
-            context.Register(context.Get<GraphicsFeature>().CreateFrameBuffer(a, renderPass)));
-    }
-
-    Ref<FrameBuffer> frameBuffer = _frameBuffers[m->swapChainIndex];
+    UiAttachments a;
+    a.color = context.Get<PresentFeature>().swapChain->images[m->swapChainIndex];
+    const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>().CreateFrameBuffer(a, renderPass);    
 
     VkRenderPassBeginInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     renderPassInfo.renderPass = renderPass;
 
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = {frameBuffer->width, frameBuffer->height};
+    renderPassInfo.renderArea.extent = {frameBuffer.width, frameBuffer.height};
 
-    renderPassInfo.framebuffer = frameBuffer->frameBuffer;
+    renderPassInfo.framebuffer = frameBuffer.frameBuffer;
 
     vkCmdBeginRenderPass(_commandBuffers[currentFrame].buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     

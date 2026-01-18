@@ -25,7 +25,7 @@ struct API MessageHandler {
 
 struct API Message {
     void* message;
-    std::type_index type;
+    TypeId type;
     bool bottomToTop;
 };
 
@@ -78,7 +78,7 @@ struct API RenderContext {
         
         T* feature = new T(*this, std::forward<CallArgs>(args)...);
 
-        std::type_index typeId = getTypeId<T>();
+        TypeId typeId = getTypeId<T>();
 
         _features[typeId] = static_cast<FeatureSet*>(feature);
 
@@ -90,7 +90,7 @@ struct API RenderContext {
     template<typename T>
     T* TryGet() {
         static_assert(std::is_base_of<FeatureSet, T>::value, "T must be derived from FeatureSet");
-        std::type_index typeId = getTypeId<T>();
+        TypeId typeId = getTypeId<T>();
     
         auto it = _features.find(getTypeId<T>());
         if (it == _features.end())
@@ -165,7 +165,7 @@ struct API RenderContext {
 
     template<typename T>
     void Send(T* message=nullptr, bool bottomToTop=false) {
-        std::type_index id = getTypeId<T>();
+        TypeId id = getTypeId<T>();
         auto it = _messageHandlers.find(id);
 
         if (it == _messageHandlers.end()) {
@@ -218,10 +218,10 @@ private:
 
     std::vector<DestructorPair> _initOrder;
 
-    std::unordered_map<std::type_index, FeatureSet*> _features;
-    std::vector<std::type_index> _featureInitOrder;
+    std::unordered_map<TypeId, FeatureSet*> _features;
+    std::vector<TypeId> _featureInitOrder;
 
-    std::unordered_map<std::type_index, std::vector<MessageHandler>> _messageHandlers;
+    std::unordered_map<TypeId, std::vector<MessageHandler>> _messageHandlers;
     std::queue<Message> _messages;
 
     bool _handling;

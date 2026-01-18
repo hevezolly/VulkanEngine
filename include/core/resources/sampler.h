@@ -1,5 +1,8 @@
 #pragma once
 #include <common.h>
+#include <resource_id.h>
+
+struct RenderContext;
 
 struct API SamplerFilter {
     VkFilter minFilter;
@@ -22,11 +25,10 @@ struct API SamplerAddressMode {
 struct API Sampler {
     VkSampler vkSampler;
 
-    Sampler(VkSampler sampler, VkDevice device): 
-        vkSampler(sampler), device(device) {}
+    Sampler(VkSampler sampler, RenderContext& ctx);
 
     RULE_5(Sampler)
 
 private:
-    VkDevice device;
+    RenderContext* context;
 };

@@ -82,15 +82,13 @@ struct _Resources {
     Refs<Semaphore> imgAvailableSemaphores;
     Refs<Semaphore> renderFinish;
     Refs<Fence> inFlightFences;
-    Refs<Buffer> uniformBuffers;
-    Refs<DescriptorSet> descriptorSets;
-    Refs<FrameBuffer> frameBuffers;
+    ResourceRefs<Buffer> uniformBuffers;
     Ref<GraphicsPipeline> pipeline;
-    Ref<Buffer> vertexBuffer;
-    Ref<Buffer> indexBuffer;
-    Ref<Image> image;
-    Ref<Image> depth;
-    Ref<Sampler> sampler;
+    ResourceRef<Buffer> vertexBuffer;
+    ResourceRef<Buffer> indexBuffer;
+    ResourceRef<Image> image;
+    ResourceRef<Image> depth;
+    ResourceRef<Sampler> sampler;
 };
 
 _Resources PrepareResources(
@@ -198,26 +196,6 @@ void main() {
         r.commandBuffers.push_back(context.Get<CommandPool>().CreateGraphicsBuffer());
         r.uniformBuffers.push_back(context.Get<Resources>()
             .CreateBuffer<UniformData>(BufferPreset::UNIFORM, 1));
-        
-        r.descriptorSets.push_back(
-            context.Register(std::move(context.Get<Descriptors>()
-            .CreateDescriptorSet<ShaderInput>())));
-        
-        ShaderInput data{};
-        data.transforms = &r.uniformBuffers.back();
-        data.img = r.image->view;
-        data.img_sampler = &r.sampler;
-
-        r.descriptorSets.back()->Update(data);
-    }
-
-    for (int i = 0; i < context.Get<PresentFeature>().swapChain->images.size(); i++) {
-        Attachments attachments;
-        attachments.color = context.Get<PresentFeature>().swapChain->images[i].view;
-        attachments.depth = r.depth->view;
-        r.frameBuffers.push_back(context.Register(
-            context.Get<GraphicsFeature>().CreateFrameBuffer(attachments, r.pipeline->renderPass))
-        );
     }
       
     r.commandBuffers[0].Begin();
@@ -239,10 +217,10 @@ void main() {
 
 void RecordCommandBuffer(
     GraphicsCommandBuffer& cmd, 
-    Ref<Buffer> vertexBuffer,
-    Ref<Buffer> indexBuffer,
+    ResourceRef<Buffer> vertexBuffer,
+    ResourceRef<Buffer> indexBuffer,
     Ref<GraphicsPipeline> pipeline, 
-    Ref<FrameBuffer> frameBuffer,
+    const FrameBuffer& frameBuffer,
     VkDescriptorSet descriptorSet
 ) {
     cmd.Begin();
@@ -251,15 +229,15 @@ void RecordCommandBuffer(
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = static_cast<float>(frameBuffer->width);
-    viewport.height = static_cast<float>(frameBuffer->height);
+    viewport.width = static_cast<float>(frameBuffer.width);
+    viewport.height = static_cast<float>(frameBuffer.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(cmd.buffer, 0, 1, &viewport);
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = {frameBuffer->width, frameBuffer->height};
+    scissor.extent = {frameBuffer.width, frameBuffer.height};
     vkCmdSetScissor(cmd.buffer, 0, 1, &scissor);
 
     VkDeviceSize offset = 0;
@@ -314,11 +292,23 @@ void DrawFrame(
 
     vkDeviceWaitIdle(context.device());
 
-    VkDescriptorSet set = r.descriptorSets[frameId]->vkSet;
+    ShaderInput data{};
+    data.transforms = r.uniformBuffers.back();
+    data.img = r.image;
+    data.img_sampler = r.sampler;
+
+    DescriptorSet& set = context.Get<Descriptors>().BorrowDescriptorSet(data);
+
+    Attachments attachments;
+    attachments.color = context.Get<PresentFeature>().swapChain->images[imageIndex];
+    attachments.depth = r.depth;
+    
+    const FrameBuffer& buffer = context.Get<GraphicsFeature>()
+        .CreateFrameBuffer(attachments, r.pipeline->renderPass);
 
     cmd.Reset();
     RecordCommandBuffer(cmd, r.vertexBuffer, r.indexBuffer, r.pipeline, 
-        r.frameBuffers[imageIndex], set
+        buffer, set.vkSet
     );
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];

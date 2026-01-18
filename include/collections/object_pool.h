@@ -13,7 +13,7 @@ struct API ObjectPool
         T item;
 
         Node(T&& movedItem): 
-            pool(nullptr), next(nullptr), previous(nullptr), item(std::move(movedItem)) {}
+            next(nullptr), previous(nullptr), item(std::move(movedItem)) {}
     };
 
     bool isEmpty() {
@@ -73,7 +73,7 @@ struct API ObjectPool
 
         begin = other.begin;
         nextAailable = other.nextAailable;
-        end = other.nextAailable;
+        end = other.end;
         *_storage = this;
         other._storage = nullptr;
         other.begin = nullptr;
@@ -92,10 +92,9 @@ private:
     Node* end;
 
     void Return(Node* node) {
-        assert(node != nullptr)
+        assert(node != nullptr);
         assert(node != nextAailable);
         
-        node->pool = this;
         Node* prev = node->previous;
         Node* next = node->next;
 
@@ -126,7 +125,7 @@ private:
 };
 
 template<typename T>
-struct Borrowed {
+struct API Borrowed {
     
     T& val() {
         assert(_ptr != nullptr);
@@ -151,16 +150,16 @@ struct Borrowed {
     }
 
     void Forget() {
-        other._ptr = nullptr;
-        other._storage = nullptr;
+        _ptr = nullptr;
+        _storage = nullptr;
     }
 
-    Borrowed(ObjectPool<T>** storage,  ObjectPool<T>::Node* p): _storage(storage), _ptr(p){}
+    Borrowed(ObjectPool<T>** storage, typename ObjectPool<T>::Node* p): _storage(storage), _ptr(p){}
 
     ~Borrowed() {
 
         if (_storage == nullptr)
-            return
+            return;
 
         (*_storage)->Return(_ptr);
     }
@@ -186,7 +185,7 @@ struct Borrowed {
     }
 
 private:
-    ObjectPool<T>::Node* _ptr;
+    typename ObjectPool<T>::Node* _ptr;
     ObjectPool<T>** _storage;
 };
 

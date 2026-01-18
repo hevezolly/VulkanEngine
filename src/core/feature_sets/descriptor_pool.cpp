@@ -1,6 +1,10 @@
 #include <descriptor_pool.h>
 #include <render_context.h>
 
+Allocator& __get_alloc(RenderContext* ctx) {
+    return ctx->Get<Allocator>();
+}
+
 void __deallocate(RenderContext* context, RawMemChunk memory, bool force) {
     context->Get<Allocator>().Free(memory, force);
 }
@@ -128,7 +132,7 @@ void Descriptors::OnMessage(EarlyDestroyMsg*) {
 void Descriptors::OnMessage(BeginFrameMsg* m) {
     frameId = m->inFlightFrame;
     if (_allocatedDescriptors.size() > frameId) {
-        for (auto& pair : _allocatedDescriptors[frameId])
+        for (auto& pair : *_allocatedDescriptors[frameId])
             pair.second.Reset();
     }
 }

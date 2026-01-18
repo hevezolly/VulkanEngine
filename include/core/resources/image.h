@@ -4,6 +4,9 @@
 #include <resource_memory.h>
 #include <optional>
 #include <glm/glm.hpp>
+#include <resource_id.h>
+
+struct RenderContext;
 
 void formatDepthStencilSupport(VkFormat format, bool& depth, bool& stencil);
 
@@ -24,12 +27,12 @@ struct API ImageView {
     VkImageView vkImageView;
     const Image* referencedImage;
 
-    ImageView(VkDevice device, const Image* image, VkImageAspectFlags aspect);
+    ImageView(RenderContext& context, const Image* image, VkImageAspectFlags aspect);
 
     RULE_5(ImageView)
 
 private:
-    VkDevice device;
+    RenderContext* context;
 };
 
 struct ResourceState {
@@ -44,12 +47,12 @@ struct API Image {
     ImageView* view;
     VkClearValue clearValue;
 
-    Image(VkImage readyImage, VkDevice device, const ImageDescription& description);
-    Image(VkImage img, VkDevice device, Memory&& memory, const ImageDescription& description);
+    Image(VkImage readyImage, RenderContext& context, const ImageDescription& description);
+    Image(VkImage img, RenderContext& context, Memory&& memory, const ImageDescription& description);
     
     RULE_5(Image)
 
 private:
-    VkDevice device = VK_NULL_HANDLE;
+    RenderContext* context = nullptr;
     std::optional<Memory> memory;
 };

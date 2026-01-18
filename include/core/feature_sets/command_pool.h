@@ -40,7 +40,7 @@ struct API GraphicsCommandBuffer: ComputeCommandBuffer {
     using ComputeCommandBuffer::ComputeCommandBuffer;
     virtual QueueType queueType();
     
-    void BeginRenderPass(Ref<GraphicsPipeline> pipeline, Ref<FrameBuffer> frameBuffer);
+    void BeginRenderPass(Ref<GraphicsPipeline> pipeline, const FrameBuffer& frameBuffer);
     void EndRenderPass();
     friend struct CommandPool;
 };

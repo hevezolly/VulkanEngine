@@ -136,5 +136,5 @@ void PresentFeature::OnMessage(CollectRequiredQueueTypesMsg* m) {
 }
 
 VkExtent2D PresentFeature::swapChainExtent() {
-    return {swapChain->images[0].description.width, swapChain->images[0].description.height};
+    return {swapChain->images[0]->description.width, swapChain->images[0]->description.height};
 }
