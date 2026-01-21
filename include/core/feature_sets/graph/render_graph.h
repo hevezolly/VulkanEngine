@@ -4,6 +4,7 @@
 #include <render_node.h>
 #include <allocator_feature.h>
 #include <unordered_map>
+#include <unordered_set>
 
 struct NodeWrapper {
     MemChunk<NodeDependency> inputDependency;
@@ -26,15 +27,20 @@ struct API RenderGraph: FeatureSet,
 
     void AddNode(RenderNode&);
 
-    void Render();
+    void BuildGraph();
 
     void OnMessage(BeginFrameMsg*);
     void OnMessage(DestroyMsg*);
 
 private:
+
+    MemChunk<uint32_t> sortNodes();
+
     std::vector<NodeWrapper> nodes;
     std::unordered_map<ResourceId, uint32_t> _versions;
 
     std::unordered_map<ResourceId, ResourceUsage> _lastWrite;
+    std::vector<std::vector<uint32_t>> _dependencies;
+    std::vector<std::unordered_set<uint32_t>> _incomingEdges;
 
 };
