@@ -1,8 +1,13 @@
 #pragma once
 #include <common.h>
-#include <node_dependency.h>
 #include <allocator_feature.h>
 #include <command_pool.h>
+#include <resource_id.h>
+
+struct API NodeDependency {
+    ResourceId resource;
+    ResourceState state;
+};
 
 struct API RenderNode {
     

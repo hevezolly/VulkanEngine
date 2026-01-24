@@ -47,30 +47,48 @@ struct API Resources: FeatureSet,
     void DestroyImmediate(ResourceId resource);
 
     template <typename T>
-    ResourceRef<T> Register(T&& value) {
+    ResourceRef<T> Register(T&& value, const ResourceState& resourceState) {
         static_assert(std::is_same_v<T, Image> ||
-                      std::is_same_v<T, Buffer> ||
-                      std::is_same_v<T, Sampler>);
+                      std::is_same_v<T, Buffer>);
         return ResourceRef<T>();
     }
 
     template<>
-    ResourceRef<Image> Resources::Register<Image>(Image&& img) {
+    ResourceRef<Image> Resources::Register<Image>(Image&& img, const ResourceState& resourceState) {
         ResourceId id = _images.Insert(std::move(img));
+        _states[id] = resourceState;
         return {id, &_images};
     } 
 
     template<>
-    ResourceRef<Buffer> Resources::Register<Buffer>(Buffer&& buffer) {
+    ResourceRef<Buffer> Resources::Register<Buffer>(Buffer&& buffer, const ResourceState& resourceState) {
         ResourceId id = _buffers.Insert(std::move(buffer));
+        _states[id] = resourceState;
         return {id, &_buffers};
+    }
+
+    template <typename T>
+    ResourceRef<T> Get(ResourceId id) {
+        static_assert(std::is_same_v<T, Image> ||
+                      std::is_same_v<T, Buffer>);
+        return ResourceRef<T>();
+    }
+
+    template<>
+    ResourceRef<Image> Resources::Get<Image>(ResourceId id) {
+        assert(id.type() == ResourceType::Image);
+        return {id, &_images};
     } 
 
     template<>
-    ResourceRef<Sampler> Resources::Register<Sampler>(Sampler&& sampler) {
-        ResourceId id = _samplers.Insert(std::move(sampler));
-        return {id, &_samplers};
-    } 
+    ResourceRef<Buffer> Resources::Get<Buffer>(ResourceId id) {
+        assert(id.type() == ResourceType::Buffer);
+        return {id, &_buffers};
+    }
+
+    ResourceState GetState(ResourceId id);
+    void SetState(ResourceId id, const ResourceState& state);
+    ResourceState UpdateState(ResourceId id, const ResourceState& state);
 
     virtual void OnMessage(InitMsg*);
     virtual void OnMessage(DestroyMsg*);
@@ -78,6 +96,8 @@ struct API Resources: FeatureSet,
 private:
     VkPhysicalDeviceMemoryProperties vkMemProperties;
 
+    std::unordered_map<ResourceId, ResourceState> _states;
+    
     ResourceStorage<Buffer> _buffers;
     ResourceStorage<Image> _images;
     ResourceStorage<Sampler> _samplers;

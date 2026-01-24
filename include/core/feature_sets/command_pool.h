@@ -6,6 +6,8 @@
 #include <synchronization.h>
 #include <messages.h>
 #include <frame_buffer.h>
+#include <resource_id.h>
+#include <resource_storage.h>
 
 struct API TransferCommandBuffer {
     VkCommandBuffer buffer;
@@ -18,8 +20,9 @@ struct API TransferCommandBuffer {
     void End();
     void Reset();
     void CopyBufferRegion(VkBuffer src, VkBuffer dst, uint32_t size, uint32_t src_offset = 0, uint32_t dst_offset = 0);
-    void ImageBarrier(Image& img, VkImageLayout newLayout, VkAccessFlags access, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destStage);
-    
+    void ImageBarrier(ResourceRef<Image> img, const ResourceState& newState);
+    void Barrier(uint32_t count, const ResourceId* ids, const ResourceState* states);
+
     virtual RULE_5(TransferCommandBuffer)
     
     friend struct CommandPool;

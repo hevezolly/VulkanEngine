@@ -156,7 +156,12 @@ static VkDevice CreateLogicalDevice(
     }
 
     VkPhysicalDeviceFeatures deviceFeatures{};
+
+    VkPhysicalDeviceVulkan13Features vulkan13Features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+    vulkan13Features.synchronization2 = VK_TRUE;
+
     VkDeviceCreateInfo createInfo{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
+    createInfo.pNext = &vulkan13Features;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(uniqueQueueFamilies.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());

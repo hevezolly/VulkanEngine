@@ -1,6 +1,22 @@
 #pragma once
 #include <common.h>
 
+struct ResourceState {
+    VkAccessFlags2 currentAccess;
+    VkPipelineStageFlags2 accessStage;
+    VkImageLayout currentLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+
+    ResourceState(
+        VkAccessFlags2 access, 
+        VkPipelineStageFlags2 stage, 
+        VkImageLayout layout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED): 
+        currentAccess(access),
+        accessStage(stage),
+        currentLayout(layout) {}
+
+    ResourceState(): ResourceState(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT) {}
+};
+
 namespace ResourceIdLimits {
 
     inline constexpr uint32_t SIZE = 64;
@@ -9,12 +25,12 @@ namespace ResourceIdLimits {
     inline constexpr uint32_t ID_BITS = SIZE - TYPE_BITS - GENERATION_BITS;
 
     inline constexpr uint64_t GENERATION_MASK = 
-        ((0xffffffff >> TYPE_BITS) & 
-        (0xffffffff << ID_BITS));
+        ((UINT64_MAX >> TYPE_BITS) & 
+        (UINT64_MAX << ID_BITS));
 
-    inline constexpr uint32_t PARENT_IDS_COUNT = (uint32_t(1) << ID_BITS);
-    inline constexpr uint32_t RESOURCE_TYPES_COUNT = (uint32_t(1) << TYPE_BITS);
-    inline constexpr uint32_t GENERATION_COUNT = (uint32_t(1) << GENERATION_BITS);
+    inline constexpr uint64_t PARENT_IDS_COUNT = (uint64_t(1) << ID_BITS);
+    inline constexpr uint64_t RESOURCE_TYPES_COUNT = (uint64_t(1) << TYPE_BITS);
+    inline constexpr uint64_t GENERATION_COUNT = (uint64_t(1) << GENERATION_BITS);
 }
 
 enum struct ResourceType: uint8_t {

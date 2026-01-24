@@ -35,15 +35,9 @@ private:
     RenderContext* context;
 };
 
-struct ResourceState {
-    VkImageLayout currentLayout;
-    VkAccessFlags currentAccess;
-};
-
 struct API Image {
     VkImage vkImage;
     ImageDescription description;
-    ResourceState state;
     ImageView* view;
     VkClearValue clearValue;
 

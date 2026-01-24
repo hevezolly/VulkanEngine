@@ -19,3 +19,25 @@ void Allocator::OnMessage(BeginFrameMsg* m) {
     if (m->inFlightFrame == 0)
         freeOffset = 0;
 }
+
+ArenaContext::~ArenaContext() {
+    if (alloc) {
+        alloc->SetOffset(freeOffset);
+        alloc = nullptr;
+    }
+}
+
+ArenaContext& ArenaContext::operator=(ArenaContext&& other) noexcept {
+    if (this != &other) {
+        alloc = other.alloc;
+        freeOffset = other.freeOffset;
+        other.alloc = nullptr;
+    }
+
+    return *this;
+}
+
+ArenaContext::ArenaContext(ArenaContext&& other) noexcept : 
+    alloc(other.alloc), freeOffset(other.freeOffset) {
+    other.alloc = nullptr;
+}

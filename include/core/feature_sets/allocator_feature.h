@@ -3,6 +3,8 @@
 
 #define PREALLOCATED_SIZE 10240
 
+struct Allocator;
+
 enum struct AllocationType {
     Bump,
     Heap
@@ -73,6 +75,7 @@ struct MemChunk {
         friend bool operator==(const Iterator& a, const Iterator& b) {
             return a.m_ptr == b.m_ptr;
         }
+        
         friend bool operator!=(const Iterator& a, const Iterator& b) {
             return a.m_ptr != b.m_ptr;
         }
@@ -85,7 +88,142 @@ struct MemChunk {
     Iterator end() { return Iterator(data + size); } 
 };
 
+template<typename T>
+struct MemBuffer {
+
+    uint32_t size() {return _size;}
+
+    T* data() {return _data.data;}
+
+    T& operator[](int index) {
+        assert(index >= 0 && index < _size);
+        return _data[index];
+    }
+
+    const T& operator[](int index) const {
+        assert(index >= 0 && index < _size);
+        return _data[index];
+    }
+
+    T& back() {
+        assert(_size > 0);
+        return _data[_size - 1];
+    }
+
+    const T& back() const {
+        assert(_size > 0);
+        return _data[_size - 1];
+    }
+
+    void push_back(const T& value) {
+        assert(_size < _data.size);
+
+        _data[_size++] = value;
+    }
+
+    void push_back(T&& value) {
+        assert(_size < _data.size);
+
+        _data[_size++] = std::move(value);
+    }
+
+    void pop_back() {
+        assert(_size > 0);
+        _size--;
+    }
+
+    void fast_delete_at(uint32_t index) {
+        assert(_size > 0);
+        assert(index < _size);
+        if (index != _size-1) {
+            std::swap(_data[_size-1], _data[index]);
+        }
+        pop_back();
+    }
+
+    void fast_delete(const T& item) {
+        uint32_t index = 0;
+        for (; index < _size; index++) {
+            if (_data[index] == item)
+                break;
+        }
+
+        if (index < _size)
+            fast_delete_at(index);
+    }
+
+    void resize(uint32_t count) {
+        _size = count;
+    }
+
+    MemBuffer(MemChunk<T> data): _size(0), _data(data) {}
+    
+    explicit operator MemChunk<T>() const {
+        return _data;
+    }
+
+    struct Iterator {
+        // Iterator traits (required for STL compatibility pre-C++20)
+        using iterator_category = std::forward_iterator_tag; //
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T*;
+        using reference = T&;
+
+        // Constructor
+        Iterator(pointer ptr) : m_ptr(ptr) {}
+
+        // Required Operators
+        // Dereference operator
+        reference operator*() const { return *m_ptr; }
+        pointer operator->() const { return m_ptr; }
+
+        // Prefix increment operator (++it)
+        Iterator& operator++() {
+            m_ptr++;
+            return *this;
+        }
+
+        // Postfix increment operator (it++)
+        Iterator operator++(int) {
+            Iterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        // Comparison operators
+        friend bool operator==(const Iterator& a, const Iterator& b) {
+            return a.m_ptr == b.m_ptr;
+        }
+        
+        friend bool operator!=(const Iterator& a, const Iterator& b) {
+            return a.m_ptr != b.m_ptr;
+        }
+
+    private:
+        pointer m_ptr; // Pointer to the current element
+    };
+
+    Iterator begin() { return Iterator(data()); }
+    Iterator end() { return Iterator(data() + size()); } 
+    
+private:
+    MemChunk<T> _data;
+    uint32_t _size;
+};
+
 using RawMemChunk = MemChunk<char>;
+
+
+struct ArenaContext {
+
+    ArenaContext(Allocator* a, uintptr_t offset) : freeOffset(offset), alloc(a){}
+
+    RULE_5(ArenaContext)
+private:
+    Allocator* alloc;
+    uintptr_t freeOffset;
+};
 
 struct Allocator: FeatureSet,
     CanHandle<EarlyInitMsg>,
@@ -140,11 +278,24 @@ struct Allocator: FeatureSet,
             freeOffset = std::min(chunkStart, freeOffset);
     }
 
+    template<typename T>
+    void Free(MemBuffer<T> borrowed, bool force = false) {
+        Free(static_cast<MemChunk<T>>(borrowed), force);
+    }
+
+    ArenaContext BeginContext() {
+        return ArenaContext(this, freeOffset);
+    }
+
+    friend ArenaContext;
+
 private:
+
+    void SetOffset(uintptr_t offset) {
+        freeOffset = offset;
+    }
 
     char* chunk;
     size_t allocatedSize;
     uintptr_t freeOffset;
-
-
 };

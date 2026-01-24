@@ -2,6 +2,7 @@
 #include <render_context.h>
 #include <graphics_feature.h>
 #include <allocator_feature.h>
+#include <resources.h>
 
 TransferCommandBuffer::~TransferCommandBuffer() {
     if (!transient || context==nullptr)
@@ -233,33 +234,84 @@ void GraphicsCommandBuffer::EndRenderPass() {
     vkCmdEndRenderPass(buffer);
 }
 
-void TransferCommandBuffer::ImageBarrier(Image& img, VkImageLayout newLayout, VkAccessFlags access, VkPipelineStageFlags srcStage, VkPipelineStageFlags destStage) {
+void TransferCommandBuffer::ImageBarrier(ResourceRef<Image> img, const ResourceState& newState) {
+    Barrier(1, &img.id, &newState);
+}
 
-    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+void TransferCommandBuffer::Barrier(uint32_t count, const ResourceId* ids, const ResourceState* states) {
 
-    barrier.oldLayout = img.state.currentLayout;
-    barrier.newLayout = newLayout;
+    if (count == 0)
+        return;
 
-    barrier.image = img.vkImage;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    Allocator& alloc = context->Get<Allocator>();
+    Resources& resources = context->Get<Resources>();
+    auto _ = alloc.BeginContext();
 
-    barrier.srcAccessMask = img.state.currentAccess;
-    barrier.dstAccessMask = access;
+    MemBuffer<VkImageMemoryBarrier2> imageBarriers = alloc.BumpAllocate<VkImageMemoryBarrier2>(count);
+    MemBuffer<VkBufferMemoryBarrier2> bufferBarriers = alloc.BumpAllocate<VkBufferMemoryBarrier2>(count);
 
-    vkCmdPipelineBarrier(buffer,
-        srcStage, destStage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+    for (int i = 0; i < count; i++) {
 
-    img.state.currentAccess = access;
-    img.state.currentLayout = newLayout;
+        ResourceId id = ids[i];
+        ResourceState newState = states[i];
+        ResourceState oldState = resources.GetState(id);
+
+        if (id.type() == ResourceType::Image) {
+            imageBarriers.push_back(VkImageMemoryBarrier2{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2});
+
+            imageBarriers.back().srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            imageBarriers.back().dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+            imageBarriers.back().oldLayout = oldState.currentLayout;
+            imageBarriers.back().newLayout = newState.currentLayout;
+
+            imageBarriers.back().image = resources.Get<Image>(id)->vkImage;
+            imageBarriers.back().subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            imageBarriers.back().subresourceRange.baseMipLevel = 0;
+            imageBarriers.back().subresourceRange.levelCount = 1;
+            imageBarriers.back().subresourceRange.baseArrayLayer = 0;
+            imageBarriers.back().subresourceRange.layerCount = 1;
+
+            imageBarriers.back().srcAccessMask = oldState.currentAccess;
+            imageBarriers.back().dstAccessMask = newState.currentAccess;
+
+            imageBarriers.back().srcStageMask = oldState.accessStage;
+            imageBarriers.back().dstStageMask = newState.accessStage;
+
+            resources.SetState(id, newState);
+
+        } else if (id.type() == ResourceType::Buffer) {
+            bufferBarriers.push_back(VkBufferMemoryBarrier2{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2});
+
+            ResourceRef<Buffer> buffer = resources.Get<Buffer>(id);
+
+            bufferBarriers.back().offset = buffer->memory.offset;
+            bufferBarriers.back().size = buffer->size_bytes();
+
+            bufferBarriers.back().srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            bufferBarriers.back().dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+            bufferBarriers.back().srcAccessMask = oldState.currentAccess;
+            bufferBarriers.back().dstAccessMask = newState.currentAccess;
+
+            bufferBarriers.back().srcStageMask = oldState.accessStage;
+            bufferBarriers.back().dstStageMask = newState.accessStage;
+
+            bufferBarriers.back().buffer = buffer->vkBuffer;
+
+            resources.SetState(id, newState);
+        }
+    }
+
+    if (imageBarriers.size() == 0 && bufferBarriers.size() == 0)
+        return;
+
+    VkDependencyInfo dep{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dep.imageMemoryBarrierCount = imageBarriers.size();
+    dep.pImageMemoryBarriers = imageBarriers.data();
+
+    dep.bufferMemoryBarrierCount = bufferBarriers.size();
+    dep.pBufferMemoryBarriers = bufferBarriers.data();
+
+    vkCmdPipelineBarrier2(buffer, &dep);
 }

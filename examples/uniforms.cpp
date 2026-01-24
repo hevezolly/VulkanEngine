@@ -201,11 +201,12 @@ void main() {
     r.commandBuffers[0].Begin();
 
     r.commandBuffers[0].ImageBarrier(
-        *r.image, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_READ_BIT, 
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        r.image, 
+        ResourceState{
+            VK_ACCESS_2_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        });
 
     r.commandBuffers[0].End();
 

@@ -60,7 +60,7 @@ Buffer createStandaloneBuffer(RenderContext& c, BufferPreset preset, uint32_t si
 }
 
 ResourceRef<Buffer> Resources::CreateRawBuffer(BufferPreset preset, uint32_t size_bytes) {
-    return Register(createStandaloneBuffer(context, preset, size_bytes));
+    return Register(createStandaloneBuffer(context, preset, size_bytes), ResourceState{});
 }
 
 Buffer createAndFillBuffer(RenderContext& context, BufferPreset preset, uint32_t size_bytes, void* data) {
@@ -120,7 +120,7 @@ ResourceRef<Image> Resources::CreateImage(const ImageDescription& description, I
     
     ResourceRef<Image> result = Register(Image(image, context, 
         AllocateMemory(memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), 
-        description));
+        description), ResourceState{});
 
     context.Get<Allocator>().Free(usedQueues);
     return result;
@@ -267,11 +267,12 @@ ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFo
     
     cmd.Begin();
 
-    cmd.ImageBarrier(*result, 
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-        VK_ACCESS_TRANSFER_WRITE_BIT, 
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT
+    cmd.ImageBarrier(result, 
+        ResourceState {
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        }
     );
     
     VkBufferImageCopy region{};
@@ -331,10 +332,26 @@ void Resources::OnMessage(DestroyMsg*) {
     _buffers.clear();
     _samplers.clear();
     _images.clear();
+    _states.clear();
 }
 
+ResourceState Resources::GetState(ResourceId id) {
+    auto it = _states.find(id);
+    if (it != _states.end())
+        return it->second;
+    
+    return ResourceState();
+}
 
+void Resources::SetState(ResourceId id, const ResourceState& state) {
+    _states[id] = state;
+}
 
+ResourceState Resources::UpdateState(ResourceId id, const ResourceState& state) {
+    ResourceState old = GetState(id);
+    SetState(id, state);
+    return old;
+}
 
 void Resources::DestroyImmediate(ResourceId resource) {
 
@@ -342,9 +359,11 @@ void Resources::DestroyImmediate(ResourceId resource) {
     {
     case ResourceType::Buffer:
         _buffers.TryRemove(resource);
+        _states.erase(resource);
         break;
     case ResourceType::Image:
         _images.TryRemove(resource);
+        _states.erase(resource);
         break;
     case ResourceType::Sampler:
         _samplers.TryRemove(resource);

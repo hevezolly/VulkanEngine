@@ -34,7 +34,7 @@ private:
 struct API Memory {
     uint32_t size_bytes;
     VkDeviceMemory vkMemory;
-    uint32_t offset;
+    uint32_t offset; // TODO: refactor
     
     Memory(VkDeviceMemory memory, VkDevice device, uint32_t size);
     MemoryMapToken Map(uint32_t size, uint32_t offset=0);

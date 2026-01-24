@@ -91,8 +91,7 @@ Image::Image(
 ):  vkImage(readyImage),
     description(description),
     memory(std::nullopt),
-    context(nullptr),
-    state{VK_IMAGE_LAYOUT_UNDEFINED, 0}
+    context(nullptr)
 {
     auto aspect = getAspect(description.format);
     if ((aspect & VK_IMAGE_ASPECT_COLOR_BIT) == VK_IMAGE_ASPECT_COLOR_BIT)
@@ -110,8 +109,7 @@ Image::Image(
 ):  vkImage(img),
     description(description),
     memory(std::move(memory)),
-    context(&ctx),
-    state{VK_IMAGE_LAYOUT_UNDEFINED, 0}
+    context(&ctx)
 {
     vkBindImageMemory(ctx.device(), img, this->memory.value().vkMemory, memory.offset);
     auto aspect = getAspect(description.format);
@@ -130,7 +128,6 @@ Image& Image::operator=(Image&& other) noexcept {
     context = other.context;
     vkImage = other.vkImage;
     view = other.view;
-    state = other.state;
     clearValue = other.clearValue;
     view->referencedImage = this;
     description = other.description;

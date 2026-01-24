@@ -153,7 +153,8 @@ SwapChain::SwapChain(RenderContext* context, const SwapChainInitializer& args) {
     description.format = format;
     
     for (auto img: premadeImages) {
-        images.push_back(context->Get<Resources>().Register(Image(img, *context, description)));
+        images.push_back(context->Get<Resources>().Register(
+            Image(img, *context, description), ResourceState()));
     }
 }
 

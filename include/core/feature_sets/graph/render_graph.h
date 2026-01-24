@@ -14,10 +14,25 @@ struct NodeWrapper {
     RenderNode* node;
 };
 
-struct ResourceUsage {
+struct VersionedResource {
+    ResourceId id;
     uint32_t version;
-    uint32_t nodeIndex;
+
+    bool operator==(const VersionedResource& other) const {
+        return id == other.id && version == other.version;
+    }
 };
+
+namespace std {
+    template <>
+    struct hash<VersionedResource> {
+        std::size_t operator()(const VersionedResource& pn) const noexcept {
+            std::size_t h1 = std::hash<ResourceId>{}(pn.id);
+            std::size_t h2 = std::hash<uint32_t>{}(pn.version);
+            return h1 ^ (h2 << 1);
+        }
+    };
+}
 
 struct API RenderGraph: FeatureSet,
     CanHandle<BeginFrameMsg>,
@@ -27,20 +42,16 @@ struct API RenderGraph: FeatureSet,
 
     void AddNode(RenderNode&);
 
-    void BuildGraph();
+    void BuildGraph(TransferCommandBuffer& commandBuffer);
 
     void OnMessage(BeginFrameMsg*);
     void OnMessage(DestroyMsg*);
 
 private:
 
-    MemChunk<uint32_t> sortNodes();
+    MemBuffer<uint32_t> sortNodes();
 
     std::vector<NodeWrapper> nodes;
-    std::unordered_map<ResourceId, uint32_t> _versions;
-
-    std::unordered_map<ResourceId, ResourceUsage> _lastWrite;
     std::vector<std::vector<uint32_t>> _dependencies;
-    std::vector<std::unordered_set<uint32_t>> _incomingEdges;
-
+    std::vector<std::vector<uint32_t>> _incomingEdges;
 };
