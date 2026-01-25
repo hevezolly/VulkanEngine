@@ -12,12 +12,12 @@ void RenderGraph::AddNode(RenderNode& node) {
 
     uint32_t nodeIndex = nodes.size();
 
-    NodeWrapper wrapper;
+    NodeWrapper wrapper{};
     wrapper.inputDependency = node.getInputDependencies();
     wrapper.outpnputDependency = node.getOutputDependencies();
     wrapper.node = &node;
-    wrapper.inputVersions = context.Get<Allocator>().HeapAllocate<uint32_t>(wrapper.inputDependency.size);
-    wrapper.outputVersions = context.Get<Allocator>().HeapAllocate<uint32_t>(wrapper.outputVersions.size);
+    wrapper.inputVersions = context.Get<Allocator>().BumpAllocate<uint32_t>(wrapper.inputDependency.size);
+    wrapper.outputVersions = context.Get<Allocator>().BumpAllocate<uint32_t>(wrapper.outputVersions.size);
 
     std::unordered_map<ResourceId, uint32_t> versions;
     std::unordered_map<ResourceId, ResourceUsage> lastWrite;
@@ -25,8 +25,10 @@ void RenderGraph::AddNode(RenderNode& node) {
     _dependencies.push_back(std::vector<uint32_t>());
     _incomingEdges.push_back(std::vector<uint32_t>());
 
+    LOG("input size " << wrapper.inputDependency.size)
     for (int i = 0; i < wrapper.inputDependency.size; i++) {
 
+        LOG("i " << i)
         ResourceId resource = wrapper.inputDependency[i].resource;
 
         wrapper.inputVersions[i] = versions[resource];
@@ -38,7 +40,9 @@ void RenderGraph::AddNode(RenderNode& node) {
         }
     }
 
+    LOG("output size " << wrapper.outpnputDependency.size)
     for (int i = 0; i < wrapper.outpnputDependency.size; i++) {
+        LOG("i " << i)
         uint32_t writeVersion = ++versions[wrapper.outpnputDependency[i].resource];
         wrapper.outputVersions[i] = writeVersion;
         ResourceUsage& usage = lastWrite[wrapper.outpnputDependency[i].resource];
@@ -106,6 +110,9 @@ MemBuffer<uint32_t> RenderGraph::sortNodes() {
 }
 
 void RenderGraph::BuildGraph(TransferCommandBuffer& commandBuffer) {
+
+    commandBuffer.Begin();
+
     Allocator& alloc = context.Get<Allocator>();
     
     auto _ = alloc.BeginContext();
@@ -143,4 +150,10 @@ void RenderGraph::BuildGraph(TransferCommandBuffer& commandBuffer) {
     
         node.node->Record(commandBuffer);
     }
+
+    nodes.clear();
+    _dependencies.clear();
+    _incomingEdges.clear();
+
+    commandBuffer.End();
 }

@@ -6,6 +6,7 @@
 #include <allocator_feature.h>
 #include <render_context.h>
 #include <resource_storage.h>
+#include <render_node.h>
 
 #ifndef BLOCK_NAME
 #error "BLOCK_NAME must be defined"
@@ -49,6 +50,20 @@ public:
         BLOCK
         #include <reset_attachment_defines.h>
         return counter;
+    }
+
+    void write_outputs(NodeDependency* dependencies) {
+        uint32_t index = 0;
+        #define WRAPPER(...)
+        #define COLOR_WRAPPER(n, sc, lo, so, slo, sso, ol) \
+        dependencies[index].resource = n##.id; \
+        dependencies[index++].state = ResourceState{VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, ol};
+        #define DS_WRAPPER(n, sc, lo, so, slo, sso, ol) \
+        dependencies[index].resource = n##.id; \
+        dependencies[index++].state = ResourceState{VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, ol};
+        #include <define_attachments.h>
+        BLOCK
+        #include <reset_attachment_defines.h>
     }
 
     static void GetAttachmentDescriptions(std::vector<VkAttachmentDescription>& data, const Formats& formats) {

@@ -9,6 +9,7 @@
 #include <render_context.h>
 #include <resource_id.h>
 #include <resource_storage.h>
+#include <render_node.h>
 
 #ifndef BLOCK_NAME
 #error "BLOCK_NAME must be defined"
@@ -42,12 +43,67 @@ BLOCK
         uint32_t value = 0;
 
         #define DEFINITION
-        #define WRAPPER(t, n, b, s, dc, dt, bv, iv, sv, info) value++;
+        #define WRAPPER(t, n, b, s, in, out) value++;
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
         #undef DEFINITION
         return value;
+    }
+
+    static constexpr uint32_t size_inputs() {
+        uint32_t value = 0;
+
+        #define RESOURCES
+        #define WRAPPER(t, n, b, s, in, out) if constexpr (in) value++;
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef RESOURCES
+        return value;
+    }
+
+    static constexpr uint32_t size_outputs() {
+        uint32_t value = 0;
+
+        #define RESOURCES
+        #define WRAPPER(t, n, b, s, in, out) if constexpr (out) value++;
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef RESOURCES
+        return value;
+    }
+
+    void write_inputs(NodeDependency* dependencies) {
+        uint32_t index = 0;
+
+        #define RESOURCES
+        #define WRAPPER(t, n, b, s, in, out) \
+        if constexpr (in) { \
+        dependencies[index].resource = n##.id; \
+        dependencies[index++].state = ResourceState {VK_ACCESS_2_SHADER_READ_BIT, ToVkPipelineStage(s), VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};}
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef RESOURCES
+    }
+
+    void write_outputs(NodeDependency* dependencies) {
+        uint32_t index = 0;
+
+        #define RESOURCES
+        #define WRAPPER(t, n, b, s, in, out) \
+        if constexpr (out) { \
+        dependencies[index].resource = n##.id; \
+        dependencies[index++].state = ResourceState { \
+            VK_ACCESS_2_SHADER_WRITE_BIT | (in ? VK_ACCESS_2_SHADER_READ_BIT : 0), \
+            ToVkPipelineStage(s), \
+            VkImageLayout::VK_IMAGE_LAYOUT_GENERAL};}
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef RESOURCES
     }
 
     static constexpr uint32_t count(VkDescriptorType type) {

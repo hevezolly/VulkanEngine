@@ -14,6 +14,8 @@
 #include <thread>
 #include <stable_frame_rate.h>
 #include <registry.h>
+#include <graphics_node.h>
+#include <render_graph.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -216,43 +218,6 @@ void main() {
     return r;
 }
 
-void RecordCommandBuffer(
-    GraphicsCommandBuffer& cmd, 
-    ResourceRef<Buffer> vertexBuffer,
-    ResourceRef<Buffer> indexBuffer,
-    Ref<GraphicsPipeline> pipeline, 
-    const FrameBuffer& frameBuffer,
-    VkDescriptorSet descriptorSet
-) {
-    cmd.Begin();
-    cmd.BeginRenderPass(pipeline, frameBuffer);
-
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(frameBuffer.width);
-    viewport.height = static_cast<float>(frameBuffer.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(cmd.buffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = {frameBuffer.width, frameBuffer.height};
-    vkCmdSetScissor(cmd.buffer, 0, 1, &scissor);
-
-    VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(cmd.buffer, 0, 1, &vertexBuffer->vkBuffer, &offset);
-
-    vkCmdBindIndexBuffer(cmd.buffer, indexBuffer->vkBuffer, 0, VkIndexType::VK_INDEX_TYPE_UINT16);
-    vkCmdBindDescriptorSets(cmd.buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, 1, &descriptorSet, 0, nullptr);
-
-    vkCmdDrawIndexed(cmd.buffer, indexBuffer->count<uint16_t>(), 1, 0, 0, 0);
-
-    cmd.EndRenderPass();
-    cmd.End();
-}
-
 void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -296,19 +261,17 @@ void DrawFrame(
     data.img = r.image;
     data.img_sampler = r.sampler;
 
-    DescriptorSet& set = context.Get<Descriptors>().BorrowDescriptorSet(data);
-
     Attachments attachments;
     attachments.color = context.Get<PresentFeature>().swapChain->images[imageIndex];
     attachments.depth = r.depth;
-    
-    const FrameBuffer& buffer = context.Get<GraphicsFeature>()
-        .CreateFrameBuffer(attachments, r.pipeline->renderPass);
+
+    GraphicsNode<ShaderInput, Attachments> node{&context, r.pipeline, data, attachments};
+
+    context.Get<RenderGraph>().AddNode(node);
 
     cmd.Reset();
-    RecordCommandBuffer(cmd, r.vertexBuffer, r.indexBuffer, r.pipeline, 
-        buffer, set.vkSet
-    );
+
+    context.Get<RenderGraph>().BuildGraph(cmd);
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
 
@@ -335,6 +298,7 @@ void Run() {
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .WithFeature<GraphicsFeature>()
            .WithFeature<Registry>("examples/resources")
+           .WithFeature<RenderGraph>()
            .Initialize();
     volkLoadInstance(context.vkInstance);
 

@@ -34,19 +34,13 @@ namespace std {
     };
 }
 
-struct API RenderGraph: FeatureSet,
-    CanHandle<BeginFrameMsg>,
-    CanHandle<DestroyMsg>
+struct API RenderGraph: FeatureSet
 {
     using FeatureSet::FeatureSet;
 
     void AddNode(RenderNode&);
 
     void BuildGraph(TransferCommandBuffer& commandBuffer);
-
-    void OnMessage(BeginFrameMsg*);
-    void OnMessage(DestroyMsg*);
-
 private:
 
     MemBuffer<uint32_t> sortNodes();

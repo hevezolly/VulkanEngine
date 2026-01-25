@@ -19,6 +19,18 @@ inline VkShaderStageFlagBits ToVkShaderStage(Stage stage) {
     return static_cast<VkShaderStageFlagBits>(stage);
 }
 
+inline VkPipelineStageFlags2 ToVkPipelineStage(Stage stage) {
+    VkPipelineStageFlags2 result = 0;
+    if ((stage & Stage::Fragment) == Stage::Fragment)
+        result |= VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    if ((stage & Stage::Vertex) == Stage::Vertex)
+        result |= VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+    if ((stage & Stage::Compute) == Stage::Compute)
+        result |= VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+
+    return result;
+}
+
 enum struct API LoadOp {
     Load = VK_ATTACHMENT_LOAD_OP_LOAD,
     Clear = VK_ATTACHMENT_LOAD_OP_CLEAR,

@@ -239,7 +239,8 @@ struct Allocator: FeatureSet,
 
     template<typename T>
     MemChunk<T> BumpAllocate(uint32_t count = 1) {
-        assert(count > 0);
+        if (count == 0)
+            return MemChunk<T>::Null();
         size_t alignment = alignof(T);
         size_t allocationSize = sizeof(T) * count;
         uintptr_t alignedOffset = freeOffset + (alignment - freeOffset % alignment) % alignment;
@@ -253,7 +254,8 @@ struct Allocator: FeatureSet,
 
     template<typename T>
     MemChunk<T> HeapAllocate(uint32_t count = 1) {
-        assert(count > 0);
+        if (count == 0)
+            return MemChunk<T>::Null();
         size_t alignment = alignof(T);
         size_t allocationSize = sizeof(T) * count;
 
