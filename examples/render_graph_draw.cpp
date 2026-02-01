@@ -16,6 +16,7 @@
 #include <registry.h>
 #include <graphics_node.h>
 #include <render_graph.h>
+#include <shader_loader.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -41,6 +42,11 @@ UNIFORM_BUFFER(transforms, 0, Stage::Vertex) \
 IMAGE_SAMPLER(img, 1, Stage::Fragment)
 #include <gen_bindings.h>
 
+#define BLOCK_NAME ShaderInputImg
+#define BLOCK \
+UNIFORM_BUFFER(transforms, 0, Stage::Fragment)
+#include <gen_bindings.h>
+
 /*
 expands to:
 struct ShaderInput {
@@ -54,8 +60,13 @@ struct ShaderInput {
 
 #define BLOCK_NAME Attachments
 #define BLOCK \
-COLOR(color, LoadOp::Clear) FINAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) \
+COLOR(color, LoadOp::Clear) \
 DEPTH(depth, LoadOp::Clear) 
+#include <gen_attachments.h>
+
+#define BLOCK_NAME AttachmentsImg
+#define BLOCK \
+COLOR(color, LoadOp::Clear)
 #include <gen_attachments.h>
 
 /*
@@ -77,6 +88,7 @@ struct UniformData {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
+    float time;
 };
 
 struct _Resources {
@@ -86,10 +98,13 @@ struct _Resources {
     Refs<Fence> inFlightFences;
     ResourceRefs<Buffer> uniformBuffers;
     Ref<GraphicsPipeline> pipeline;
+    Ref<GraphicsPipeline> pipelineImg;
     ResourceRef<Buffer> vertexBuffer;
     ResourceRef<Buffer> indexBuffer;
     ResourceRef<Image> image;
+    ResourceRef<Image> resourceImg;
     ResourceRef<Image> depth;
+    ResourceRef<Image> depth2;
     ResourceRef<Sampler> sampler;
 };
 
@@ -99,48 +114,12 @@ _Resources PrepareResources(
 
     _Resources r{};
 
-    ShaderSource vertexSource;
-    vertexSource.name = "testVertex";
-    vertexSource.stage = Stage::Vertex;
-    vertexSource.source = 
-R"(#version 450
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-} ubo;
+    
+    ShaderBinary vertexBin = context.Get<ShaderLoader>().Get("shaders/basic.vert", Stage::Vertex);
+    ShaderBinary fragmentBin = context.Get<ShaderLoader>().Get("shaders/basic.frag", Stage::Fragment);
 
-layout(location = 0) in vec3 in_position;
-layout(location = 1) in vec3 in_color;
-layout(location = 2) in vec2 uv;
-layout(location = 0) out vec3 fragColor;
-layout(location = 1) out vec2 uv_out;
-
-void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_position, 1.0);
-    fragColor = in_color;
-    uv_out = uv;
-})";
-
-    ShaderSource fragmentSource;
-    fragmentSource.name = "testFragment";
-    fragmentSource.stage = Stage::Fragment;
-    fragmentSource.source = 
-R"(#version 450
-layout(binding = 1) uniform sampler2D tex;
-
-layout(location = 0) in vec3 fragColor;
-layout(location = 1) in vec2 uv;
-layout(location = 0) out vec4 outColor;
-
-void main() {
-    outColor = texture(tex, uv);
-}
-)";
-
-    ShaderCompiler compiler;
-    ShaderBinary vertexBin = compiler.FromSource(vertexSource);
-    ShaderBinary fragmentBin = compiler.FromSource(fragmentSource);
+    ShaderBinary vertexBinImg = context.Get<ShaderLoader>().Get("shaders/full_screen.vert", Stage::Vertex);
+    ShaderBinary fragmentBinImg = context.Get<ShaderLoader>().Get("shaders/test_full_screen.frag", Stage::Fragment);
 
     VkFormat dsFormat = context.Get<Device>().SelectSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
@@ -149,19 +128,40 @@ void main() {
 
     r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
         ImageUsage::DepthStencil);
-    r.image = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
-
+    context.Get<Resources>().GiveName(r.depth, "depth");
+    r.depth2 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
+        ImageUsage::DepthStencil);
+    context.Get<Resources>().GiveName(r.depth2, "depth2");
+    r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
+        ImageUsage::ColorAttachment | ImageUsage::Sampled);
+    context.Get<Resources>().GiveName(r.image, "image");
+    r.image->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
+    r.resourceImg = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
+    context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
+    
 
     r.pipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
         .SetVertex<Vertex>()
         .AddLayout<ShaderInput>()
-        .SetAttachments<Attachments>(Attachments::Formats{
+        .SetAttachments<Attachments>({
             context.Get<PresentFeature>().swapChain->format,
             r.depth->description.format
         })
-        .AddShaderStage(Stage::Vertex, vertexBin)
-        .AddShaderStage(Stage::Fragment, fragmentBin)
+        .AddShaderStage(vertexBin)
+        .AddShaderStage(fragmentBin)
+        .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
+        .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
+        .Build();
+
+    r.pipelineImg = context
+        .Get<GraphicsFeature>().NewGraphicsPipeline()
+        .AddLayout<ShaderInputImg>()
+        .SetAttachments<AttachmentsImg>({
+            r.image->description.format
+        })
+        .AddShaderStage("shaders/full_screen.vert", Stage::Vertex)
+        .AddShaderStage("shaders/test_full_screen.frag", Stage::Fragment)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
         .Build();
@@ -178,13 +178,15 @@ void main() {
         {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
     };
     r.vertexBuffer = context.Get<Resources>().CreateBuffer<Vertex>(BufferPreset::VERTEX, vertices);
-
+    context.Get<Resources>().GiveName(r.vertexBuffer, "vertex_buffer");
+    
     std::vector<uint16_t> indices = {
         0, 2, 1, 2, 0, 3,
         4, 6, 5, 6, 4, 7
     };
     r.indexBuffer = context.Get<Resources>().CreateBuffer<uint16_t>(BufferPreset::INDEX, indices);
-    
+    context.Get<Resources>().GiveName(r.indexBuffer, "index_buffer");
+
     r.imgAvailableSemaphores = context.Get<Synchronization>().CreateSemaphores(framesInFlight);
     r.inFlightFences = context.Get<Synchronization>().CreateFences(framesInFlight, true);
     r.renderFinish = context.Get<Synchronization>().CreateSemaphores(
@@ -198,22 +200,9 @@ void main() {
         r.commandBuffers.push_back(context.Get<CommandPool>().CreateGraphicsBuffer());
         r.uniformBuffers.push_back(context.Get<Resources>()
             .CreateBuffer<UniformData>(BufferPreset::UNIFORM, 1));
+        context.Get<Resources>().GiveName(r.uniformBuffers[i], "uniform_buffer_" + std::to_string(i));
+        
     }
-      
-    r.commandBuffers[0].Begin();
-
-    r.commandBuffers[0].ImageBarrier(
-        r.image, 
-        ResourceState{
-            VK_ACCESS_2_SHADER_READ_BIT,
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        });
-
-    r.commandBuffers[0].End();
-
-    context.Get<CommandPool>().Submit(r.commandBuffers[0]);
-    vkQueueWaitIdle(context.Get<Device>().queues.get(QueueType::Graphics));
 
     return r;
 }
@@ -231,7 +220,7 @@ void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
     d.proj = glm::perspective(glm::radians(45.0f), swapChain->extent.width / (float) swapChain->extent.height, 0.1f, 10.0f);
     
     d.proj[1][1] *= -1;
-
+    d.time = time;
     memcpy(uniformBuffer.memory.PersistentMap().data(), &d, sizeof(d));
 } 
 
@@ -255,23 +244,47 @@ void DrawFrame(
     GraphicsCommandBuffer& cmd = r.commandBuffers[frameId];
 
     UpdateShaderData(context, *r.uniformBuffers[frameId]);
+    
+    auto& node2 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+
+    Attachments attachments;
+    attachments.color = r.image;
+    attachments.depth = r.depth2;
+    node2.SetAttachments(attachments);
 
     ShaderInput data{};
     data.transforms = r.uniformBuffers.back();
-    data.img = r.image;
+    data.img = r.resourceImg;
     data.img_sampler = r.sampler;
+    node2.SetBindings(data);
 
-    Attachments attachments;
+    node2.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
+    node2.SetVertexBuffer<Vertex>(r.vertexBuffer);
+
+    auto& node = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+
     attachments.color = context.Get<PresentFeature>().swapChain->images[imageIndex];
     attachments.depth = r.depth;
+    node.SetAttachments(attachments);
 
-    GraphicsNode<ShaderInput, Attachments> node{&context, r.pipeline, data, attachments};
+    data.transforms = r.uniformBuffers.back();
+    data.img = r.image;
+    data.img_sampler = r.sampler;
+    node.SetBindings(data);
 
-    context.Get<RenderGraph>().AddNode(node);
+    node.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
+    node.SetVertexBuffer<Vertex>(r.vertexBuffer);
 
     cmd.Reset();
+    cmd.Begin();
 
     context.Get<RenderGraph>().BuildGraph(cmd);
+
+    cmd.ImageBarrier(context.Get<PresentFeature>().swapChain->images[imageIndex], 
+        ResourceState{VK_ACCESS_2_NONE, 0, VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR}
+    );
+
+    cmd.End();
 
     Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
 

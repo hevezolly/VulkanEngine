@@ -7,6 +7,7 @@
 #include <resources.h>
 #include <descriptor_pool.h>
 #include <registry.h>
+#include <shader_loader.h>
 
 
 static VkResult checkLayersSupport(std::vector<const char*>& layers) {
@@ -44,6 +45,7 @@ RenderContext::RenderContext(): _handling(false) {
         .WithFeature<Synchronization>()
         .WithFeature<Resources>()
         .WithFeature<Descriptors>()
+        .WithFeature<ShaderLoader>()
         .WithFeature<Registry>();
 }
 
@@ -147,4 +149,10 @@ void RenderContext::HandleMessages() {
     }
 
     _handling = false;
+}
+
+void RenderContext::NameVkObject(VkObjectType type, uint64_t handle, const std::string& name) {
+#ifdef ENABLE_VULKAN_VALIDATION
+    Get<DebuggingFeature>().NameVkObject(type, handle, name);
+#endif
 }

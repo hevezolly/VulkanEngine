@@ -22,6 +22,7 @@ struct API Registry: FeatureSet
     Registry(RenderContext&, const char* resourcesFolder = "");
 
     MemChunk<char> LoadResource(const char* path);
+    std::string LoadText(const char* path);
 
     RawImageData LoadImage(const char* path, int forceNumberOfComponents=0);
     

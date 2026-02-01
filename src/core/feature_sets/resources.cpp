@@ -27,7 +27,10 @@ void Resources::OnMessage(InitMsg*) {
         context.Get<Device>().vkPhysicalDevice, &vkMemProperties);
 }
 
-Memory Resources::AllocateMemory(VkMemoryRequirements requirements, VkMemoryPropertyFlags properties) 
+Memory Resources::AllocateMemory(
+    VkMemoryRequirements requirements, 
+    VkMemoryPropertyFlags properties, uint32_t usable_size
+) 
 {
     VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
 
@@ -36,7 +39,7 @@ Memory Resources::AllocateMemory(VkMemoryRequirements requirements, VkMemoryProp
 
     VkDeviceMemory mem;
     VK(vkAllocateMemory(context.device(), &allocInfo, nullptr, &mem));
-    return Memory(mem, context.device(), requirements.size);
+    return Memory(mem, context.device(), usable_size == 0 ? requirements.size : usable_size);
 }
 
 Buffer createStandaloneBuffer(RenderContext& c, BufferPreset preset, uint32_t size_bytes) {
@@ -54,7 +57,8 @@ Buffer createStandaloneBuffer(RenderContext& c, BufferPreset preset, uint32_t si
     VK(vkCreateBuffer(c.device(), &bufferInfo, nullptr, &buffer));
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(c.device(), buffer, &memRequirements);
-    Buffer result = Buffer(c, buffer, c.Get<Resources>().AllocateMemory(memRequirements, preset.memoryProperties));
+    Buffer result = Buffer(c, buffer, c.Get<Resources>().AllocateMemory(
+        memRequirements, preset.memoryProperties, size_bytes));
     c.Get<Allocator>().Free(usedQueues);
     return result;
 }
@@ -261,6 +265,7 @@ ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFo
     LOG(description.width _S_ description.height)
     
     ResourceRef<Image> result = CreateImage(description, usage | ImageUsage::TransferDst);
+    GiveName(result, path);
     Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, imageData.size(), imageData.data);
     imageData.Free();
     TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
@@ -351,6 +356,50 @@ ResourceState Resources::UpdateState(ResourceId id, const ResourceState& state) 
     ResourceState old = GetState(id);
     SetState(id, state);
     return old;
+}
+
+const std::string& Resources::GetName(ResourceId id) {
+    auto it = _names.find(id);
+    if (it != _names.end())
+        return it->second;
+    
+    return "";
+}
+
+
+void Resources::GiveName(ResourceId id, const std::string& name) {
+    _names[id] = name;
+#ifdef ENABLE_VULKAN_VALIDATION
+    switch (id.type())
+    {
+        case ResourceType::Buffer:
+            context.NameVkObject(
+                VkObjectType::VK_OBJECT_TYPE_BUFFER, 
+                (uint64_t)Get<Buffer>(id)->vkBuffer,
+                name);
+            break;
+        case ResourceType::Image: {
+            auto& image = *Get<Image>(id);
+            context.NameVkObject(
+                VkObjectType::VK_OBJECT_TYPE_IMAGE, 
+                (uint64_t)image.vkImage,
+                name);
+            context.NameVkObject(
+                VkObjectType::VK_OBJECT_TYPE_IMAGE_VIEW, 
+                (uint64_t)image.view->vkImageView,
+                name);
+            break;
+        }
+        case ResourceType::Sampler:
+            context.NameVkObject(
+                VkObjectType::VK_OBJECT_TYPE_SAMPLER, 
+                (uint64_t)Get<Sampler>(id)->vkSampler,
+                name);
+            break;
+        default:
+            break;
+    }
+#endif
 }
 
 void Resources::DestroyImmediate(ResourceId resource) {

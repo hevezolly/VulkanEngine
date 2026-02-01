@@ -134,7 +134,7 @@ struct ResourceRef {
     }
 
     bool operator!=(const ResourceRef<T>& other) const {
-        return !(*this == other)
+        return !(*this == other);
     }
 
     operator ResourceId() const {

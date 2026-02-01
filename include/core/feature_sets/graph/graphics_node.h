@@ -6,21 +6,26 @@
 #include <graphics_feature.h>
 #include <allocator_feature.h>
 
-template<typename Bindings, typename Attachments>
+#define BLOCK_NAME NullBindings
+#define BLOCK
+#include <gen_bindings.h>
+
+
+template<typename Attachments, typename Bindings = NullBindings>
 struct GraphicsNode: RenderNode {
 
-    GraphicsNode(
-        RenderContext* c, 
-        Ref<GraphicsPipeline> p,
-        const Bindings& bindings, 
-        const Attachments& attachments):
-        _attachments(attachments), context(c), pipeline(p), _bindings(bindings){}
+    void SetAttachments(const Attachments& a) {
+        _attachments = a;
+    }
+
+    void SetBindings(const Bindings& b) {
+        static_assert(!std::is_same<Bindings, NullBindings>::value, "no bindings time is defined");
+        _bindings = b;
+    }
 
     GraphicsNode(
-        RenderContext* c, 
-        Ref<GraphicsPipeline> p,
-        const Attachments& attachments): 
-        _attachments(attachments), context(c), pipeline(p), _bindings(std::nullopt){}
+        RenderContext& c, 
+        Ref<GraphicsPipeline> p): RenderNode(c), pipeline(p){} 
 
     template<typename Vertex>
     void SetVertexBuffer(ResourceRef<Buffer> vertex) {
@@ -41,39 +46,63 @@ struct GraphicsNode: RenderNode {
         return QueueType::Graphics;
     }
 
-    virtual MemChunk<NodeDependency> getInputDependencies() {
+    virtual uint32_t getInputDependenciesCount() {
         uint32_t size = 0;
         if (_bindings.has_value())
             size += Bindings::size_inputs();
-
-        if (size == 0)
-            return MemChunk<NodeDependency>::Null();
-        
-        MemChunk<NodeDependency> result = context->Get<Allocator>().BumpAllocate<NodeDependency>(size);
-        _bindings.value().write_inputs(result.data);
-        return result;
+        if (_vertexBuffer.has_value())
+            size++;
+        if (_indexBuffer.has_value())
+            size++;
+        return size;
     }
 
-    virtual MemChunk<NodeDependency> getOutputDependencies() {
+    virtual uint32_t getOutputDependenciesCount() {
         uint32_t size = Attachments::size();
         if (_bindings.has_value())
             size += Bindings::size_outputs();
+        return size;
+    }
 
-        if (size == 0)
-            return MemChunk<NodeDependency>::Null();
+    virtual void getInputDependencies(NodeDependency* dependencies) {
+        uint32_t written = 0;
+        if (_bindings.has_value() && Bindings::size_inputs() > 0) {
+            _bindings.value().write_inputs(dependencies);
+            written += Bindings::size_inputs();
+        }
         
-        MemChunk<NodeDependency> result = context->Get<Allocator>().BumpAllocate<NodeDependency>(size);
-        _attachments.write_outputs(result.data);
+        if (_vertexBuffer.has_value()) {
+            dependencies[written++] = NodeDependency {
+                _vertexBuffer.value().id,
+                ResourceState {
+                    VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT,
+                    VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT
+                }
+            };
+        }
+
+        if (_indexBuffer.has_value()) {
+            dependencies[written++] = NodeDependency {
+                _indexBuffer.value().id,
+                ResourceState {
+                    VK_ACCESS_2_INDEX_READ_BIT,
+                    VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT
+                }
+            };
+        }
+    }
+
+    virtual void getOutputDependencies(NodeDependency* dependencies) {
+        _attachments.write_outputs(dependencies);
         
         if (_bindings.has_value() && Bindings::size_outputs() > 0)
-            _bindings.value().write_outputs(result.data + Attachments::size());
-        return result;
+            _bindings.value().write_outputs(dependencies + Attachments::size());
     }
 
     virtual void Record(TransferCommandBuffer& commandBuffer) {
         GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(commandBuffer);
         
-        const FrameBuffer& frameBuffer = context->Get<GraphicsFeature>()
+        const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>()
             .CreateFrameBuffer(_attachments, pipeline->renderPass);
 
         cmd.BeginRenderPass(pipeline, frameBuffer);
@@ -103,7 +132,7 @@ struct GraphicsNode: RenderNode {
 
         if (_bindings.has_value()) {
 
-            DescriptorSet& set = context->Get<Descriptors>().BorrowDescriptorSet(_bindings.value());
+            DescriptorSet& set = context.Get<Descriptors>().BorrowDescriptorSet(_bindings.value());
 
             vkCmdBindDescriptorSets(cmd.buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, 1, &set.vkSet, 0, nullptr);
         }
@@ -144,7 +173,6 @@ struct GraphicsNode: RenderNode {
     }
 
 private:
-    RenderContext* context;
     Ref<GraphicsPipeline> pipeline;
     std::optional<uint32_t> _drawCount;
     uint32_t _vertexSize;

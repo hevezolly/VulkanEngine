@@ -53,7 +53,7 @@ struct API Ref
     }
 
     bool operator!=(const Ref<T>& other) const {
-        return !(*this == other)
+        return !(*this == other);
     }
 
     bool isNull() {

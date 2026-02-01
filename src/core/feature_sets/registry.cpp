@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
+#include <sstream>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -59,10 +60,26 @@ RawMemChunk Registry::LoadResource(const char* path) {
 
     RawMemChunk fileData = alloc.HeapAllocate<char>(fileSize);
     file.read(fileData.data, fileSize);
+    file.close();
 
     alloc.Free(name, true);
 
     return fileData;
+}
+
+std::string Registry::LoadText(const char* path) {
+    Allocator& alloc = context.Get<Allocator>();
+    RawMemChunk name = getFileName(alloc, resourcesBase, path);
+
+    std::ifstream file(name.data);
+
+    assert(file.is_open());
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    file.close();
+
+    return buffer.str();
 }
 
 RawImageData Registry::LoadImage(const char* path, int forceNumberOfComponents) {

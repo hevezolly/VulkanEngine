@@ -70,6 +70,8 @@ struct API RenderContext {
 
     void Initialize();
 
+    void NameVkObject(VkObjectType type, uint64_t handle, const std::string& name);
+
     RULE_NO(RenderContext)
 
     template<typename T, typename... CallArgs>

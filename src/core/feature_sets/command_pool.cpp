@@ -265,12 +265,9 @@ void TransferCommandBuffer::Barrier(uint32_t count, const ResourceId* ids, const
             imageBarriers.back().oldLayout = oldState.currentLayout;
             imageBarriers.back().newLayout = newState.currentLayout;
 
-            imageBarriers.back().image = resources.Get<Image>(id)->vkImage;
-            imageBarriers.back().subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            imageBarriers.back().subresourceRange.baseMipLevel = 0;
-            imageBarriers.back().subresourceRange.levelCount = 1;
-            imageBarriers.back().subresourceRange.baseArrayLayer = 0;
-            imageBarriers.back().subresourceRange.layerCount = 1;
+            auto image = resources.Get<Image>(id);
+            imageBarriers.back().image = image->vkImage;
+            imageBarriers.back().subresourceRange =  image->view->subresourceRange;
 
             imageBarriers.back().srcAccessMask = oldState.currentAccess;
             imageBarriers.back().dstAccessMask = newState.currentAccess;

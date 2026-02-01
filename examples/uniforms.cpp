@@ -14,6 +14,7 @@
 #include <thread>
 #include <stable_frame_rate.h>
 #include <registry.h>
+#include <shader_loader.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -97,48 +98,8 @@ _Resources PrepareResources(
 
     _Resources r{};
 
-    ShaderSource vertexSource;
-    vertexSource.name = "testVertex";
-    vertexSource.stage = Stage::Vertex;
-    vertexSource.source = 
-R"(#version 450
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-} ubo;
-
-layout(location = 0) in vec3 in_position;
-layout(location = 1) in vec3 in_color;
-layout(location = 2) in vec2 uv;
-layout(location = 0) out vec3 fragColor;
-layout(location = 1) out vec2 uv_out;
-
-void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_position, 1.0);
-    fragColor = in_color;
-    uv_out = uv;
-})";
-
-    ShaderSource fragmentSource;
-    fragmentSource.name = "testFragment";
-    fragmentSource.stage = Stage::Fragment;
-    fragmentSource.source = 
-R"(#version 450
-layout(binding = 1) uniform sampler2D tex;
-
-layout(location = 0) in vec3 fragColor;
-layout(location = 1) in vec2 uv;
-layout(location = 0) out vec4 outColor;
-
-void main() {
-    outColor = texture(tex, uv);
-}
-)";
-
-    ShaderCompiler compiler;
-    ShaderBinary vertexBin = compiler.FromSource(vertexSource);
-    ShaderBinary fragmentBin = compiler.FromSource(fragmentSource);
+    ShaderBinary vertexBin = context.Get<ShaderLoader>().Get("shaders/basic.vert", Stage::Vertex);
+    ShaderBinary fragmentBin = context.Get<ShaderLoader>().Get("shaders/basic.frag", Stage::Fragment);
 
     VkFormat dsFormat = context.Get<Device>().SelectSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
@@ -158,8 +119,8 @@ void main() {
             context.Get<PresentFeature>().swapChain->format,
             r.depth->description.format
         })
-        .AddShaderStage(Stage::Vertex, vertexBin)
-        .AddShaderStage(Stage::Fragment, fragmentBin)
+        .AddShaderStage(vertexBin)
+        .AddShaderStage(fragmentBin)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
         .Build();

@@ -132,6 +132,14 @@ struct MemBuffer {
         _size--;
     }
 
+    bool contains(const T& item) {
+        for (int i = 0; i < _size; i++) {
+            if (_data[i] == item)
+                return true;
+        }
+        return false;
+    }
+
     void fast_delete_at(uint32_t index) {
         assert(_size > 0);
         assert(index < _size);

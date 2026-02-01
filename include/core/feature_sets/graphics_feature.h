@@ -53,7 +53,8 @@ struct API GraphicsPipelineBuilder {
     std::optional<VkAttachmentReference> dsRef;
     VkSubpassDescription subpass;
 
-    GraphicsPipelineBuilder& AddShaderStage(Stage stage, ShaderBinary& binary);
+    GraphicsPipelineBuilder& AddShaderStage(const std::string& path, Stage stage);
+    GraphicsPipelineBuilder& AddShaderStage(const ShaderBinary& binary);
 
     GraphicsPipelineBuilder& AddDynamicState(VkDynamicState state);
 

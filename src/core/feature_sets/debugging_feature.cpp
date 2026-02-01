@@ -16,6 +16,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 }
 
+void DebuggingFeature::NameVkObject(VkObjectType type, uint64_t handle, const std::string& name) {
+    VkDebugUtilsObjectNameInfoEXT nameInfo { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
+    nameInfo.objectType = type;
+    nameInfo.objectHandle = handle;
+    nameInfo.pObjectName = name.c_str();
+
+    VK(vkSetDebugUtilsObjectNameEXT(context.device(), &nameInfo))
+}
+
 DebuggingFeature::DebuggingFeature(RenderContext& context): FeatureSet(context) {
     messengerCreateInfo = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
     messengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;

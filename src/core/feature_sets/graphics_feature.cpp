@@ -1,6 +1,7 @@
 #include <graphics_feature.h>
 #include <render_context.h>
 #include <present_feature.h>
+#include <shader_loader.h>
 
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     context(&context)
@@ -52,9 +53,13 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 }
 
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(const std::string& path, Stage stage) {
+    return AddShaderStage(context->Get<ShaderLoader>().Get(path, stage));
+}
+
+
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
-    Stage stage, 
-    ShaderBinary& binary
+    const ShaderBinary& binary
 ) {
     VkShaderModule vkModule;
     VkShaderModuleCreateInfo moduleInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -66,7 +71,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
     shaderModules.emplace_back(vkModule, context->device());
     
     VkPipelineShaderStageCreateInfo stageInfo{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-    stageInfo.stage = ToVkShaderStage(stage);
+    stageInfo.stage = ToVkShaderStage(binary.stage);
     stageInfo.module = vkModule;
     stageInfo.pName = "main";
 

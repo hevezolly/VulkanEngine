@@ -17,7 +17,7 @@ struct API Resources: FeatureSet,
 {
     using FeatureSet::FeatureSet;
 
-    Memory AllocateMemory(VkMemoryRequirements requirements, VkMemoryPropertyFlags properties);
+    Memory AllocateMemory(VkMemoryRequirements requirements, VkMemoryPropertyFlags properties, uint32_t usable_size = 0);
 
     ResourceRef<Buffer> CreateRawBuffer(BufferPreset preset, uint32_t size_bytes);
     
@@ -70,7 +70,8 @@ struct API Resources: FeatureSet,
     template <typename T>
     ResourceRef<T> Get(ResourceId id) {
         static_assert(std::is_same_v<T, Image> ||
-                      std::is_same_v<T, Buffer>);
+                      std::is_same_v<T, Buffer> ||
+                      std::is_same_v<T, Sampler>);
         return ResourceRef<T>();
     }
 
@@ -86,6 +87,16 @@ struct API Resources: FeatureSet,
         return {id, &_buffers};
     }
 
+    template<>
+    ResourceRef<Sampler> Resources::Get<Sampler>(ResourceId id) {
+        assert(id.type() == ResourceType::Sampler);
+        return {id, &_samplers};
+    }
+
+    void GiveName(ResourceId id, const std::string& name);
+
+    const std::string& GetName(ResourceId id);
+
     ResourceState GetState(ResourceId id);
     void SetState(ResourceId id, const ResourceState& state);
     ResourceState UpdateState(ResourceId id, const ResourceState& state);
@@ -97,6 +108,7 @@ private:
     VkPhysicalDeviceMemoryProperties vkMemProperties;
 
     std::unordered_map<ResourceId, ResourceState> _states;
+    std::unordered_map<ResourceId, std::string> _names;
     
     ResourceStorage<Buffer> _buffers;
     ResourceStorage<Image> _images;

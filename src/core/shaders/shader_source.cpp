@@ -40,7 +40,9 @@ ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source)
 
     glslang_shader_t* shader = glslang_shader_create(&input);
 
-    ShaderBinary bin;
+    ShaderBinary bin = {};
+    bin.name = source.name;
+    bin.stage = source.stage;
     
 
     if (!glslang_shader_preprocess(shader, &input))	{

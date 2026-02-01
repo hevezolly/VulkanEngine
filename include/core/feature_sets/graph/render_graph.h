@@ -5,8 +5,10 @@
 #include <allocator_feature.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <render_context.h>
 
 struct NodeWrapper {
+    QueueType queue;
     MemChunk<NodeDependency> inputDependency;
     MemChunk<uint32_t> inputVersions;
     MemChunk<NodeDependency> outpnputDependency;
@@ -38,14 +40,25 @@ struct API RenderGraph: FeatureSet
 {
     using FeatureSet::FeatureSet;
 
-    void AddNode(RenderNode&);
+    template<typename T, typename... Args>
+    T& AddNode(Args&&... args) {
+        Allocator& alloc = context.Get<Allocator>();
+        MemChunk<T> nodeData = alloc.BumpAllocate<T>();
+        T* node = new (nodeData.data) T(context, std::forward<Args>(args)...);
 
+        nodes.push_back(NodeWrapper{
+            MemChunk<NodeDependency>::Null(),
+            MemChunk<uint32_t>::Null(),
+            MemChunk<NodeDependency>::Null(),
+            MemChunk<uint32_t>::Null(),
+            node
+        });
+
+        return *node;
+    }
+    
     void BuildGraph(TransferCommandBuffer& commandBuffer);
 private:
 
-    MemBuffer<uint32_t> sortNodes();
-
     std::vector<NodeWrapper> nodes;
-    std::vector<std::vector<uint32_t>> _dependencies;
-    std::vector<std::vector<uint32_t>> _incomingEdges;
 };

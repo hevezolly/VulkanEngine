@@ -2,55 +2,65 @@
 #include <render_context.h>
 #include <allocator_feature.h>
 #include <command_pool.h>
+#include <algorithm>
 
 struct ResourceUsage {
     uint32_t version;
     uint32_t nodeIndex;
 };
 
-void RenderGraph::AddNode(RenderNode& node) {
+void populateNode(NodeWrapper& wrapper, uint32_t nodeIndex, Allocator& alloc, 
+    std::vector<std::vector<uint32_t>>& outEdges,
+    std::vector<std::vector<uint32_t>>& inEdges,
+    std::unordered_map<ResourceId, uint32_t> versions,
+    std::unordered_map<ResourceId, ResourceUsage> lastWrite
+) {
+    uint32_t inputSize = wrapper.node->getInputDependenciesCount();
+    uint32_t outputSize = wrapper.node->getOutputDependenciesCount();
+    wrapper.queue = wrapper.node->getTargetQueue();
+    if (inputSize != 0) {
+        wrapper.inputDependency = alloc.BumpAllocate<NodeDependency>(inputSize);
+        wrapper.inputVersions = alloc.BumpAllocate<uint32_t>(inputSize);
+        wrapper.node->getInputDependencies(wrapper.inputDependency.data);
+    }
 
-    uint32_t nodeIndex = nodes.size();
+    if (outputSize != 0) {
+        wrapper.outpnputDependency = alloc.BumpAllocate<NodeDependency>(outputSize);
+        wrapper.outputVersions = alloc.BumpAllocate<uint32_t>(outputSize);
+        wrapper.node->getOutputDependencies(wrapper.outpnputDependency.data);
+    }
 
-    NodeWrapper wrapper{};
-    wrapper.inputDependency = node.getInputDependencies();
-    wrapper.outpnputDependency = node.getOutputDependencies();
-    wrapper.node = &node;
-    wrapper.inputVersions = context.Get<Allocator>().BumpAllocate<uint32_t>(wrapper.inputDependency.size);
-    wrapper.outputVersions = context.Get<Allocator>().BumpAllocate<uint32_t>(wrapper.outputVersions.size);
+    outEdges.push_back(std::vector<uint32_t>());
+    inEdges.push_back(std::vector<uint32_t>());
 
-    std::unordered_map<ResourceId, uint32_t> versions;
-    std::unordered_map<ResourceId, ResourceUsage> lastWrite;
-    
-    _dependencies.push_back(std::vector<uint32_t>());
-    _incomingEdges.push_back(std::vector<uint32_t>());
-
-    LOG("input size " << wrapper.inputDependency.size)
     for (int i = 0; i < wrapper.inputDependency.size; i++) {
 
-        LOG("i " << i)
         ResourceId resource = wrapper.inputDependency[i].resource;
 
         wrapper.inputVersions[i] = versions[resource];
         
         if (lastWrite.find(resource) != lastWrite.end()) {
             assert(lastWrite[resource].version == versions[resource]);
-            _dependencies[lastWrite[resource].nodeIndex].push_back(nodeIndex);
-            _incomingEdges[nodeIndex].push_back(lastWrite[resource].nodeIndex);
+            uint32_t lastWriteIndex = lastWrite[resource].nodeIndex;
+            if (std::find(outEdges[lastWriteIndex].begin(), 
+                outEdges[lastWriteIndex].end(), nodeIndex) == 
+                outEdges[lastWriteIndex].end())
+                outEdges[lastWriteIndex].push_back(nodeIndex);
+            
+            if (std::find(inEdges[nodeIndex].begin(), 
+                inEdges[nodeIndex].end(), lastWriteIndex) == 
+                inEdges[nodeIndex].end())
+                inEdges[nodeIndex].push_back(lastWriteIndex);
         }
     }
 
-    LOG("output size " << wrapper.outpnputDependency.size)
     for (int i = 0; i < wrapper.outpnputDependency.size; i++) {
-        LOG("i " << i)
         uint32_t writeVersion = ++versions[wrapper.outpnputDependency[i].resource];
         wrapper.outputVersions[i] = writeVersion;
         ResourceUsage& usage = lastWrite[wrapper.outpnputDependency[i].resource];
         usage.version = writeVersion;
         usage.nodeIndex = nodeIndex;
     }
-
-    nodes.push_back(wrapper);
 }
 
 void findStartingNodes(std::vector<std::vector<uint32_t>>& deps, MemBuffer<uint32_t>& data) {
@@ -61,27 +71,32 @@ void findStartingNodes(std::vector<std::vector<uint32_t>>& deps, MemBuffer<uint3
     }
 }
 
-MemBuffer<uint32_t> RenderGraph::sortNodes() {
+MemBuffer<uint32_t> sortNodes(
+    RenderContext& context,
+    std::vector<std::vector<uint32_t>>& outEdges,
+    std::vector<std::vector<uint32_t>>& inEdges
+) 
+{
     Allocator& alloc = context.Get<Allocator>();
-    uint32_t capacity = _dependencies.size();
+    uint32_t capacity = outEdges.size();
 
     MemBuffer<uint32_t> finalSortedNodes = alloc.BumpAllocate<uint32_t>(capacity);
 
     auto _ = alloc.BeginContext();
 
     MemBuffer<uint32_t> initialNodes = alloc.BumpAllocate<uint32_t>(capacity);
-    findStartingNodes(_dependencies, initialNodes);
+    findStartingNodes(outEdges, initialNodes);
 
-    MemChunk<MemBuffer<uint32_t>> dependencies = alloc.BumpAllocate<MemBuffer<uint32_t>>(_dependencies.size());
-    for (int i = 0; i < _dependencies.size(); i++) {
-        dependencies[i] = alloc.BumpAllocate<uint32_t>(_dependencies[i].size());
-        std::memcpy(dependencies[i].data(), _dependencies[i].data(), _dependencies[i].size() * sizeof(uint32_t));
+    MemChunk<MemBuffer<uint32_t>> dependencies = alloc.BumpAllocate<MemBuffer<uint32_t>>(outEdges.size());
+    for (int i = 0; i < outEdges.size(); i++) {
+        dependencies[i] = alloc.BumpAllocate<uint32_t>(outEdges[i].size());
+        std::memcpy(dependencies[i].data(), outEdges[i].data(), outEdges[i].size() * sizeof(uint32_t));
     }
 
-    MemChunk<MemBuffer<uint32_t>> incomingEdges = alloc.BumpAllocate<MemBuffer<uint32_t>>(_incomingEdges.size());
-    for (int i = 0; i < _incomingEdges.size(); i++) {
-        incomingEdges[i] = alloc.BumpAllocate<uint32_t>(_incomingEdges[i].size());
-        std::memcpy(incomingEdges[i].data(), _incomingEdges[i].data(), _incomingEdges[i].size() * sizeof(uint32_t));
+    MemChunk<MemBuffer<uint32_t>> incomingEdges = alloc.BumpAllocate<MemBuffer<uint32_t>>(inEdges.size());
+    for (int i = 0; i < inEdges.size(); i++) {
+        incomingEdges[i] = alloc.BumpAllocate<uint32_t>(inEdges[i].size());
+        std::memcpy(incomingEdges[i].data(), inEdges[i].data(), inEdges[i].size() * sizeof(uint32_t));
     }
 
     while (initialNodes.size() > 0) {
@@ -109,15 +124,84 @@ MemBuffer<uint32_t> RenderGraph::sortNodes() {
     return finalSortedNodes;
 }
 
+struct QueueTimeStep {
+
+    union {
+        uint32_t node;
+        uint32_t semaphoreValue;
+    };
+
+    enum Type {
+        Node,
+        Wait,
+        Signal
+    } type;
+};
+
 void RenderGraph::BuildGraph(TransferCommandBuffer& commandBuffer) {
 
-    commandBuffer.Begin();
+    if (nodes.size() == 0)
+        return;
 
     Allocator& alloc = context.Get<Allocator>();
     
     auto _ = alloc.BeginContext();
 
-    MemBuffer<uint32_t> sortedNodes = sortNodes();
+    std::unordered_map<ResourceId, uint32_t> versions;
+    std::unordered_map<ResourceId, ResourceUsage> lastWrite;
+    std::vector<std::vector<uint32_t>> outEdges;
+    std::vector<std::vector<uint32_t>> inEdges;
+
+    uint32_t index = 0;
+    for (NodeWrapper& node : nodes) {
+        populateNode(node, index++, alloc, outEdges, inEdges, versions, lastWrite);
+    }
+
+    // topologically sort nodes per queue
+    MemBuffer<uint32_t> sortedNodes = sortNodes(context, outEdges, inEdges);
+    uint32_t queuesCount = (uint32_t)QueueType::None;
+    MemChunk<MemBuffer<uint32_t>> sortedNodesPerQueue = alloc.BumpAllocate<MemBuffer<uint32_t>>(queuesCount);
+    MemChunk<MemBuffer<uint32_t>> submissionBoundaries = alloc.BumpAllocate<MemBuffer<uint32_t>>(queuesCount);
+    MemChunk<uint32_t> semaphoreValues = alloc.BumpAllocate<uint32_t>(queuesCount); // TODO
+
+    for (int i = 0; i < queuesCount; i++) {
+        semaphoreValues[i] = 0;
+        sortedNodesPerQueue[i] = alloc.BumpAllocate<uint32_t>(sortedNodes.size());
+        submissionBoundaries[i] = alloc.BumpAllocate<uint32_t>(sortedNodes.size() - 1);
+
+        for (uint32_t node : sortedNodes) {
+            uint32_t queueIndex = (uint32_t)nodes[node].queue;
+
+            assert(queueIndex < (uint32_t)QueueType::None);
+            sortedNodesPerQueue[queueIndex].push_back(node);
+        }
+    }
+
+    for (int queue = 0; queue < queuesCount; queue++) {
+
+        QueueType currentQueue = (QueueType)queue;
+
+        for (int i = 0; i < sortedNodesPerQueue[queue].size(); i++) {
+            uint32_t node = sortedNodesPerQueue[queue][i];
+
+            if (i > 0)
+        }
+
+        for (uint32_t node : sortedNodesPerQueue[queue]) {
+
+            for (uint32_t dependency : inEdges[node]) {
+                QueueType dependencyQueue = nodes[dependency].queue;
+                if (dependencyQueue != currentQueue) {
+                    submissionBoundaries[queue]
+                }
+
+            }
+
+        }
+
+    }
+
+
 
     for (uint32_t nodeId : sortedNodes) {
         const NodeWrapper& node = nodes[nodeId];
@@ -152,8 +236,5 @@ void RenderGraph::BuildGraph(TransferCommandBuffer& commandBuffer) {
     }
 
     nodes.clear();
-    _dependencies.clear();
-    _incomingEdges.clear();
 
-    commandBuffer.End();
 }

@@ -48,11 +48,15 @@ referencedImage(image)
     createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    createInfo.subresourceRange.aspectMask = aspect;
-    createInfo.subresourceRange.baseMipLevel = 0;
-    createInfo.subresourceRange.levelCount = 1;
-    createInfo.subresourceRange.baseArrayLayer = 0;
-    createInfo.subresourceRange.layerCount = 1;
+    subresourceRange = {};
+
+    subresourceRange.aspectMask = aspect;
+    subresourceRange.baseMipLevel = 0;
+    subresourceRange.levelCount = 1;
+    subresourceRange.baseArrayLayer = 0;
+    subresourceRange.layerCount = 1;
+
+    createInfo.subresourceRange = subresourceRange;
 
     VK(vkCreateImageView(context.device(), &createInfo, nullptr, &vkImageView));
 }
@@ -65,6 +69,7 @@ ImageView& ImageView::operator=(ImageView&& other) noexcept {
     vkImageView = other.vkImageView;
     context = other.context;
     referencedImage = other.referencedImage;
+    subresourceRange = other.subresourceRange;
     other.referencedImage = nullptr;
     other.vkImageView = VK_NULL_HANDLE;
     other.context = nullptr;

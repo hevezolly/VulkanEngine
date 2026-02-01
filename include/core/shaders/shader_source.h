@@ -14,6 +14,8 @@ struct API ShaderSource
 };
 
 struct API ShaderBinary {
+    std::string name;
+    Stage stage;
     std::vector<uint32_t> spirVWords;
     inline uint32_t size_in_bytes() const { return spirVWords.size() * sizeof(uint32_t); }
 };

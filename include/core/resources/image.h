@@ -26,6 +26,7 @@ struct API Image;
 struct API ImageView {
     VkImageView vkImageView;
     const Image* referencedImage;
+    VkImageSubresourceRange subresourceRange;
 
     ImageView(RenderContext& context, const Image* image, VkImageAspectFlags aspect);
 

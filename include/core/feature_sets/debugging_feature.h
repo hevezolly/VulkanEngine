@@ -14,6 +14,8 @@ struct API DebuggingFeature: FeatureSet,
     VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo; 
     VkDebugUtilsMessengerEXT vkDebugMessenger;
 
+    void NameVkObject(VkObjectType type, uint64_t handle, const std::string& name);
+
     DebuggingFeature(RenderContext& context);
     virtual void OnMessage(EarlyInitMsg*);
     virtual void OnMessage(DestroyMsg*);
