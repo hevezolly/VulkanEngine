@@ -4,138 +4,287 @@
 #include <command_pool.h>
 #include <algorithm>
 
-struct ResourceUsage {
-    uint32_t version;
-    uint32_t nodeIndex;
+static constexpr VkPipelineStageFlags2 kStageOrder[] = {
+    VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+    VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT,
+    VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT,
+
+    VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+    VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT,
+    VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT,
+    VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT,
+    VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT,
+    VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT,
+    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+
+    VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+
+    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+
+    VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+
+    VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+    VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR,
+
+    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
 };
 
-void populateNode(NodeWrapper& wrapper, uint32_t nodeIndex, Allocator& alloc, 
-    std::vector<std::vector<uint32_t>>& outEdges,
-    std::vector<std::vector<uint32_t>>& inEdges,
-    std::unordered_map<ResourceId, uint32_t> versions,
-    std::unordered_map<ResourceId, ResourceUsage> lastWrite
-) {
-    uint32_t inputSize = wrapper.node->getInputDependenciesCount();
-    uint32_t outputSize = wrapper.node->getOutputDependenciesCount();
-    wrapper.queue = wrapper.node->getTargetQueue();
-    if (inputSize != 0) {
-        wrapper.inputDependency = alloc.BumpAllocate<NodeDependency>(inputSize);
-        wrapper.inputVersions = alloc.BumpAllocate<uint32_t>(inputSize);
-        wrapper.node->getInputDependencies(wrapper.inputDependency.data);
-    }
-
-    if (outputSize != 0) {
-        wrapper.outpnputDependency = alloc.BumpAllocate<NodeDependency>(outputSize);
-        wrapper.outputVersions = alloc.BumpAllocate<uint32_t>(outputSize);
-        wrapper.node->getOutputDependencies(wrapper.outpnputDependency.data);
-    }
-
-    outEdges.push_back(std::vector<uint32_t>());
-    inEdges.push_back(std::vector<uint32_t>());
-
-    for (int i = 0; i < wrapper.inputDependency.size; i++) {
-
-        ResourceId resource = wrapper.inputDependency[i].resource;
-
-        wrapper.inputVersions[i] = versions[resource];
-        
-        if (lastWrite.find(resource) != lastWrite.end()) {
-            assert(lastWrite[resource].version == versions[resource]);
-            uint32_t lastWriteIndex = lastWrite[resource].nodeIndex;
-            if (std::find(outEdges[lastWriteIndex].begin(), 
-                outEdges[lastWriteIndex].end(), nodeIndex) == 
-                outEdges[lastWriteIndex].end())
-                outEdges[lastWriteIndex].push_back(nodeIndex);
-            
-            if (std::find(inEdges[nodeIndex].begin(), 
-                inEdges[nodeIndex].end(), lastWriteIndex) == 
-                inEdges[nodeIndex].end())
-                inEdges[nodeIndex].push_back(lastWriteIndex);
-        }
-    }
-
-    for (int i = 0; i < wrapper.outpnputDependency.size; i++) {
-        uint32_t writeVersion = ++versions[wrapper.outpnputDependency[i].resource];
-        wrapper.outputVersions[i] = writeVersion;
-        ResourceUsage& usage = lastWrite[wrapper.outpnputDependency[i].resource];
-        usage.version = writeVersion;
-        usage.nodeIndex = nodeIndex;
-    }
-}
-
-void findStartingNodes(std::vector<std::vector<uint32_t>>& deps, MemBuffer<uint32_t>& data) {
-    for (uint32_t i = 0; i < deps.size(); i++) {
-        if (deps[i].size() == 0) {
-            data.push_back(i);
-        }
-    }
-}
-
-MemBuffer<uint32_t> sortNodes(
-    RenderContext& context,
-    std::vector<std::vector<uint32_t>>& outEdges,
-    std::vector<std::vector<uint32_t>>& inEdges
-) 
+inline VkPipelineStageFlags2 earliest_stage(VkPipelineStageFlags2 mask)
 {
-    Allocator& alloc = context.Get<Allocator>();
-    uint32_t capacity = outEdges.size();
+    for (VkPipelineStageFlags2 s : kStageOrder)
+        if (mask & s)
+            return s;
 
-    MemBuffer<uint32_t> finalSortedNodes = alloc.BumpAllocate<uint32_t>(capacity);
-
-    auto _ = alloc.BeginContext();
-
-    MemBuffer<uint32_t> initialNodes = alloc.BumpAllocate<uint32_t>(capacity);
-    findStartingNodes(outEdges, initialNodes);
-
-    MemChunk<MemBuffer<uint32_t>> dependencies = alloc.BumpAllocate<MemBuffer<uint32_t>>(outEdges.size());
-    for (int i = 0; i < outEdges.size(); i++) {
-        dependencies[i] = alloc.BumpAllocate<uint32_t>(outEdges[i].size());
-        std::memcpy(dependencies[i].data(), outEdges[i].data(), outEdges[i].size() * sizeof(uint32_t));
-    }
-
-    MemChunk<MemBuffer<uint32_t>> incomingEdges = alloc.BumpAllocate<MemBuffer<uint32_t>>(inEdges.size());
-    for (int i = 0; i < inEdges.size(); i++) {
-        incomingEdges[i] = alloc.BumpAllocate<uint32_t>(inEdges[i].size());
-        std::memcpy(incomingEdges[i].data(), inEdges[i].data(), inEdges[i].size() * sizeof(uint32_t));
-    }
-
-    while (initialNodes.size() > 0) {
-        uint32_t node = initialNodes.back();
-        initialNodes.pop_back();
-        finalSortedNodes.push_back(node);
-
-        for (int m_index = dependencies[node].size() - 1; m_index >= 0; m_index--) {
-            uint32_t m = dependencies[node][m_index];
-            dependencies[node].pop_back();
-            incomingEdges[m].fast_delete(m);
-
-            if (incomingEdges[m].size() == 0) {
-                assert(initialNodes.size() <= capacity-1);
-                initialNodes.push_back(m);
-            }
-        }
-    }
-
-    for (int i = 0; i < capacity; i++) {
-        assert(dependencies[i].size() == 0);
-        assert(incomingEdges[i].size() == 0);
-    }
-
-    return finalSortedNodes;
+    return VK_PIPELINE_STAGE_2_NONE;
 }
+
+inline VkPipelineStageFlags2 min_stage(
+    VkPipelineStageFlags2 a,
+    VkPipelineStageFlags2 b)
+{
+    if (a == VK_PIPELINE_STAGE_2_NONE) return b;
+    if (b == VK_PIPELINE_STAGE_2_NONE) return a;
+
+    VkPipelineStageFlags2 ea = earliest_stage(a);
+    VkPipelineStageFlags2 eb = earliest_stage(b);
+
+    // find which appears first in the canonical order
+    for (VkPipelineStageFlags2 s : kStageOrder)
+    {
+        if (s == ea) return ea;
+        if (s == eb) return eb;
+    }
+
+    // fallback (should never happen)
+    return ea;
+}
+
+struct ResourceUsage {
+    VersionedResource resource;
+    uint32_t node;
+    uint32_t dependencyIndex;
+};
+
+struct SignalDescription {
+    VkPipelineStageFlags2 stage;
+    uint32_t signalValue;
+    uint32_t queue;
+};
 
 struct QueueTimeStep {
 
-    union {
-        uint32_t node;
-        uint32_t semaphoreValue;
-    };
+    uint32_t node;
+    std::vector<SignalDescription> signals;
 
-    enum Type {
+    enum struct Type {
         Node,
         Wait,
         Signal
     } type;
+
+    static QueueTimeStep Node(uint32_t node) {
+        QueueTimeStep step;
+        step.type = Type::Node;
+        step.node = node;
+        return step;
+    }
+
+    static QueueTimeStep Signal(std::vector<SignalDescription>&& signal) {
+        QueueTimeStep step;
+        step.type = Type::Signal;
+        step.signals = std::move(signal);
+        return step;
+    }
+
+    static QueueTimeStep Wait(std::vector<SignalDescription>&& wait) {
+        QueueTimeStep step;
+        step.type = Type::Wait;
+        step.signals = std::move(wait);
+        return step;
+    }
+};
+
+struct GraphInstance {
+    std::vector<NodeWrapper>& nodes;
+    Allocator& alloc;
+    std::unordered_map<VersionedResource, ResourceUsage> writes;
+    std::unordered_map<VersionedResource, std::vector<ResourceUsage>> reads;
+
+    std::vector<std::vector<ResourceUsage>> inEdges;
+    std::vector<std::vector<VersionedResource>> outEdges;
+
+    std::unordered_map<ResourceId, uint32_t> versions;
+    std::vector<std::list<QueueTimeStep>> queueTimelines; 
+    std::vector<uint32_t> sortedNodes;
+    std::vector<SignalDescription> signalsPerNode;
+
+    const std::vector<ResourceUsage>& getReads(VersionedResource r) {
+        static const std::vector<ResourceUsage> emptyVector; 
+        auto it = reads.find(r);
+        if (it == reads.end())
+            return emptyVector;
+        return it->second;
+    }
+
+    void populateNode(NodeWrapper& wrapper, uint32_t nodeIndex) {
+        uint32_t inputSize = wrapper.node->getInputDependenciesCount();
+        uint32_t outputSize = wrapper.node->getOutputDependenciesCount();
+        wrapper.queue = wrapper.node->getTargetQueue();
+        if (inputSize != 0) {
+            wrapper.inputDependency = alloc.BumpAllocate<NodeDependency>(inputSize);
+            wrapper.inputVersions = alloc.BumpAllocate<uint32_t>(inputSize);
+            wrapper.node->getInputDependencies(wrapper.inputDependency.data);
+        }
+
+        if (outputSize != 0) {
+            wrapper.outpnputDependency = alloc.BumpAllocate<NodeDependency>(outputSize);
+            wrapper.outputVersions = alloc.BumpAllocate<uint32_t>(outputSize);
+            wrapper.node->getOutputDependencies(wrapper.outpnputDependency.data);
+        }
+
+        outEdges.push_back(std::vector<VersionedResource>());
+        inEdges.push_back(std::vector<ResourceUsage>());
+
+        for (uint32_t i = 0; i < wrapper.inputDependency.size; i++) {
+
+            ResourceId resource = wrapper.inputDependency[i].resource;
+            VersionedResource r {resource, versions[resource]};
+            wrapper.inputVersions[i] = r.version;
+            
+            inEdges[nodeIndex].push_back({r, nodeIndex, i});
+            reads[r].push_back({r, nodeIndex, i});
+        }
+
+        for (uint32_t i = 0; i < wrapper.outpnputDependency.size; i++) {
+            uint32_t writeVersion = ++versions[wrapper.outpnputDependency[i].resource];
+            wrapper.outputVersions[i] = writeVersion;
+            VersionedResource r {wrapper.outpnputDependency[i].resource, writeVersion};
+            
+            outEdges[nodeIndex].push_back(r);
+            writes[r] = {r, nodeIndex, i};
+        }
+    }
+
+    void findStartingNodes(std::vector<std::vector<VersionedResource>>& deps, MemBuffer<uint32_t>& data) {
+        for (uint32_t i = 0; i < deps.size(); i++) {
+            if (deps[i].size() == 0) {
+                data.push_back(i);
+            }
+        }
+    }
+
+    void sortNodes() 
+    {
+        uint32_t capacity = outEdges.size();
+
+        auto _ = alloc.BeginContext();
+
+        MemBuffer<uint32_t> initialNodes = alloc.BumpAllocate<uint32_t>(capacity);
+        findStartingNodes(outEdges, initialNodes);
+
+
+        std::vector<std::vector<uint32_t>> dependencies;
+        std::vector<std::unordered_set<uint32_t>> incomingEdges;
+
+        for (uint32_t i = 0; i < outEdges.size(); i++) {
+            dependencies.push_back(std::vector<uint32_t>());
+            for (VersionedResource write : outEdges[i]) {
+                const std::vector<ResourceUsage>& reads = getReads(write);
+
+                for (ResourceUsage read: reads) {
+                    if (read.node >= incomingEdges.size())
+                        incomingEdges.resize(read.node + 1);
+                    auto result = incomingEdges[read.node].insert(i);
+                    
+                    if (result.second) {
+                        dependencies[i].push_back(read.node);
+                    }
+                }
+            }
+        }
+
+        while (initialNodes.size() > 0) {
+            uint32_t node = initialNodes.back();
+            initialNodes.pop_back();
+            sortedNodes.push_back(node);
+
+            for (int m_index = dependencies[node].size() - 1; m_index >= 0; m_index--) {
+                uint32_t m = dependencies[node][m_index];
+                dependencies[node].pop_back();
+                incomingEdges[m].erase(node);
+
+                if (incomingEdges[m].size() == 0) {
+                    assert(initialNodes.size() <= capacity-1);
+                    initialNodes.push_back(m);
+                }
+            }
+        }
+
+        for (int i = 0; i < capacity; i++) {
+            assert(dependencies[i].size() == 0);
+            assert(incomingEdges[i].size() == 0);
+        }
+    }
+
+    void buildTimelines() {
+        uint32_t queuesCount = (uint32_t)QueueType::None;
+        MemChunk<uint32_t> semaphoreValues = alloc.BumpAllocate<uint32_t>(queuesCount); 
+
+        for (int i = 0; i < queuesCount; i++) {
+            semaphoreValues[i] = 0;
+            queueTimelines.push_back(std::list<QueueTimeStep>());
+        }
+
+        signalsPerNode.resize(nodes.size());
+
+        for (uint32_t node: sortedNodes) {
+            uint32_t queueIndex = (uint32_t)nodes[node].queue;
+            uint32_t signalValue = ++semaphoreValues[queueIndex];
+
+            signalsPerNode[node] = {
+                0,
+                signalValue,
+                queueIndex
+            };
+        }
+
+        MemChunk<SignalDescription> perQueueSignals = alloc.BumpAllocate<SignalDescription>((uint32_t)QueueType::None);
+
+        for (uint32_t node : sortedNodes) {
+            uint32_t queueIndex = (uint32_t)nodes[node].queue;
+
+            perQueueSignals.clearToZero();
+
+            for (ResourceUsage inResource : inEdges[node]) {
+                auto it = writes.find(inResource.resource);
+                if (it == writes.end())
+                    continue;
+
+                ResourceUsage write = it->second;
+
+                uint32_t newQueue = (uint32_t)nodes[write.node].queue; 
+                if (newQueue == queueIndex) {
+                    continue;
+                }
+
+                SignalDescription signal {
+                    nodes[inResource.node].inputDependency[inResource.dependencyIndex].state.accessStage,
+                    signalsPerNode[write.node].signalValue,
+                    newQueue
+                };
+
+                perQueueSignals[newQueue].signalValue = std::max(perQueueSignals[newQueue].signalValue, signal.signalValue);
+                perQueueSignals[newQueue].stage = min_stage(perQueueSignals[newQueue].stage, signal.stage);
+                perQueueSignals[newQueue].queue = newQueue;
+            }
+
+            if (waitBoundaries.size() > 0) {
+                queueTimelines[queueIndex].push_back(QueueTimeStep::Wait(std::move(waitBoundaries)));
+            }
+        }
+    }
 };
 
 void RenderGraph::BuildGraph(TransferCommandBuffer& commandBuffer) {
@@ -147,63 +296,20 @@ void RenderGraph::BuildGraph(TransferCommandBuffer& commandBuffer) {
     
     auto _ = alloc.BeginContext();
 
-    std::unordered_map<ResourceId, uint32_t> versions;
-    std::unordered_map<ResourceId, ResourceUsage> lastWrite;
-    std::vector<std::vector<uint32_t>> outEdges;
-    std::vector<std::vector<uint32_t>> inEdges;
+    GraphInstance instance {
+        nodes,
+        alloc
+    };
 
     uint32_t index = 0;
     for (NodeWrapper& node : nodes) {
-        populateNode(node, index++, alloc, outEdges, inEdges, versions, lastWrite);
+        instance.populateNode(node, index++);
     }
 
-    // topologically sort nodes per queue
-    MemBuffer<uint32_t> sortedNodes = sortNodes(context, outEdges, inEdges);
-    uint32_t queuesCount = (uint32_t)QueueType::None;
-    MemChunk<MemBuffer<uint32_t>> sortedNodesPerQueue = alloc.BumpAllocate<MemBuffer<uint32_t>>(queuesCount);
-    MemChunk<MemBuffer<uint32_t>> submissionBoundaries = alloc.BumpAllocate<MemBuffer<uint32_t>>(queuesCount);
-    MemChunk<uint32_t> semaphoreValues = alloc.BumpAllocate<uint32_t>(queuesCount); // TODO
+    instance.sortNodes();
+    instance.buildTimelines();
 
-    for (int i = 0; i < queuesCount; i++) {
-        semaphoreValues[i] = 0;
-        sortedNodesPerQueue[i] = alloc.BumpAllocate<uint32_t>(sortedNodes.size());
-        submissionBoundaries[i] = alloc.BumpAllocate<uint32_t>(sortedNodes.size() - 1);
-
-        for (uint32_t node : sortedNodes) {
-            uint32_t queueIndex = (uint32_t)nodes[node].queue;
-
-            assert(queueIndex < (uint32_t)QueueType::None);
-            sortedNodesPerQueue[queueIndex].push_back(node);
-        }
-    }
-
-    for (int queue = 0; queue < queuesCount; queue++) {
-
-        QueueType currentQueue = (QueueType)queue;
-
-        for (int i = 0; i < sortedNodesPerQueue[queue].size(); i++) {
-            uint32_t node = sortedNodesPerQueue[queue][i];
-
-            if (i > 0)
-        }
-
-        for (uint32_t node : sortedNodesPerQueue[queue]) {
-
-            for (uint32_t dependency : inEdges[node]) {
-                QueueType dependencyQueue = nodes[dependency].queue;
-                if (dependencyQueue != currentQueue) {
-                    submissionBoundaries[queue]
-                }
-
-            }
-
-        }
-
-    }
-
-
-
-    for (uint32_t nodeId : sortedNodes) {
+    for (uint32_t nodeId : instance.sortedNodes) {
         const NodeWrapper& node = nodes[nodeId];
 
         MemBuffer<ResourceId> resources = alloc.BumpAllocate<ResourceId>(

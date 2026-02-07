@@ -25,6 +25,11 @@ struct MemChunk {
         assert(index >= 0 && index < size);
         return *(data + index);
     }
+
+    void clearToZero() {
+        if (data != nullptr)
+            memset(data, 0, size * sizeof(T));
+    }
     
     operator MemChunk<char>() {
         MemChunk<char> result;
@@ -256,8 +261,10 @@ struct Allocator: FeatureSet,
 
         freeOffset = alignedOffset + allocationSize;
         T* ptr = reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(chunk)+ alignedOffset); 
-        memset(ptr, 0, allocationSize);
-        return MemChunk<T>{ptr, count, AllocationType::Bump};
+
+        auto result = MemChunk<T>{ptr, count, AllocationType::Bump};
+        result.clearToZero();
+        return result;
     }
 
     template<typename T>
