@@ -408,15 +408,33 @@ void Resources::DestroyImmediate(ResourceId resource) {
     {
     case ResourceType::Buffer:
         _buffers.TryRemove(resource);
-        _states.erase(resource);
         break;
     case ResourceType::Image:
         _images.TryRemove(resource);
-        _states.erase(resource);
         break;
     case ResourceType::Sampler:
         _samplers.TryRemove(resource);
     default:
         break;
     }
+    _states.erase(resource);
+    _synchronization.erase(resource);
+}
+
+bool Resources::ResourceRequiresSynchronization(ResourceId resource) {
+    return _synchronization.find(resource) != _synchronization.end();
+}
+
+Ref<Semaphore> Resources::ExtractSyncContext(ResourceId resource) {
+    auto it = _synchronization.find(resource);
+
+    if (it == _synchronization.end())
+        return Ref<Semaphore>::Null();
+    auto result = it->second;
+    _synchronization.erase(it);
+    return result; 
+}
+
+void Resources::SetSynchronizationContext(ResourceId resource, Ref<Semaphore> sync) {
+    _synchronization[resource] = sync;
 }

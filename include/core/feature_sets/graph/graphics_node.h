@@ -99,8 +99,8 @@ struct GraphicsNode: RenderNode {
             _bindings.value().write_outputs(dependencies + Attachments::size());
     }
 
-    virtual void Record(TransferCommandBuffer& commandBuffer) {
-        GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(commandBuffer);
+    virtual void Record(ExecutionContext commandBuffer) {
+        GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(commandBuffer->commandBuffer);
         
         const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>()
             .CreateFrameBuffer(_attachments, pipeline->renderPass);

@@ -10,6 +10,7 @@
 #include <resource_id.h>
 #include <unordered_map>
 #include <resource_storage.h>
+#include <synchronization.h>
 
 struct API Resources: FeatureSet,
     CanHandle<InitMsg>,
@@ -104,11 +105,16 @@ struct API Resources: FeatureSet,
     virtual void OnMessage(InitMsg*);
     virtual void OnMessage(DestroyMsg*);
 
+    bool ResourceRequiresSynchronization(ResourceId resource);
+    Ref<Semaphore> ExtractSyncContext(ResourceId resource);
+    void SetSynchronizationContext(ResourceId resource, Ref<Semaphore>);
+
 private:
     VkPhysicalDeviceMemoryProperties vkMemProperties;
 
     std::unordered_map<ResourceId, ResourceState> _states;
     std::unordered_map<ResourceId, std::string> _names;
+    std::unordered_map<ResourceId, Ref<Semaphore>> _synchronization;
     
     ResourceStorage<Buffer> _buffers;
     ResourceStorage<Image> _images;

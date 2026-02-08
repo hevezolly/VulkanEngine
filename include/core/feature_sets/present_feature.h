@@ -44,6 +44,9 @@ struct API PresentFeature: FeatureSet,
     virtual void OnMessage(CollectRequiredQueueTypesMsg*);
 
     uint32_t AcquireNextImage(Ref<Semaphore> imageReady);
+
+    ResourceRef<Image> AcquireNextImage();
+
     VkExtent2D swapChainExtent();
 
     uint32_t swapChainSize();

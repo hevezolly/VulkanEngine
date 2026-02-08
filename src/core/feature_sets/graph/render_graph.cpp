@@ -69,8 +69,7 @@ struct ResourceUsage {
 
 struct SignalDescription {
     VkPipelineStageFlags2 stage;
-    uint32_t signalValue;
-    uint32_t queue;
+    uint32_t syncContext;
 };
 
 struct QueueTimeStep {
@@ -91,10 +90,10 @@ struct QueueTimeStep {
         return step;
     }
 
-    static QueueTimeStep Signal(std::vector<SignalDescription>&& signal) {
+    static QueueTimeStep Signal(SignalDescription signal) {
         QueueTimeStep step;
         step.type = Type::Signal;
-        step.signals = std::move(signal);
+        step.signals.push_back(signal);
         return step;
     }
 
@@ -104,6 +103,14 @@ struct QueueTimeStep {
         step.signals = std::move(wait);
         return step;
     }
+};
+
+struct SynchronizationContext {
+    uint32_t queue;
+    uint32_t timelineValue;
+    VkPipelineStageFlags2 signalStage;
+    bool explicitSemaphore;
+    uint32_t waits;
 };
 
 struct GraphInstance {
@@ -118,7 +125,8 @@ struct GraphInstance {
     std::unordered_map<ResourceId, uint32_t> versions;
     std::vector<std::list<QueueTimeStep>> queueTimelines; 
     std::vector<uint32_t> sortedNodes;
-    std::vector<SignalDescription> signalsPerNode;
+
+    std::vector<SynchronizationContext> syncContexts;
 
     const std::vector<ResourceUsage>& getReads(VersionedResource r) {
         static const std::vector<ResourceUsage> emptyVector; 
@@ -228,26 +236,75 @@ struct GraphInstance {
         }
     }
 
-    void buildTimelines() {
+    void defineSyncronizationContexts() {
+
         uint32_t queuesCount = (uint32_t)QueueType::None;
         MemChunk<uint32_t> semaphoreValues = alloc.BumpAllocate<uint32_t>(queuesCount); 
 
         for (int i = 0; i < queuesCount; i++) {
             semaphoreValues[i] = 0;
-            queueTimelines.push_back(std::list<QueueTimeStep>());
         }
 
-        signalsPerNode.resize(nodes.size());
+        syncContexts.resize(sortedNodes.size());
 
         for (uint32_t node: sortedNodes) {
             uint32_t queueIndex = (uint32_t)nodes[node].queue;
-            uint32_t signalValue = ++semaphoreValues[queueIndex];
 
-            signalsPerNode[node] = {
-                0,
-                signalValue,
-                queueIndex
-            };
+            VkPipelineStageFlags2 stage = 0;
+            for (VersionedResource outResource: outEdges[node]) {
+                ResourceUsage write = writes[outResource];
+                bool found = false;
+
+                for (ResourceUsage read : getReads(outResource)) {
+                    uint32_t newQueue = (uint32_t)nodes[read.node].queue;
+
+                    if (newQueue != queueIndex) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    stage |= nodes[write.node].outpnputDependency[write.dependencyIndex].state.accessStage;
+                }
+            }
+
+            if (stage != 0) {
+                syncContexts[node].timelineValue = ++semaphoreValues[queueIndex]; 
+                syncContexts[node].queue = queueIndex;
+                syncContexts[node].signalStage = stage;
+            }
+        }
+    }
+
+    void AssignWait(SignalDescription& signal, SignalDescription newSignal, bool requirebinary) {
+
+        SynchronizationContext* oldContext;
+        SynchronizationContext* newContext = &syncContexts[newSignal.syncContext];
+        
+        if (signal.stage != 0) {
+            oldContext = &syncContexts[signal.syncContext];
+        }
+
+        if (signal.stage == 0 || oldContext->timelineValue < newContext->timelineValue) {
+            if (signal.stage != 0) {
+                assert(oldContext->waits > 0);
+                oldContext->waits--;
+            }
+
+            newContext->waits++;
+            signal.syncContext = newSignal.syncContext;
+        }
+
+        signal.stage |= newSignal.stage;
+        syncContexts[signal.syncContext].explicitSemaphore |= requirebinary;
+    }
+
+    void buildTimelines() {
+        uint32_t queuesCount = (uint32_t)QueueType::None;
+
+        for (int i = 0; i < queuesCount; i++) {
+            queueTimelines.push_back(std::list<QueueTimeStep>());
         }
 
         MemChunk<SignalDescription> perQueueSignals = alloc.BumpAllocate<SignalDescription>((uint32_t)QueueType::None);
@@ -269,21 +326,77 @@ struct GraphInstance {
                     continue;
                 }
 
-                SignalDescription signal {
+                SignalDescription newSignal {
                     nodes[inResource.node].inputDependency[inResource.dependencyIndex].state.accessStage,
-                    signalsPerNode[write.node].signalValue,
-                    newQueue
+                    write.node
                 };
 
-                perQueueSignals[newQueue].signalValue = std::max(perQueueSignals[newQueue].signalValue, signal.signalValue);
-                perQueueSignals[newQueue].stage = min_stage(perQueueSignals[newQueue].stage, signal.stage);
-                perQueueSignals[newQueue].queue = newQueue;
+                AssignWait(perQueueSignals[newQueue], newSignal, nodes[node].node->requireBinarySemaphore());
             }
 
-            if (waitBoundaries.size() > 0) {
-                queueTimelines[queueIndex].push_back(QueueTimeStep::Wait(std::move(waitBoundaries)));
+            std::vector<SignalDescription> usedSignals;
+            for (int i = 0; i < queuesCount; i++) {
+                if (perQueueSignals[i].stage != 0)
+                    usedSignals.push_back(perQueueSignals[i]);
+            }
+
+            if (usedSignals.size() > 0)
+                queueTimelines[queueIndex].push_back(QueueTimeStep::Wait(std::move(usedSignals)));
+
+            queueTimelines[queueIndex].push_back(QueueTimeStep::Node(node));
+
+            if (syncContexts[node].timelineValue > 0)
+                queueTimelines[queueIndex].push_back(QueueTimeStep::Signal(SignalDescription {
+                    syncContexts[node].signalStage,
+                    node
+                }));
+        }
+    }
+
+    void simplifyTimelines() {
+        MemChunk<uint32_t> perQueueSignals = alloc.BumpAllocate<uint32_t>((uint32_t)QueueType::None);
+        
+        for (uint32_t queue = 0; queue < (uint32_t)QueueType::None; queue++) {
+            perQueueSignals.clearToZero();
+            auto it = queueTimelines[queue].begin();
+            while (it != queueTimelines[queue].end()) {
+                if (it->type == QueueTimeStep::Type::Wait) {
+                    
+                    for (int i = it->signals.size() - 1; i >= 0; --i) {
+                        
+                        SignalDescription signal = it->signals[i];
+
+                        SynchronizationContext& context = syncContexts[signal.syncContext];
+
+                        if (perQueueSignals[context.queue] > context.timelineValue) {
+                            it->signals.erase(it->signals.begin() + i);
+                        }
+                        else {
+                            perQueueSignals[context.queue] = context.timelineValue;
+                        }
+                    }
+                } else if (it->type == QueueTimeStep::Type::Signal) {
+                     for (int i = it->signals.size() - 1; i >= 0; --i) {
+                        
+                        SignalDescription signal = it->signals[i];
+
+                        SynchronizationContext& context = syncContexts[signal.syncContext];
+
+                        if (context.waits == 0) {
+                            it->signals.erase(it->signals.begin() + i);
+                        }
+                    }
+                }
+
+                if (it->type != QueueTimeStep::Type::Node && it->signals.size() == 0) {
+                    it = queueTimelines[queue].erase(it);
+                    continue;
+                }
+
+                ++it;
             }
         }
+
     }
 };
 
@@ -307,7 +420,9 @@ void RenderGraph::BuildGraph(TransferCommandBuffer& commandBuffer) {
     }
 
     instance.sortNodes();
+    instance.defineSyncronizationContexts();
     instance.buildTimelines();
+    instance.simplifyTimelines();
 
     for (uint32_t nodeId : instance.sortedNodes) {
         const NodeWrapper& node = nodes[nodeId];

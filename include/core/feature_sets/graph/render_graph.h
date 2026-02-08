@@ -61,4 +61,7 @@ struct API RenderGraph: FeatureSet
 private:
 
     std::vector<NodeWrapper> nodes;
+
+    std::vector<std::vector<Ref<Semaphore>>> semaphoresPerFramePerQueue;
+    std::vector<std::vector<uint32_t>> semaphoreValuesPerFramePerQueue;
 };

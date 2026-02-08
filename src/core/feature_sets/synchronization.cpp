@@ -26,10 +26,20 @@ Fence::~Fence() {
     }
 }
 
-Ref<Semaphore> Synchronization::CreateSemaphore() {
+Ref<Semaphore> Synchronization::CreateSemaphore(bool timeline) {
     Ref<Semaphore> s = context.New<Semaphore>(&context);
 
     VkSemaphoreCreateInfo info {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+
+    VkSemaphoreTypeCreateInfo timelineCreateInfo;
+    if (timeline) {
+        timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+        timelineCreateInfo.pNext = NULL;
+        timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+        timelineCreateInfo.initialValue = 0;
+        info.pNext = &timelineCreateInfo;
+    }
+
     VK(vkCreateSemaphore(context.device(), &info, nullptr, &s->vk))
     return s;
 }
@@ -66,3 +76,29 @@ Refs<Fence> Synchronization::CreateFences(uint32_t size, bool signaled) {
     return s;
 }
 
+void Synchronization::OnMessage(BeginFrameMsg* m) {
+    _borrowedSemaphores.SetFrame(m->inFlightFrame);
+    _borrowedSemaphores->clear();
+}
+
+void Synchronization::OnMessage(DestroyMsg*) {
+    _borrowedSemaphores.clearAll();
+}
+
+Ref<Semaphore> Synchronization::BorrowSemaphore() {
+    if (semaphoresPool.isEmpty()) {
+        semaphoresPool.Insert(CreateSemaphore());
+    }
+
+    _borrowedSemaphores->push_back(semaphoresPool.Borrow());
+    return *_borrowedSemaphores->back();
+}
+
+void Synchronization::ReturnSemaphorEarly(Ref<Semaphore> s) {
+    for (int i = _borrowedSemaphores->size() -1; i >= 0; i--) {
+        if (_borrowedSemaphores[i].val() == s) {
+            _borrowedSemaphores->erase(_borrowedSemaphores->begin() + i);
+            break;
+        }
+    }
+}

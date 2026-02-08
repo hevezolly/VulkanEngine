@@ -1,6 +1,7 @@
 #include <present_feature.h>
 #include <render_context.h>
 #include <vk_collect.h>
+#include <resources.h>
 
 PresentFeature::PresentFeature(
     RenderContext& context,
@@ -95,7 +96,33 @@ uint32_t PresentFeature::AcquireNextImage(Ref<Semaphore> imageReady) {
         VK(result)
     }
 
+    ResourceId img = swapChain->images[nextImage];
+    context.Get<Resources>().SetSynchronizationContext(img, imageReady);
+
     return nextImage;
+}
+
+ResourceRef<Image> PresentFeature::AcquireNextImage() {
+
+    Synchronization& sync = context.Get<Synchronization>();
+    Ref<Semaphore> imageReady = sync.BorrowSemaphore();
+
+    uint32_t nextImage = 0;
+    VkResult result = vkAcquireNextImageKHR(context.device(), swapChain->swapChain, UINT64_MAX, imageReady->vk, VK_NULL_HANDLE, &nextImage);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        sync.ReturnSemaphorEarly(imageReady);
+        recreateSwapChain();
+        return AcquireNextImage();
+    }
+    else {
+        VK(result)
+    }
+
+    ResourceRef<Image> img = swapChain->images[nextImage];
+    context.Get<Resources>().SetSynchronizationContext(img, imageReady);
+
+    return img;
 }
 
 void PresentFeature::OnMessage(PresentMsg* m) {

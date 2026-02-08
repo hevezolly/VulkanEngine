@@ -147,3 +147,4 @@ private:
 
 template<typename T>
 using ResourceRefs = std::vector<ResourceRef<T>>;
+
