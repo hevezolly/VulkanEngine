@@ -1,5 +1,4 @@
 #pragma once
-#include <resource_id.h>
 #include <common.h>
 #include <resource_id.h>
 #include <vector>

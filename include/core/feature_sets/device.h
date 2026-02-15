@@ -1,9 +1,9 @@
 #pragma once
 
+#include <common.h>
 #include <volk.h>
 #include <vector>
 #include <optional>
-#include <common.h>
 #include <feature_set.h>
 #include <messages.h>
 #include <allocator_feature.h>

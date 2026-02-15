@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <render_context.h>
+#include <synchronization.h>
 
 struct NodeWrapper {
     QueueType queue;
@@ -36,7 +37,8 @@ namespace std {
     };
 }
 
-struct API RenderGraph: FeatureSet
+struct API RenderGraph: FeatureSet,
+    CanHandle<BeginFrameMsg>
 {
     using FeatureSet::FeatureSet;
 
@@ -57,11 +59,11 @@ struct API RenderGraph: FeatureSet
         return *node;
     }
     
-    void BuildGraph(TransferCommandBuffer& commandBuffer);
+    void Run();
 private:
 
     std::vector<NodeWrapper> nodes;
 
-    std::vector<std::vector<Ref<Semaphore>>> semaphoresPerFramePerQueue;
-    std::vector<std::vector<uint32_t>> semaphoreValuesPerFramePerQueue;
+    FramedStorage<std::vector<Ref<Semaphore>>> semaphoresPerFramePerQueue;
+    FramedStorage<std::vector<uint32_t>> semaphoreValuesPerFramePerQueue;
 };

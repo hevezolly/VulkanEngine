@@ -1,7 +1,7 @@
 #pragma once
+#include <common.h>
 #include <atomic>
 #include <vector>
-#include <common.h>
 #include <typeindex>
 #include <typeinfo>
 #include <messages.h>

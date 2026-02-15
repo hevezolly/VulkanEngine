@@ -36,8 +36,8 @@ name& operator=(name&&) = delete;
 enum struct API QueueType {
     Graphics,
     Transfer,
-    Present,
     Compute,
+    Present,
     None
 };
 

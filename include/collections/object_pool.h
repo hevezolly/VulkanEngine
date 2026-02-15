@@ -17,11 +17,11 @@ struct API ObjectPool
     };
 
     bool isEmpty() {
-        return nextAailable == nullptr;
+        return nextAvailable == nullptr;
     }
 
     void Reset() {
-        nextAailable = end;
+        nextAvailable = end;
     }
 
     Borrowed<T> Borrow();
@@ -38,7 +38,7 @@ struct API ObjectPool
         Return(newNode);
     }
 
-    ObjectPool(): begin(nullptr), end(nullptr), nextAailable(nullptr) {
+    ObjectPool(): begin(nullptr), end(nullptr), nextAvailable(nullptr) {
         _storage = new ObjectPool*;
         *_storage = this;
     }
@@ -72,15 +72,47 @@ struct API ObjectPool
         }
 
         begin = other.begin;
-        nextAailable = other.nextAailable;
+        nextAvailable = other.nextAvailable;
         end = other.end;
         *_storage = this;
         other._storage = nullptr;
         other.begin = nullptr;
         other.end = nullptr;
-        other.nextAailable = nullptr;
+        other.nextAvailable = nullptr;
 
         return *this;
+    }
+
+    void TransferAvailableTo(ObjectPool& other) {
+        if (other._storage == _storage)
+            return;
+        
+        if (nextAvailable == nullptr)
+            return;
+
+        Node* rangeStart = begin;
+        Node* rangeEnd = nextAvailable;
+
+        begin = nextAvailable->next;
+
+        if (nextAvailable == end)
+            end = nullptr;
+        
+        nextAvailable = nullptr;
+
+        rangeEnd->next = other.begin;
+
+        if (other.begin != nullptr)
+            other.begin->previous = rangeEnd;
+
+        rangeStart->previous = nullptr;
+        other.begin = rangeStart;
+
+        if (other.nextAvailable == nullptr)
+            other.nextAvailable = rangeEnd;
+        
+        if (other.end == nullptr)
+            other.end = rangeEnd;
     }
 
     friend Borrowed;
@@ -88,12 +120,12 @@ private:
 
     ObjectPool** _storage;
     Node* begin;
-    Node* nextAailable;
+    Node* nextAvailable;
     Node* end;
 
     void Return(Node* node) {
         assert(node != nullptr);
-        assert(node != nextAailable);
+        assert(node != nextAvailable);
         
         Node* prev = node->previous;
         Node* next = node->next;
@@ -115,11 +147,11 @@ private:
         node->previous = nullptr;
         begin = node;
 
-        if (nextAailable == nullptr) {
-            nextAailable = begin;
+        if (nextAvailable == nullptr) {
+            nextAvailable = node;
         }
 
-        if (end == nullptr);
+        if (end == nullptr)
             end = begin;
     }
 };
@@ -193,8 +225,8 @@ template<typename T>
 Borrowed<T> ObjectPool<T>::Borrow() {
     assert(!isEmpty());
 
-    Node* extracted = nextAailable;
-    nextAailable = nextAailable->previous;
+    Node* extracted = nextAvailable;
+    nextAvailable = nextAvailable->previous;
 
     return Borrowed(_storage, extracted);
 }

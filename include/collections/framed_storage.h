@@ -12,29 +12,35 @@ struct FramedStorage {
         currentFrame = frame;
     }
 
-    std::vector<T>& operator*() {
+    T& val() {
         return _storage[currentFrame];
     }
 
-    std::vector<T>* operator ->() {
+    T& operator*() {
+        return _storage[currentFrame];
+    }
+
+    T* operator ->() {
         return &_storage[currentFrame];
     }
 
-    std::vector<T>* operator &() {
+    T* operator &() {
         return &_storage[currentFrame];
     }
 
-    void clearAll() {
-        for (int i = 0; i < _storage.size(); i++) {
-            _storage[i].clear();
-        }
+    T& get(uint32_t frame) {
+        return _storage[frame];
     }
 
-    T& operator[](size_t i) {
-        return _storage[currentFrame][i];
+    uint32_t size() {
+        return _storage.size();
+    }
+
+    void clear() {
+        _storage.clear();
     }
 
 private:
     uint32_t currentFrame = 0;
-    std::vector<std::vector<T>> _storage;
+    std::vector<T> _storage;
 };

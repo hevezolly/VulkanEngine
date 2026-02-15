@@ -1,7 +1,8 @@
 #pragma once
-#include <render_context.h>
 #include <common.h>
 #include <image.h>
+
+struct RenderContext;
 
 struct API FrameBuffer
 {

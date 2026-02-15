@@ -9,11 +9,12 @@ struct RenderContext;
 struct API NodeDependency {
     ResourceId resource;
     ResourceState state;
+    bool stateByWriter = false;
 };
 
 struct API ExecutionContext {
     TransferCommandBuffer* commandBuffer;
-    MemChunk<Semaphore> executionStart;
+    MemChunk<Ref<Semaphore>> executionStart;
 };
 
 struct API RenderNode {

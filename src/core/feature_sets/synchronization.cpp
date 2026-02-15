@@ -77,28 +77,17 @@ Refs<Fence> Synchronization::CreateFences(uint32_t size, bool signaled) {
 }
 
 void Synchronization::OnMessage(BeginFrameMsg* m) {
-    _borrowedSemaphores.SetFrame(m->inFlightFrame);
-    _borrowedSemaphores->clear();
+    _semaphoresPool.SetFrame(m->inFlightFrame);
 }
 
 void Synchronization::OnMessage(DestroyMsg*) {
-    _borrowedSemaphores.clearAll();
+    _semaphoresPool.clear();
 }
 
-Ref<Semaphore> Synchronization::BorrowSemaphore() {
-    if (semaphoresPool.isEmpty()) {
-        semaphoresPool.Insert(CreateSemaphore());
+Ref<Semaphore> Synchronization::BorrowSemaphore(bool timeline) {
+    if (_semaphoresPool.isEmpty()) {
+        _semaphoresPool.Insert(CreateSemaphore(timeline));
     }
 
-    _borrowedSemaphores->push_back(semaphoresPool.Borrow());
-    return *_borrowedSemaphores->back();
-}
-
-void Synchronization::ReturnSemaphorEarly(Ref<Semaphore> s) {
-    for (int i = _borrowedSemaphores->size() -1; i >= 0; i--) {
-        if (_borrowedSemaphores[i].val() == s) {
-            _borrowedSemaphores->erase(_borrowedSemaphores->begin() + i);
-            break;
-        }
-    }
+    return _semaphoresPool.Borrow();
 }

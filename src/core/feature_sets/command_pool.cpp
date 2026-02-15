@@ -5,34 +5,12 @@
 #include <resources.h>
 
 TransferCommandBuffer::~TransferCommandBuffer() {
-    if (!transient || context==nullptr)
-        return;
-
-    vkFreeCommandBuffers(context->device(), vkCommandPool, 1, &buffer);
 }
 
-TransferCommandBuffer::TransferCommandBuffer(VkCommandBuffer b, RenderContext* c, VkCommandPool pool, bool t):
-    transient(t),
+TransferCommandBuffer::TransferCommandBuffer(VkCommandBuffer b, RenderContext* c):
     context(c),
-    vkCommandPool(pool),
     buffer(b)
 {}
-
-TransferCommandBuffer& TransferCommandBuffer::operator=(TransferCommandBuffer&& other) noexcept {
-    if (this == &other)
-        return *this;
-
-    buffer = other.buffer;
-    context = other.context;
-    vkCommandPool = other.vkCommandPool;
-    transient = other.transient;
-
-    other.buffer = VK_NULL_HANDLE;
-    other.context = nullptr;
-    other.vkCommandPool = VK_NULL_HANDLE;
-
-    return *this;
-}
 
 void TransferCommandBuffer::CopyBufferRegion(
     VkBuffer src, 
@@ -47,10 +25,6 @@ void TransferCommandBuffer::CopyBufferRegion(
     copy.size = size;
 
     vkCmdCopyBuffer(buffer, src, dst, 1, &copy);
-}
-
-TransferCommandBuffer::TransferCommandBuffer(TransferCommandBuffer&& other) noexcept {
-    *this = std::move(other);
 }
 
 QueueType TransferCommandBuffer::queueType() {
@@ -89,12 +63,15 @@ void CreateBuffer(VkDevice device, VkCommandPool pool, VkCommandBuffer* buffer) 
 CommandPool::CommandPool(RenderContext& context): FeatureSet(context) {
 }
 
-void CommandPool::OnMessage(InitMsg* m) {
-
+void createCommandPoolsSet(
+    RenderContext& context,
+    VkCommandPool& graphicsCommandPool,
+    VkCommandPool& compueCommandPool,
+    VkCommandPool& transferCommandPool
+) {
     graphicsCommandPool = VK_NULL_HANDLE;
     compueCommandPool = VK_NULL_HANDLE;
     
-    separateTransferQueue = true;
     uint32_t transferQueue = context.Get<Device>().queueFamilies.get(QueueType::Transfer);
 
     if (context.Has<GraphicsFeature>()) {
@@ -104,7 +81,6 @@ void CommandPool::OnMessage(InitMsg* m) {
             graphicsQueue,
             false
         );
-        separateTransferQueue &= graphicsQueue != transferQueue;
     }
 
     transferCommandPool = CreateCommandPool(
@@ -112,12 +88,12 @@ void CommandPool::OnMessage(InitMsg* m) {
         transferQueue,
         false
     );
+}
 
-    transientTransferCommandPool = CreateCommandPool(
-        context.device(),
-        transferQueue,
-        true
-    );
+void CommandPool::OnMessage(InitMsg* m) {
+
+    createCommandPoolsSet(context, graphicsCommandPool, compueCommandPool, transferCommandPool);
+    
 }
 
 void CommandPool::OnMessage(DestroyMsg* m) {
@@ -125,7 +101,14 @@ void CommandPool::OnMessage(DestroyMsg* m) {
         vkDestroyCommandPool(context.device(), graphicsCommandPool, nullptr);
 
     vkDestroyCommandPool(context.device(), transferCommandPool, nullptr);
-    vkDestroyCommandPool(context.device(), transientTransferCommandPool, nullptr);
+
+    for(uint32_t frame = 0; frame < framedCommandPools.size(); frame++) {
+        for (uint32_t queue = 0; queue < framedCommandPools.get(frame).size(); queue++) {
+            VkCommandPool pool = framedCommandPools.get(frame)[queue];
+            if (pool != VK_NULL_HANDLE)
+                vkDestroyCommandPool(context.device(), pool, nullptr);
+        }
+    }
 }
 
 void CommandPool::Submit(
@@ -186,14 +169,18 @@ GraphicsCommandBuffer CommandPool::CreateGraphicsBuffer() {
     VkCommandBuffer buffer;
     CreateBuffer(context.device(), graphicsCommandPool, &buffer);
 
-    return GraphicsCommandBuffer(buffer, &context, graphicsCommandPool, false);
+    return GraphicsCommandBuffer(buffer, &context);
 }
 
 TransferCommandBuffer CommandPool::CreateTransferBuffer(bool transient) {
+
+    if (transient)
+        return BorrowCommandBuffer(QueueType::Transfer);
+
     VkCommandBuffer buffer;
-    VkCommandPool pool = transient ? transientTransferCommandPool : transferCommandPool;
+    VkCommandPool pool = transferCommandPool;
     CreateBuffer(context.device(), pool, &buffer);
-    return TransferCommandBuffer(buffer, &context, pool, transient);
+    return TransferCommandBuffer(buffer, &context);
 }
 
 void TransferCommandBuffer::Begin() {
@@ -210,7 +197,6 @@ void TransferCommandBuffer::End() {
 }
 
 void TransferCommandBuffer::Reset() {
-    assert(!transient);
     vkResetCommandBuffer(buffer, 0);
 }
 
@@ -311,4 +297,58 @@ void TransferCommandBuffer::Barrier(uint32_t count, const ResourceId* ids, const
     dep.pBufferMemoryBarriers = bufferBarriers.data();
 
     vkCmdPipelineBarrier2(buffer, &dep);
+}
+
+TransferCommandBuffer CommandPool::BorrowCommandBuffer(QueueType queue) {
+    assert(queue == QueueType::Graphics || queue == QueueType::Compute || queue == QueueType::Transfer);
+
+    if (queue == QueueType::Graphics && !context.Has<GraphicsFeature>())
+        throw std::runtime_error("attempt to access graphics queue without GraphicsFeature enabled");
+    
+    uint32_t index = static_cast<uint32_t>(queue);
+    if (framedCommandPools->size() <= index) {
+        framedCommandPools->resize(3);
+        createCommandPoolsSet(context, 
+            framedCommandPools.val()[static_cast<uint32_t>(QueueType::Graphics)],
+            framedCommandPools.val()[static_cast<uint32_t>(QueueType::Compute)],
+            framedCommandPools.val()[static_cast<uint32_t>(QueueType::Transfer)]);
+    }
+
+    if (allocatedBuffers.size() <= index) {
+        allocatedBuffers.resize(3);
+    }
+
+    if (allocatedBuffers[index].isEmpty()) {
+        VkCommandBuffer buffer;
+        CreateBuffer(context.device(), 
+            framedCommandPools.val()[index],
+            &buffer 
+        );
+        allocatedBuffers[index].Insert(std::move(buffer));
+    }
+
+    VkCommandBuffer result = allocatedBuffers[index].Borrow();
+
+    switch (queue)
+    {
+    case QueueType::Graphics:
+        return GraphicsCommandBuffer(result, &context);
+    
+    case QueueType::Compute:
+        return ComputeCommandBuffer(result, &context);
+
+    default:
+        return TransferCommandBuffer(result, &context);
+    }
+}
+
+void CommandPool::OnMessage(BeginFrameMsg* msg) {
+    framedCommandPools.SetFrame(msg->inFlightFrame);
+    for (int i = 0; i < framedCommandPools.val().size(); i++) {
+        vkResetCommandPool(context.device(), framedCommandPools.val()[i], 0);
+    }
+
+    for (int i = 0; i < allocatedBuffers.size(); i++) {
+        allocatedBuffers[i].SetFrame(msg->inFlightFrame);
+    }
 }

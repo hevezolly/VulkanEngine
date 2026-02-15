@@ -1,9 +1,9 @@
 #pragma once
+#include <common.h>
 #include <feature_set.h>
 #include <handles.h>
 #include <allocator_feature.h>
-#include <framed_storage.h>
-#include <object_pool.h>
+#include <framed_object_pool.h>
 
 struct API Semaphore {
     VkSemaphore vk;
@@ -40,13 +40,12 @@ struct API Synchronization: FeatureSet,
     Ref<Semaphore> CreateSemaphore(bool timeline = false);
     Refs<Semaphore> CreateSemaphores(uint32_t size);
 
-    Ref<Semaphore> BorrowSemaphore();
-    void ReturnSemaphorEarly(Ref<Semaphore> s);
+    Ref<Semaphore> BorrowSemaphore(bool timeline);
 
     Ref<Fence> CreateFence(bool signaled=false);
     Refs<Fence> CreateFences(uint32_t size, bool signaled=false);
 
 private:
-    FramedStorage<Borrowed<Ref<Semaphore>>> _borrowedSemaphores;
-    ObjectPool<Ref<Semaphore>> semaphoresPool;
+
+    FramedObjectPool<Ref<Semaphore>> _semaphoresPool;
 };
