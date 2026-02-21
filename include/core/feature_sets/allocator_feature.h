@@ -96,9 +96,10 @@ struct MemChunk {
 template<typename T>
 struct MemBuffer {
 
-    uint32_t size() {return _size;}
+    inline uint32_t size() {return _size;}
+    inline uint32_t capacity() {return _data.size;}
 
-    T* data() {return _data.data;}
+    inline T* data() {return _data.data;}
 
     T& operator[](int index) {
         assert(index >= 0 && index < _size);

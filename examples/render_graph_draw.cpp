@@ -17,6 +17,7 @@
 #include <graphics_node.h>
 #include <render_graph.h>
 #include <shader_loader.h>
+#include <present_node.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -92,13 +93,8 @@ struct UniformData {
 };
 
 struct _Resources {
-    std::vector<GraphicsCommandBuffer> commandBuffers;
-    Refs<Semaphore> imgAvailableSemaphores;
-    Refs<Semaphore> renderFinish;
-    Refs<Fence> inFlightFences;
     ResourceRefs<Buffer> uniformBuffers;
     Ref<GraphicsPipeline> pipeline;
-    Ref<GraphicsPipeline> pipelineImg;
     ResourceRef<Buffer> vertexBuffer;
     ResourceRef<Buffer> indexBuffer;
     ResourceRef<Image> image;
@@ -115,30 +111,49 @@ _Resources PrepareResources(
     _Resources r{};
 
     
+    LOG("RESOURCES1")
+    
     ShaderBinary vertexBin = context.Get<ShaderLoader>().Get("shaders/basic.vert", Stage::Vertex);
     ShaderBinary fragmentBin = context.Get<ShaderLoader>().Get("shaders/basic.frag", Stage::Fragment);
 
     ShaderBinary vertexBinImg = context.Get<ShaderLoader>().Get("shaders/full_screen.vert", Stage::Vertex);
     ShaderBinary fragmentBinImg = context.Get<ShaderLoader>().Get("shaders/test_full_screen.frag", Stage::Fragment);
 
+    LOG("RESOURCES2")
+
     VkFormat dsFormat = context.Get<Device>().SelectSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
         VK_IMAGE_TILING_OPTIMAL,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
+    LOG("RESOURCES3")
+
     r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
         ImageUsage::DepthStencil);
+    LOG("RESOURCES4")
     context.Get<Resources>().GiveName(r.depth, "depth");
+    LOG("RESOURCES5")
     r.depth2 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
         ImageUsage::DepthStencil);
+    LOG("RESOURCES6")
     context.Get<Resources>().GiveName(r.depth2, "depth2");
+    LOG("RESOURCES7")
     r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
         ImageUsage::ColorAttachment | ImageUsage::Sampled);
+    LOG("RESOURCES8")
     context.Get<Resources>().GiveName(r.image, "image");
+    LOG("RESOURCES9")
     r.image->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
+    LOG("RESOURCES10")
     r.resourceImg = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
+    LOG("RESOURCES11")
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
     
+    LOG("RESOURCES11")
+
+    LOG("RESOURCES4")
+
+    LOG("RESOURCES5")
 
     r.pipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
@@ -150,18 +165,6 @@ _Resources PrepareResources(
         })
         .AddShaderStage(vertexBin)
         .AddShaderStage(fragmentBin)
-        .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
-        .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
-        .Build();
-
-    r.pipelineImg = context
-        .Get<GraphicsFeature>().NewGraphicsPipeline()
-        .AddLayout<ShaderInputImg>()
-        .SetAttachments<AttachmentsImg>({
-            r.image->description.format
-        })
-        .AddShaderStage("shaders/full_screen.vert", Stage::Vertex)
-        .AddShaderStage("shaders/test_full_screen.frag", Stage::Fragment)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT)
         .AddDynamicState(VkDynamicState::VK_DYNAMIC_STATE_SCISSOR)
         .Build();
@@ -187,22 +190,17 @@ _Resources PrepareResources(
     r.indexBuffer = context.Get<Resources>().CreateBuffer<uint16_t>(BufferPreset::INDEX, indices);
     context.Get<Resources>().GiveName(r.indexBuffer, "index_buffer");
 
-    r.imgAvailableSemaphores = context.Get<Synchronization>().CreateSemaphores(framesInFlight);
-    r.inFlightFences = context.Get<Synchronization>().CreateFences(framesInFlight, true);
-    r.renderFinish = context.Get<Synchronization>().CreateSemaphores(
-        context.Get<PresentFeature>().swapChain->images.size());
-    r.commandBuffers.reserve(framesInFlight);
-
     r.sampler = context.Get<Resources>().CreateSampler(SamplerFilter::LINEAR, SamplerAddressMode::REPEAT);
 
     r.uniformBuffers.reserve(framesInFlight);
     for (int i = 0; i < framesInFlight; i++) {
-        r.commandBuffers.push_back(context.Get<CommandPool>().CreateGraphicsBuffer());
         r.uniformBuffers.push_back(context.Get<Resources>()
             .CreateBuffer<UniformData>(BufferPreset::UNIFORM, 1));
         context.Get<Resources>().GiveName(r.uniformBuffers[i], "uniform_buffer_" + std::to_string(i));
         
     }
+
+    LOG("RESOURCES6")
 
     return r;
 }
@@ -229,19 +227,11 @@ void DrawFrame(
     _Resources& r,
     uint32_t frameId
 ) {
-    Ref<Fence> inFlight = r.inFlightFences[frameId];
-    inFlight->Wait();
-    inFlight->Reset();
-
     context.Send(BeginFrameMsg{frameId});
 
     bool menuActive = true;
 
-    Ref<Semaphore> imgAvailable = r.imgAvailableSemaphores[frameId];
-
-    uint32_t imageIndex = context.Get<PresentFeature>().AcquireNextImage(imgAvailable);
-
-    GraphicsCommandBuffer& cmd = r.commandBuffers[frameId];
+    ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 
     UpdateShaderData(context, *r.uniformBuffers[frameId]);
     
@@ -263,38 +253,19 @@ void DrawFrame(
 
     auto& node = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
 
-    attachments.color = context.Get<PresentFeature>().swapChain->images[imageIndex];
+    attachments.color = outputImage;
     attachments.depth = r.depth;
     node.SetAttachments(attachments);
 
-    data.transforms = r.uniformBuffers.back();
     data.img = r.image;
-    data.img_sampler = r.sampler;
     node.SetBindings(data);
 
     node.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
     node.SetVertexBuffer<Vertex>(r.vertexBuffer);
 
-    cmd.Reset();
-    cmd.Begin();
+    context.Get<RenderGraph>().AddNode<PresentNode>(outputImage);
 
-    context.Get<RenderGraph>().BuildGraph(cmd);
-
-    cmd.ImageBarrier(context.Get<PresentFeature>().swapChain->images[imageIndex], 
-        ResourceState{VK_ACCESS_2_NONE, 0, VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR}
-    );
-
-    cmd.End();
-
-    Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
-
-    context.Get<CommandPool>().Submit(cmd, 
-        {{imgAvailable, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}}, 
-        {renderInCurrentImageFinish}, 
-        inFlight
-    );
-
-    context.Send(PresentMsg{imageIndex, renderInCurrentImageFinish});
+    context.Get<RenderGraph>().Run();
 }
 
 void Run() {

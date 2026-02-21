@@ -37,6 +37,26 @@ namespace std {
     };
 }
 
+struct QueueTimelineValue {
+    uint64_t timelineValue;
+    uint32_t queueIndex;
+
+    bool operator==(const QueueTimelineValue& other) const {
+        return queueIndex == other.queueIndex && timelineValue == other.timelineValue;
+    }
+};
+
+namespace std {
+    template <>
+    struct hash<QueueTimelineValue> {
+        std::size_t operator()(const QueueTimelineValue& pn) const noexcept {
+            std::size_t h1 = std::hash<uint32_t>{}(pn.queueIndex);
+            std::size_t h2 = std::hash<uint64_t>{}(pn.timelineValue);
+            return h1 ^ (h2 << 1);
+        }
+    };
+}
+
 struct API RenderGraph: FeatureSet,
     CanHandle<BeginFrameMsg>
 {
@@ -48,7 +68,8 @@ struct API RenderGraph: FeatureSet,
         MemChunk<T> nodeData = alloc.BumpAllocate<T>();
         T* node = new (nodeData.data) T(context, std::forward<Args>(args)...);
 
-        nodes.push_back(NodeWrapper{
+        nodes.push_back(NodeWrapper {
+            node->getTargetQueue(),
             MemChunk<NodeDependency>::Null(),
             MemChunk<uint32_t>::Null(),
             MemChunk<NodeDependency>::Null(),
@@ -58,12 +79,14 @@ struct API RenderGraph: FeatureSet,
 
         return *node;
     }
+
+    virtual void OnMessage(BeginFrameMsg*);
     
     void Run();
 private:
 
     std::vector<NodeWrapper> nodes;
 
-    FramedStorage<std::vector<Ref<Semaphore>>> semaphoresPerFramePerQueue;
-    FramedStorage<std::vector<uint32_t>> semaphoreValuesPerFramePerQueue;
+    FramedStorage<std::vector<Ref<Semaphore>>> semaphoresPerQueue;
+    FramedStorage<std::vector<uint64_t>> semaphoreValuesPerQueue;
 };

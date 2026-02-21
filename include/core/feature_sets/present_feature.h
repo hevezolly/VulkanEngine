@@ -51,6 +51,8 @@ struct API PresentFeature: FeatureSet,
 
     uint32_t swapChainSize();
 
+    void Present(uint32_t swapchainIndex, uint32_t semaphoresCount, VkSemaphore* semaphores);
+
 private: 
     WindowInitializer windowArgs;
     SwapChainInitializer swapChainArgs;

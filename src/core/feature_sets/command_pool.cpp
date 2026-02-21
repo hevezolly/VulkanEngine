@@ -4,9 +4,6 @@
 #include <allocator_feature.h>
 #include <resources.h>
 
-TransferCommandBuffer::~TransferCommandBuffer() {
-}
-
 TransferCommandBuffer::TransferCommandBuffer(VkCommandBuffer b, RenderContext* c):
     context(c),
     buffer(b)
@@ -165,6 +162,32 @@ void CommandPool::Submit(
     VK(vkQueueSubmit(context.Get<Device>().queues.get(buffer.queueType()), 1, &submitInfo, fence));
 }
 
+void CommandPool::Submit(
+    TransferCommandBuffer& buffer,
+    uint32_t numWaitSemaphores,
+    VkSemaphoreSubmitInfo* waitSemaphores,
+    uint32_t numSignamSemaphores,
+    VkSemaphoreSubmitInfo* signalSemaphores,
+    Ref<Fence> fence
+) {
+    VkFence vkfence = VK_NULL_HANDLE;
+    if (!fence.isNull())
+        vkfence = fence->vk;
+
+    VkCommandBufferSubmitInfo cmdInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO};
+    cmdInfo.commandBuffer = buffer.buffer;
+
+    VkSubmitInfo2 submitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO_2};
+    submitInfo.waitSemaphoreInfoCount = numWaitSemaphores;
+    submitInfo.pWaitSemaphoreInfos = waitSemaphores;
+    submitInfo.signalSemaphoreInfoCount = numSignamSemaphores;
+    submitInfo.pSignalSemaphoreInfos = signalSemaphores;
+    submitInfo.commandBufferInfoCount = 1;
+    submitInfo.pCommandBufferInfos = &cmdInfo;
+
+    VK(vkQueueSubmit2(context.Get<Device>().queues.get(buffer.queueType()), 1, &submitInfo, vkfence));
+}
+
 GraphicsCommandBuffer CommandPool::CreateGraphicsBuffer() {
     VkCommandBuffer buffer;
     CreateBuffer(context.device(), graphicsCommandPool, &buffer);
@@ -176,6 +199,7 @@ TransferCommandBuffer CommandPool::CreateTransferBuffer(bool transient) {
 
     if (transient)
         return BorrowCommandBuffer(QueueType::Transfer);
+
 
     VkCommandBuffer buffer;
     VkCommandPool pool = transferCommandPool;
@@ -345,7 +369,8 @@ TransferCommandBuffer CommandPool::BorrowCommandBuffer(QueueType queue) {
 void CommandPool::OnMessage(BeginFrameMsg* msg) {
     framedCommandPools.SetFrame(msg->inFlightFrame);
     for (int i = 0; i < framedCommandPools.val().size(); i++) {
-        vkResetCommandPool(context.device(), framedCommandPools.val()[i], 0);
+        if (framedCommandPools.val()[i] != VK_NULL_HANDLE)
+            vkResetCommandPool(context.device(), framedCommandPools.val()[i], 0);
     }
 
     for (int i = 0; i < allocatedBuffers.size(); i++) {

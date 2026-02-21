@@ -71,6 +71,15 @@ struct API CommandPool: FeatureSet,
         std::initializer_list<Ref<Semaphore>> end = {},
         Ref<Fence> = Ref<Fence>::Null());
 
+    void Submit(
+        TransferCommandBuffer&,
+        uint32_t numWaitSemaphores,
+        VkSemaphoreSubmitInfo* waitSemaphores,
+        uint32_t numSignamSemaphores,
+        VkSemaphoreSubmitInfo* signalSemaphores,
+        Ref<Fence> = Ref<Fence>::Null()
+    );
+
 private:
     FramedStorage<std::vector<VkCommandPool>> framedCommandPools;
     

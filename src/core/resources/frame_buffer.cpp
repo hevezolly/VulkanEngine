@@ -1,4 +1,5 @@
 #include <frame_buffer.h>
+#include <render_context.h>
 
 FrameBuffer::FrameBuffer(
     RenderContext* context,

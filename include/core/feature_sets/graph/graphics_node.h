@@ -100,7 +100,7 @@ struct GraphicsNode: RenderNode {
     }
 
     virtual void Record(ExecutionContext commandBuffer) {
-        GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(commandBuffer->commandBuffer);
+        GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(*commandBuffer.commandBuffer);
         
         const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>()
             .CreateFrameBuffer(_attachments, pipeline->renderPass);

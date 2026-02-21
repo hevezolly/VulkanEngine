@@ -5,6 +5,10 @@
 template<typename T>
 struct FramedStorage {
 
+    FramedStorage() {
+        SetFrame(0);
+    }
+
     void SetFrame(uint32_t frame) {
         if (_storage.size() <= frame)
             _storage.resize(frame+1);
@@ -38,6 +42,10 @@ struct FramedStorage {
 
     void clear() {
         _storage.clear();
+    }
+
+    inline uint32_t getCurrentFrame() {
+        return currentFrame;
     }
 
 private:

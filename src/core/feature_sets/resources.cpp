@@ -268,8 +268,9 @@ ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFo
     GiveName(result, path);
     Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, imageData.size(), imageData.data);
     imageData.Free();
+    LOG("1")
     TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
-    
+    LOG("2")
     cmd.Begin();
 
     cmd.ImageBarrier(result, 

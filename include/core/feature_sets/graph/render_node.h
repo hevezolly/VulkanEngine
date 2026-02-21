@@ -14,7 +14,7 @@ struct API NodeDependency {
 
 struct API ExecutionContext {
     TransferCommandBuffer* commandBuffer;
-    MemChunk<Ref<Semaphore>> executionStart;
+    MemBuffer<Ref<Semaphore>> executionStart;
 };
 
 struct API RenderNode {
@@ -25,8 +25,8 @@ struct API RenderNode {
     virtual QueueType getTargetQueue() = 0;
     virtual uint32_t getInputDependenciesCount() = 0;
     virtual uint32_t getOutputDependenciesCount() = 0;
-    virtual void getInputDependencies(NodeDependency* buffer) = 0;
-    virtual void getOutputDependencies(NodeDependency* buffer) = 0;
+    virtual void getInputDependencies(NodeDependency* buffer) {}
+    virtual void getOutputDependencies(NodeDependency* buffer) {}
 
     virtual void Record(ExecutionContext commandBuffer) = 0;
 

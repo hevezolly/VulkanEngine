@@ -105,13 +105,12 @@ uint32_t PresentFeature::AcquireNextImage(Ref<Semaphore> imageReady) {
 ResourceRef<Image> PresentFeature::AcquireNextImage() {
 
     Synchronization& sync = context.Get<Synchronization>();
-    Ref<Semaphore> imageReady = sync.BorrowSemaphore();
+    Ref<Semaphore> imageReady = sync.BorrowSemaphore(false);
 
     uint32_t nextImage = 0;
     VkResult result = vkAcquireNextImageKHR(context.device(), swapChain->swapChain, UINT64_MAX, imageReady->vk, VK_NULL_HANDLE, &nextImage);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        sync.ReturnSemaphorEarly(imageReady);
         recreateSwapChain();
         return AcquireNextImage();
     }
@@ -123,6 +122,26 @@ ResourceRef<Image> PresentFeature::AcquireNextImage() {
     context.Get<Resources>().SetSynchronizationContext(img, imageReady);
 
     return img;
+}
+
+void PresentFeature::Present(uint32_t swapchainIndex, uint32_t semaphoresCount, VkSemaphore* semaphores) {
+    VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+
+    presentInfo.waitSemaphoreCount = semaphoresCount;
+    presentInfo.pWaitSemaphores = semaphores;
+
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &swapChain->swapChain;
+    presentInfo.pImageIndices = &swapchainIndex;
+
+    VkResult result = vkQueuePresentKHR(context.Get<Device>().queues.get(QueueType::Present), &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        recreateSwapChain();
+    }
+    else {
+        VK(result)
+    }
 }
 
 void PresentFeature::OnMessage(PresentMsg* m) {

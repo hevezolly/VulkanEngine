@@ -4,6 +4,7 @@
 #include <command_pool.h>
 #include <algorithm>
 #include <resources.h>
+#include <array>
 
 template<typename T>
 struct PerQueueStorage {
@@ -126,10 +127,9 @@ struct QueueTimeStep {
 };
 
 struct SynchronizationContext {
-    uint32_t queue;
-    uint32_t timelineValue;
+    QueueTimelineValue timelineValue;
     VkPipelineStageFlags2 signalStage;
-    bool explicitSemaphore;
+    bool forceBinary;
     std::optional<ResourceId> externalSyncSource;
     uint32_t waits;
 };
@@ -203,9 +203,17 @@ struct GraphInstance {
         }
     }
 
-    void findStartingNodes(std::vector<std::vector<VersionedResource>>& deps, MemBuffer<uint32_t>& data) {
-        for (uint32_t i = 0; i < deps.size(); i++) {
-            if (deps[i].size() == 0) {
+    void findStartingNodes(uint32_t count, MemBuffer<uint32_t>& data) {
+        for (uint32_t i = 0; i < count; i++) {
+            bool found = false;
+            for (ResourceUsage usage : inEdges[i]) {
+                if (writes.find(usage.resource) != writes.end()) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
                 data.push_back(i);
             }
         }
@@ -218,14 +226,13 @@ struct GraphInstance {
         auto _ = alloc.BeginContext();
 
         MemBuffer<uint32_t> initialNodes = alloc.BumpAllocate<uint32_t>(capacity);
-        findStartingNodes(outEdges, initialNodes);
+        findStartingNodes(capacity, initialNodes);
 
-
-        std::vector<std::vector<uint32_t>> dependencies;
+        std::vector<std::vector<uint32_t>> outcomingEdges;
         std::vector<std::unordered_set<uint32_t>> incomingEdges;
 
         for (uint32_t i = 0; i < outEdges.size(); i++) {
-            dependencies.push_back(std::vector<uint32_t>());
+            outcomingEdges.push_back(std::vector<uint32_t>());
             for (VersionedResource write : outEdges[i]) {
                 const std::vector<ResourceUsage>& reads = getReads(write);
 
@@ -235,7 +242,7 @@ struct GraphInstance {
                     auto result = incomingEdges[read.node].insert(i);
                     
                     if (result.second) {
-                        dependencies[i].push_back(read.node);
+                        outcomingEdges[i].push_back(read.node);
                     }
                 }
             }
@@ -246,9 +253,9 @@ struct GraphInstance {
             initialNodes.pop_back();
             sortedNodes.push_back(node);
 
-            for (int m_index = dependencies[node].size() - 1; m_index >= 0; m_index--) {
-                uint32_t m = dependencies[node][m_index];
-                dependencies[node].pop_back();
+            for (int m_index = outcomingEdges[node].size() - 1; m_index >= 0; m_index--) {
+                uint32_t m = outcomingEdges[node][m_index];
+                outcomingEdges[node].pop_back();
                 incomingEdges[m].erase(node);
 
                 if (incomingEdges[m].size() == 0) {
@@ -259,7 +266,7 @@ struct GraphInstance {
         }
 
         for (int i = 0; i < capacity; i++) {
-            assert(dependencies[i].size() == 0);
+            assert(outcomingEdges[i].size() == 0);
             assert(incomingEdges[i].size() == 0);
         }
     }
@@ -277,8 +284,7 @@ struct GraphInstance {
                 sync[queue] = syncContexts.size();
                 syncContexts.push_back(
                     SynchronizationContext {
-                        queue, 
-                        ++timelineValue,
+                        QueueTimelineValue{queue, ++timelineValue},
                         VK_PIPELINE_STAGE_2_NONE,
                         false,
                         id,
@@ -329,8 +335,8 @@ struct GraphInstance {
             }
             
             if (stage != 0) {
-                syncContexts[node].timelineValue = ++semaphoreValues[queueIndex]; 
-                syncContexts[node].queue = queueIndex;
+                syncContexts[node].timelineValue.timelineValue = ++semaphoreValues[queueIndex]; 
+                syncContexts[node].timelineValue.queueIndex = queueIndex;
                 syncContexts[node].signalStage = stage;
             }
 
@@ -346,7 +352,7 @@ struct GraphInstance {
             oldContext = &syncContexts[signal.syncContext];
         }
 
-        if (signal.stage == 0 || oldContext->timelineValue < newContext->timelineValue) {
+        if (signal.stage == 0 || oldContext->timelineValue.timelineValue < newContext->timelineValue.timelineValue) {
             if (signal.stage != 0) {
                 assert(oldContext->waits > 0);
                 oldContext->waits--;
@@ -357,12 +363,12 @@ struct GraphInstance {
         }
 
         signal.stage |= newSignal.stage;
-        syncContexts[signal.syncContext].explicitSemaphore |= requirebinary;
+        syncContexts[signal.syncContext].forceBinary |= requirebinary;
     }
 
     void buildTimelines() {
         uint32_t queuesCount = (uint32_t)QueueType::None;
-
+        auto _ = alloc.BeginContext();
         MemChunk<SignalDescription> perQueueSignals = alloc.BumpAllocate<SignalDescription>((uint32_t)QueueType::None);
 
         for (uint32_t node : sortedNodes) {
@@ -436,7 +442,7 @@ struct GraphInstance {
 
             queueTimelines[queueIndex].push_back(QueueTimeStep::Node(node));
 
-            if (syncContexts[node].timelineValue > 0)
+            if (syncContexts[node].timelineValue.timelineValue > 0)
                 queueTimelines[queueIndex].push_back(QueueTimeStep::Signal(SignalDescription {
                     syncContexts[node].signalStage,
                     node
@@ -445,7 +451,7 @@ struct GraphInstance {
     }
 
     void simplifyTimelines() {
-        PerQueueStorage<uint32_t> perQueueSignals;
+        PerQueueStorage<uint64_t> perQueueSignals;
         std::unordered_map<ResourceId, uint32_t> perResourceSignals;
 
         for (uint32_t queue = 0; queue < (uint32_t)QueueType::None; queue++) {
@@ -460,15 +466,15 @@ struct GraphInstance {
                         SignalDescription signal = it->signals[i];
                         SynchronizationContext& context = syncContexts[signal.syncContext];
 
-                        uint32_t& compareValue = perQueueSignals[context.queue];
+                        uint64_t& compareValue = perQueueSignals[context.timelineValue.queueIndex];
                         if (context.externalSyncSource.has_value())
                             compareValue = perResourceSignals[context.externalSyncSource.value()];
 
-                        if (compareValue > context.timelineValue) {
+                        if (compareValue > context.timelineValue.timelineValue) {
                             it->signals.erase(it->signals.begin() + i);
                         }
                         else {
-                            compareValue = context.timelineValue;
+                            compareValue = context.timelineValue.timelineValue;
                         }
                     }
                 } else if (it->type == QueueTimeStep::Type::Signal) {
@@ -498,12 +504,16 @@ struct GraphInstance {
 
 void EnqueueBarriers(const NodeWrapper& node, Allocator& alloc, TransferCommandBuffer& commandBuffer) 
 {
+    auto _ = alloc.BeginContext();
     MemBuffer<ResourceId> resources = alloc.BumpAllocate<ResourceId>(
         node.inputDependency.size + node.outpnputDependency.size);
     MemBuffer<ResourceState> states = alloc.BumpAllocate<ResourceState>(
         node.inputDependency.size + node.outpnputDependency.size);
     for (int i = 0; i < node.inputDependency.size; i++) {
         
+        if (node.inputDependency[i].stateByWriter)
+            continue;
+
         if (node.inputDependency[i].resource.type() != ResourceType::Image &&
             node.inputDependency[i].resource.type() != ResourceType::Buffer)
             continue;
@@ -525,15 +535,102 @@ void EnqueueBarriers(const NodeWrapper& node, Allocator& alloc, TransferCommandB
     commandBuffer.Barrier(resources.size(), resources.data(), states.data());
 }
 
+void EnqueuePostBarriers(
+    const GraphInstance& instance,
+    uint32_t nodeId, Allocator& alloc, TransferCommandBuffer& commandBuffer) 
+{
+    auto _ = alloc.BeginContext();
+    auto& writes = instance.outEdges[nodeId];
+
+    MemBuffer<ResourceId> resources = alloc.BumpAllocate<ResourceId>(
+        writes.size());
+    MemBuffer<ResourceState> states = alloc.BumpAllocate<ResourceState>(
+        writes.size());
+
+    for (int i = 0; i < writes.size(); i++) {
+        VersionedResource write = writes[i];
+
+        if (write.id.type() != ResourceType::Buffer && write.id.type() != ResourceType::Image)
+            continue;
+
+        auto it = instance.forceWriteStates.find(write);
+        if (it != instance.forceWriteStates.end()) {
+            resources.push_back(write.id);
+            states.push_back(it->second);
+        }
+    }
+
+    commandBuffer.Barrier(resources.size(), resources.data(), states.data());
+}
+
 struct TimelineExecutionContext 
 {
-    QueueType queueType;
+    uint32_t queueIndex;
     std::list<QueueTimeStep>& timeline;
     std::list<QueueTimeStep>::iterator& step;
-    uint32_t& maxTimelineValue;
-    Ref<Semaphore> timelineSemaphore;
-    uint32_t initialSemaphoreValue;
+    uint64_t& maxTimelineValue;
+    std::vector<Ref<Semaphore>>& timelineSemaphores;
+    std::vector<uint64_t>& initialSemaphoreValues;
+    std::unordered_map<QueueTimelineValue, Ref<Semaphore>>& binarySemaphores;
 };
+
+void FillSemaphoreInfo(RenderContext& context,
+    GraphInstance& instance,
+    TimelineExecutionContext& timelineContext,
+    MemBuffer<VkSemaphoreSubmitInfo>& semaphores, bool allowExtrnalSync,
+    MemBuffer<Ref<Semaphore>>* usedSemaphores = nullptr
+) {
+    uint32_t count = timelineContext.step->signals.size();
+    assert(count <= semaphores.capacity());
+    assert(usedSemaphores == nullptr || usedSemaphores->capacity() >= count);
+
+    for (int i = 0; i < count; i++) {
+        SignalDescription wait = timelineContext.step->signals[i];
+        SynchronizationContext& syncContext = instance.syncContexts[wait.syncContext];
+        
+        Ref<Semaphore> semaphore;
+        uint64_t timelineValue = 0;
+
+        bool hasExternal = allowExtrnalSync && syncContext.externalSyncSource.has_value();
+
+        if (hasExternal || syncContext.forceBinary) {
+            if (hasExternal)
+                semaphore = context.Get<Resources>().ExtractSyncContext(syncContext.externalSyncSource.value());
+            else {
+                auto it = timelineContext.binarySemaphores.find(syncContext.timelineValue);
+                if (it != timelineContext.binarySemaphores.end())
+                    semaphore = it->second;
+                else{
+                    semaphore = context.Get<Synchronization>().BorrowSemaphore(false);
+                    timelineContext.binarySemaphores[syncContext.timelineValue] = semaphore;
+                }
+            }
+        }
+        else {
+            semaphore = timelineContext.timelineSemaphores[syncContext.timelineValue.queueIndex];
+            timelineValue = timelineContext.initialSemaphoreValues[syncContext.timelineValue.queueIndex] + 
+                            syncContext.timelineValue.timelineValue;
+
+            if (timelineValue > timelineContext.maxTimelineValue && 
+                syncContext.timelineValue.queueIndex == timelineContext.queueIndex)
+                timelineContext.maxTimelineValue = timelineValue;
+        }
+
+        if (!semaphore.isNull()) {
+            
+            if (usedSemaphores != nullptr)
+                usedSemaphores->push_back(semaphore);
+
+            semaphores.push_back(VkSemaphoreSubmitInfo {
+                VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                nullptr,
+                semaphore->vk,
+                timelineValue,
+                wait.stage
+            });
+        }
+    }
+}
 
 void RunTimeline(
     RenderContext& context,
@@ -542,15 +639,31 @@ void RunTimeline(
 ) 
 {
     Allocator& alloc = context.Get<Allocator>();
+    auto _ = alloc.BeginContext();
+    
     std::optional<TransferCommandBuffer> cmd;
 
-    if (timelineContext.queueType != QueueType::Present) {
-        cmd = context.Get<CommandPool>().BorrowCommandBuffer(timelineContext.queueType);
+    QueueType queueType = static_cast<QueueType>(timelineContext.queueIndex);
+
+    if (queueType != QueueType::Present) {
+        cmd = context.Get<CommandPool>().BorrowCommandBuffer(queueType);
+        cmd.value().Begin();
     }
 
+    MemBuffer<VkSemaphoreSubmitInfo> waitContext = MemChunk<VkSemaphoreSubmitInfo>::Null();
+    MemBuffer<Ref<Semaphore>> waitSemaphores = MemChunk<Ref<Semaphore>>::Null();
+    MemBuffer<VkSemaphoreSubmitInfo> signalContext = MemChunk<VkSemaphoreSubmitInfo>::Null();
+
+    bool finalSubmit = true;
+
     do {
-        //TODO:
         if (timelineContext.step->type == QueueTimeStep::Type::Wait) {
+            assert(waitContext.data() == nullptr);
+
+            waitSemaphores = alloc.BumpAllocate<Ref<Semaphore>>(timelineContext.step->signals.size());
+            waitContext = alloc.BumpAllocate<VkSemaphoreSubmitInfo>(timelineContext.step->signals.size());
+
+            FillSemaphoreInfo(context, instance, timelineContext, waitContext, true, &waitSemaphores);
 
         }
         else if (timelineContext.step->type == QueueTimeStep::Type::Node) {
@@ -566,28 +679,56 @@ void RunTimeline(
 
             node.node->Record(ExecutionContext {
                 cmd_p,
-                MemChunk<Ref<Semaphore>>::Null()
+                waitSemaphores
             });   
+
+            if (cmd.has_value()) {
+                EnqueuePostBarriers(instance, timelineContext.step->node, alloc, cmd.value());
+            }
         }
         else {
 
+            assert(signalContext.data() == nullptr);
 
+            signalContext = alloc.BumpAllocate<VkSemaphoreSubmitInfo>(timelineContext.step->signals.size() + 1);
+
+            FillSemaphoreInfo(context, instance, timelineContext, signalContext, false);
+            bool finalSubmit = std::next(timelineContext.step) == timelineContext.timeline.end();
             break;
         }
 
-
     } while(timelineContext.step != timelineContext.timeline.end());
+
+    if (cmd.has_value())
+        cmd.value().End();
+        if (finalSubmit) {
+            signalContext.push_back(VkSemaphoreSubmitInfo {
+                VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                nullptr,
+                timelineContext.timelineSemaphores[timelineContext.queueIndex]->vk,
+                ++timelineContext.maxTimelineValue,
+                VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT
+            });
+        }
+
+        context.Get<CommandPool>().Submit(cmd.value(), 
+            waitContext.size(),
+            waitContext.data(),
+            signalContext.size(),
+            signalContext.data()
+        );
 }
 
 void RunGraph(
     RenderContext& context, 
     GraphInstance& instance, 
     std::vector<Ref<Semaphore>>& semaphores,
-    std::vector<uint32_t>& initialValuess
+    std::vector<uint64_t>& initialValuess
 ) {
 
     uint32_t queueCount = static_cast<size_t>(QueueType::None);
-    PerQueueStorage<uint32_t> maxTimelineValues;
+    PerQueueStorage<uint64_t> maxTimelineValues;
+    std::unordered_map<QueueTimelineValue, Ref<Semaphore>> binarySemaphores;
 
     for (int queueIndex =0; queueIndex < queueCount; queueIndex++) {
 
@@ -597,12 +738,13 @@ void RunGraph(
         for (QueueTimeStep& timelineEntry : instance.queueTimelines[queueIndex]) {
 
             TimelineExecutionContext executionContext {
-                static_cast<QueueType>(queueIndex),
+                queueIndex,
                 instance.queueTimelines[queueIndex],
                 instance.queueTimelines[queueIndex].begin(),
                 maxTimelineValues[queueIndex],
-                semaphores[queueIndex],
-                initialValuess[queueIndex]
+                semaphores,
+                initialValuess,
+                binarySemaphores
             };
 
             while (executionContext.step != instance.queueTimelines[queueIndex].end())
@@ -612,7 +754,50 @@ void RunGraph(
         }
     }
 
+    for (uint32_t i = 0; i < static_cast<uint32_t>(QueueType::None); i++) {
+        initialValuess[i] = maxTimelineValues[i];
+    }
 }
+
+void RenderGraph::OnMessage(BeginFrameMsg* m) {
+    semaphoresPerQueue.SetFrame(m->inFlightFrame);
+    semaphoreValuesPerQueue.SetFrame(m->inFlightFrame);
+
+    if (semaphoresPerQueue->size() == 0) {
+        uint32_t queueCount = static_cast<uint32_t>(QueueType::None);
+        semaphoresPerQueue->reserve(queueCount);
+        semaphoreValuesPerQueue->reserve(queueCount);
+
+        for (int i = 0; i < queueCount; i++) {
+            semaphoresPerQueue->push_back(context.Get<Synchronization>().CreateSemaphore(true));
+            semaphoreValuesPerQueue->push_back(0);
+        }
+    } 
+    else {
+        Allocator& alloc = context.Get<Allocator>();
+        auto _ = alloc.BeginContext();
+
+        MemBuffer<VkSemaphore> semaphores = alloc.BumpAllocate<VkSemaphore>(semaphoresPerQueue->size());
+        MemBuffer<uint64_t> values = alloc.BumpAllocate<uint64_t>(semaphoreValuesPerQueue->size());
+
+        for (int i = 0; i < semaphoresPerQueue->size(); i++) {
+            uint64_t value = semaphoreValuesPerQueue.val()[i]; 
+            if (value == 0)
+                continue;
+
+            semaphores.push_back(semaphoresPerQueue.val()[i]->vk);
+            values.push_back(value);
+        }
+
+        VkSemaphoreWaitInfo waitInfo {VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+        waitInfo.semaphoreCount = semaphores.size();
+        waitInfo.pSemaphores = semaphores.data();
+        waitInfo.pValues = values.data();
+
+        vkWaitSemaphores(context.device(), &waitInfo, UINT64_MAX);
+    }
+}
+
 
 void RenderGraph::Run() {
 
@@ -641,10 +826,9 @@ void RenderGraph::Run() {
     RunGraph(
         context, 
         instance, 
-        *semaphoresPerFramePerQueue,
-        *semaphoreValuesPerFramePerQueue
+        *semaphoresPerQueue,
+        *semaphoreValuesPerQueue
     );
 
     nodes.clear();
-
 }
