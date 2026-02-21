@@ -19,7 +19,7 @@ struct API ExecutionContext {
 
 struct API RenderNode {
     
-    RenderNode(RenderContext& ctx): context(ctx){}
+    RenderNode(RenderContext& ctx): context(ctx), name(""){}
 
     virtual bool requireBinarySemaphore() {return false;}
     virtual QueueType getTargetQueue() = 0;
@@ -30,6 +30,15 @@ struct API RenderNode {
 
     virtual void Record(ExecutionContext commandBuffer) = 0;
 
+    void SetName(const std::string& newName) {
+        name = newName;
+    }
+
+    std::string& getName() {
+        return name;
+    }
+
 protected:
     RenderContext& context;
+    std::string name;
 };

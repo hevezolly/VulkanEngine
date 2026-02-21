@@ -198,7 +198,7 @@ GraphicsCommandBuffer CommandPool::CreateGraphicsBuffer() {
 TransferCommandBuffer CommandPool::CreateTransferBuffer(bool transient) {
 
     if (transient)
-        return BorrowCommandBuffer(QueueType::Transfer);
+        return *BorrowCommandBuffer(QueueType::Transfer);
 
 
     VkCommandBuffer buffer;
@@ -323,7 +323,7 @@ void TransferCommandBuffer::Barrier(uint32_t count, const ResourceId* ids, const
     vkCmdPipelineBarrier2(buffer, &dep);
 }
 
-TransferCommandBuffer CommandPool::BorrowCommandBuffer(QueueType queue) {
+std::unique_ptr<TransferCommandBuffer> CommandPool::BorrowCommandBuffer(QueueType queue) {
     assert(queue == QueueType::Graphics || queue == QueueType::Compute || queue == QueueType::Transfer);
 
     if (queue == QueueType::Graphics && !context.Has<GraphicsFeature>())
@@ -356,13 +356,13 @@ TransferCommandBuffer CommandPool::BorrowCommandBuffer(QueueType queue) {
     switch (queue)
     {
     case QueueType::Graphics:
-        return GraphicsCommandBuffer(result, &context);
+        return std::make_unique<GraphicsCommandBuffer>(result, &context);
     
     case QueueType::Compute:
-        return ComputeCommandBuffer(result, &context);
+        return std::make_unique<ComputeCommandBuffer>(result, &context);
 
     default:
-        return TransferCommandBuffer(result, &context);
+        return std::make_unique<TransferCommandBuffer>(result, &context);
     }
 }
 

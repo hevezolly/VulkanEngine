@@ -111,7 +111,6 @@ _Resources PrepareResources(
     _Resources r{};
 
     
-    LOG("RESOURCES1")
     
     ShaderBinary vertexBin = context.Get<ShaderLoader>().Get("shaders/basic.vert", Stage::Vertex);
     ShaderBinary fragmentBin = context.Get<ShaderLoader>().Get("shaders/basic.frag", Stage::Fragment);
@@ -119,42 +118,26 @@ _Resources PrepareResources(
     ShaderBinary vertexBinImg = context.Get<ShaderLoader>().Get("shaders/full_screen.vert", Stage::Vertex);
     ShaderBinary fragmentBinImg = context.Get<ShaderLoader>().Get("shaders/test_full_screen.frag", Stage::Fragment);
 
-    LOG("RESOURCES2")
 
     VkFormat dsFormat = context.Get<Device>().SelectSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
         VK_IMAGE_TILING_OPTIMAL,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-    LOG("RESOURCES3")
 
     r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
         ImageUsage::DepthStencil);
-    LOG("RESOURCES4")
     context.Get<Resources>().GiveName(r.depth, "depth");
-    LOG("RESOURCES5")
     r.depth2 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
         ImageUsage::DepthStencil);
-    LOG("RESOURCES6")
     context.Get<Resources>().GiveName(r.depth2, "depth2");
-    LOG("RESOURCES7")
     r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
         ImageUsage::ColorAttachment | ImageUsage::Sampled);
-    LOG("RESOURCES8")
     context.Get<Resources>().GiveName(r.image, "image");
-    LOG("RESOURCES9")
     r.image->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
-    LOG("RESOURCES10")
     r.resourceImg = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
-    LOG("RESOURCES11")
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
     
-    LOG("RESOURCES11")
-
-    LOG("RESOURCES4")
-
-    LOG("RESOURCES5")
-
     r.pipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
         .SetVertex<Vertex>()
@@ -200,8 +183,6 @@ _Resources PrepareResources(
         
     }
 
-    LOG("RESOURCES6")
-
     return r;
 }
 
@@ -236,7 +217,7 @@ void DrawFrame(
     UpdateShaderData(context, *r.uniformBuffers[frameId]);
     
     auto& node2 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
-
+    node2.SetName("draw1");
     Attachments attachments;
     attachments.color = r.image;
     attachments.depth = r.depth2;
@@ -252,6 +233,7 @@ void DrawFrame(
     node2.SetVertexBuffer<Vertex>(r.vertexBuffer);
 
     auto& node = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+    node.SetName("draw2");
 
     attachments.color = outputImage;
     attachments.depth = r.depth;
@@ -263,7 +245,7 @@ void DrawFrame(
     node.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
     node.SetVertexBuffer<Vertex>(r.vertexBuffer);
 
-    context.Get<RenderGraph>().AddNode<PresentNode>(outputImage);
+    context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 
     context.Get<RenderGraph>().Run();
 }
@@ -288,7 +270,7 @@ void Run() {
 
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
-    const uint32_t framesInFlight = 3;
+    const uint32_t framesInFlight = 1;
 
     _Resources resources = PrepareResources(context, framesInFlight);
     glfwSwapInterval(1);

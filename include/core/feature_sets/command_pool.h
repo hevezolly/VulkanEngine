@@ -63,7 +63,7 @@ struct API CommandPool: FeatureSet,
     GraphicsCommandBuffer CreateGraphicsBuffer();
     TransferCommandBuffer CreateTransferBuffer(bool transient);
 
-    TransferCommandBuffer BorrowCommandBuffer(QueueType queue);
+    std::unique_ptr<TransferCommandBuffer> BorrowCommandBuffer(QueueType queue);
 
     void Submit(
         TransferCommandBuffer&, 
