@@ -18,6 +18,7 @@
 #include <render_graph.h>
 #include <shader_loader.h>
 #include <present_node.h>
+#include <frame_dispatcher.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -205,10 +206,11 @@ void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
 
 void DrawFrame(
     RenderContext& context,
-    _Resources& r,
-    uint32_t frameId
+    _Resources& r
 ) {
-    context.Send(BeginFrameMsg{frameId});
+    context.BeginFrame();
+    uint32_t frameId = 0;
+    // uint32_t frameId = context.Get<FrameDispatcher>().frameInFlightIndex();
 
     bool menuActive = true;
 
@@ -261,7 +263,11 @@ void Run() {
     windowDescription.height = 600;
     windowDescription.hint = "VkEngine";
     RenderContext context;
+
+    const uint32_t framesInFlight = 1;
+
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
+        //    .WithFeature<FrameDispatcher>(framesInFlight)
            .WithFeature<GraphicsFeature>()
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
@@ -270,17 +276,14 @@ void Run() {
 
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
-    const uint32_t framesInFlight = 1;
 
     _Resources resources = PrepareResources(context, framesInFlight);
     glfwSwapInterval(1);
-    uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
         DrawFrame(
             context, 
-            resources,
-            (currentFrame++) % framesInFlight
+            resources
         );
     }
 }

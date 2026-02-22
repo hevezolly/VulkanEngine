@@ -12,6 +12,10 @@ struct PresentMsg{
     Ref<Semaphore> wait;
 };
 
+struct ImageAquiredMsg {
+    uint32_t imageIndex;
+};
+
 struct API SwapChainSupport {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> surfaceFormats;
@@ -51,9 +55,12 @@ struct API PresentFeature: FeatureSet,
 
     uint32_t swapChainSize();
 
+    uint32_t getCurrentSwapchainImage();
+
     void Present(uint32_t swapchainIndex, uint32_t semaphoresCount, VkSemaphore* semaphores);
 
 private: 
+    uint32_t currentSwapchainImage;
     WindowInitializer windowArgs;
     SwapChainInitializer swapChainArgs;
 

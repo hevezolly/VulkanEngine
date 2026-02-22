@@ -48,7 +48,7 @@ struct API GraphicsCommandBuffer: ComputeCommandBuffer {
 struct API CommandPool: FeatureSet, 
     CanHandle<InitMsg>,
     CanHandle<DestroyMsg>,
-    CanHandle<BeginFrameMsg>
+    CanHandle<BeginFrameLateMsg>
 {
     VkCommandPool graphicsCommandPool;
     VkCommandPool compueCommandPool;
@@ -58,7 +58,7 @@ struct API CommandPool: FeatureSet,
 
     virtual void OnMessage(InitMsg*);
     virtual void OnMessage(DestroyMsg*);
-    virtual void OnMessage(BeginFrameMsg*);
+    virtual void OnMessage(BeginFrameLateMsg*);
 
     GraphicsCommandBuffer CreateGraphicsBuffer();
     TransferCommandBuffer CreateTransferBuffer(bool transient);

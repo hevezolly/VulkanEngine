@@ -27,7 +27,7 @@ struct PresentNode: RenderNode {
         return 0;
     }
 
-    virtual bool requireBinarySemaphore() {return true;}
+    virtual SemaphoreRequirements getSemaphoreRequirements() {return SemaphoreRequirements::BinaryPerSwapchainImage;}
 
     virtual void getInputDependencies(NodeDependency* buffer);
 

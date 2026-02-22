@@ -4,6 +4,12 @@
 #include <command_pool.h>
 #include <resource_id.h>
 
+enum struct SemaphoreRequirements {
+    Timeline = 0,
+    BinaryPerFrame = 1,
+    BinaryPerSwapchainImage = 2
+};
+
 struct RenderContext;
 
 struct API NodeDependency {
@@ -21,7 +27,7 @@ struct API RenderNode {
     
     RenderNode(RenderContext& ctx): context(ctx), name(""){}
 
-    virtual bool requireBinarySemaphore() {return false;}
+    virtual SemaphoreRequirements getSemaphoreRequirements() {return SemaphoreRequirements::Timeline;}
     virtual QueueType getTargetQueue() = 0;
     virtual uint32_t getInputDependenciesCount() = 0;
     virtual uint32_t getOutputDependenciesCount() = 0;

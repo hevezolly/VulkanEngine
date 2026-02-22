@@ -64,7 +64,8 @@ void createCommandPoolsSet(
     RenderContext& context,
     VkCommandPool& graphicsCommandPool,
     VkCommandPool& compueCommandPool,
-    VkCommandPool& transferCommandPool
+    VkCommandPool& transferCommandPool,
+    const std::string& nameSuffix = ""
 ) {
     graphicsCommandPool = VK_NULL_HANDLE;
     compueCommandPool = VK_NULL_HANDLE;
@@ -366,7 +367,7 @@ std::unique_ptr<TransferCommandBuffer> CommandPool::BorrowCommandBuffer(QueueTyp
     }
 }
 
-void CommandPool::OnMessage(BeginFrameMsg* msg) {
+void CommandPool::OnMessage(BeginFrameLateMsg* msg) {
     framedCommandPools.SetFrame(msg->inFlightFrame);
     for (int i = 0; i < framedCommandPools.val().size(); i++) {
         if (framedCommandPools.val()[i] != VK_NULL_HANDLE)

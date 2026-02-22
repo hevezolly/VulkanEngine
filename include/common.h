@@ -91,7 +91,6 @@ if (__result != VK_SUCCESS) {\
 
 #ifdef ENGINE_LOG
 #define LOG(str) std::cout << str << std::endl;
-#define _S_ << " " <<
 #else
 #define LOG(str)
 #endif
