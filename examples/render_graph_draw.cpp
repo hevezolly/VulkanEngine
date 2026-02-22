@@ -52,9 +52,11 @@ struct _Resources {
     ResourceRef<Buffer> vertexBuffer;
     ResourceRef<Buffer> indexBuffer;
     ResourceRef<Image> image;
+    ResourceRef<Image> image2;
     ResourceRef<Image> resourceImg;
     ResourceRef<Image> depth;
     ResourceRef<Image> depth2;
+    ResourceRef<Image> depth3;
     ResourceRef<Sampler> sampler;
 };
 
@@ -85,10 +87,18 @@ _Resources PrepareResources(
         ImageUsage::DepthStencil);
     context.Get<Resources>().GiveName(r.depth2, "depth2");
 
+    r.depth3 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
+        ImageUsage::DepthStencil);
+    context.Get<Resources>().GiveName(r.depth3, "depth3");
+
     r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
         ImageUsage::ColorAttachment | ImageUsage::Sampled);
     context.Get<Resources>().GiveName(r.image, "image");
-    r.image->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
+
+    r.image2 = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
+        ImageUsage::ColorAttachment | ImageUsage::Sampled);
+    context.Get<Resources>().GiveName(r.image2, "image2");
+    r.image2->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
     
     r.resourceImg = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
@@ -151,7 +161,7 @@ void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
     UniformData d{};
     d.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     d.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    d.proj = glm::perspective(glm::radians(45.0f), swapChain->extent.width / (float) swapChain->extent.height, 0.1f, 10.0f);
+    d.proj = glm::perspective(glm::radians(25.0f), swapChain->extent.width / (float) swapChain->extent.height, 0.1f, 10.0f);
     
     d.proj[1][1] *= -1;
     d.time = time;
@@ -171,34 +181,48 @@ void DrawFrame(
 
     UpdateShaderData(context, *r.uniformBuffers[frameId]);
     
-    auto& node2 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
-    node2.SetName("draw1");
+    auto& node0 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+    node0.SetName("draw1");
     Attachments attachments;
     attachments.color = r.image;
     attachments.depth = r.depth2;
-    node2.SetAttachments(attachments);
+    node0.SetAttachments(attachments);
 
     ShaderInput data{};
     data.transforms = r.uniformBuffers.back();
     data.img = r.resourceImg;
     data.img_sampler = r.sampler;
+    node0.SetBindings(data);
+
+    node0.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
+    node0.SetVertexBuffer<Vertex>(r.vertexBuffer);
+
+    auto& node1 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+    node1.SetName("draw2");
+    attachments.color = r.image2;
+    attachments.depth = r.depth3;
+    node1.SetAttachments(attachments);
+
+    data.transforms = r.uniformBuffers.back();
+    data.img = r.image;
+    data.img_sampler = r.sampler;
+    node1.SetBindings(data);
+
+    node1.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
+    node1.SetVertexBuffer<Vertex>(r.vertexBuffer);
+
+    auto& node2 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+    node2.SetName("draw2");
+
+    attachments.color = outputImage;
+    attachments.depth = r.depth;
+    node2.SetAttachments(attachments);
+
+    data.img = r.image2;
     node2.SetBindings(data);
 
     node2.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
     node2.SetVertexBuffer<Vertex>(r.vertexBuffer);
-
-    auto& node = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
-    node.SetName("draw2");
-
-    attachments.color = outputImage;
-    attachments.depth = r.depth;
-    node.SetAttachments(attachments);
-
-    data.img = r.image;
-    node.SetBindings(data);
-
-    node.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
-    node.SetVertexBuffer<Vertex>(r.vertexBuffer);
 
     context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 
