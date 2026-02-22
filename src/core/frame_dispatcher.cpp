@@ -8,24 +8,23 @@ FrameDispatcher::FrameDispatcher(RenderContext& c, uint32_t framesInFlight):
 }
 
 uint64_t FrameDispatcher::frameIndex() {
-    return currentFrame;
+    return currentFrame == 0 ? 0 : currentFrame - 1;
 }
 
 uint32_t FrameDispatcher::frameInFlightIndex() {
-    return currentFrame % framesInFlight;
+    return frameIndex() % framesInFlight;
 }
 
 void FrameDispatcher::BeginFrame() {
     currentFrame++;
-
-    uint32_t frameInFlight = currentFrame % framesInFlight;
+    uint32_t currentFrameInFlight = frameInFlightIndex();
 
     BeginFrameMsg m {
-        frameInFlight
+        currentFrameInFlight
     };
 
     BeginFrameLateMsg mLate {
-        frameInFlight
+        currentFrameInFlight
     };
 
     context.Send(&m);

@@ -15,6 +15,7 @@
 #include <stable_frame_rate.h>
 #include <registry.h>
 #include <shader_loader.h>
+#include <frame_dispatcher.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -80,8 +81,6 @@ struct UniformData {
 
 struct _Resources {
     std::vector<GraphicsCommandBuffer> commandBuffers;
-    Refs<Semaphore> imgAvailableSemaphores;
-    Refs<Semaphore> renderFinish;
     Refs<Fence> inFlightFences;
     ResourceRefs<Buffer> uniformBuffers;
     Ref<GraphicsPipeline> pipeline;
@@ -144,10 +143,7 @@ _Resources PrepareResources(
     };
     r.indexBuffer = context.Get<Resources>().CreateBuffer<uint16_t>(BufferPreset::INDEX, indices);
     
-    r.imgAvailableSemaphores = context.Get<Synchronization>().CreateSemaphores(framesInFlight);
     r.inFlightFences = context.Get<Synchronization>().CreateFences(framesInFlight, true);
-    r.renderFinish = context.Get<Synchronization>().CreateSemaphores(
-        context.Get<PresentFeature>().swapChain->images.size());
     r.commandBuffers.reserve(framesInFlight);
 
     r.sampler = context.Get<Resources>().CreateSampler(SamplerFilter::LINEAR, SamplerAddressMode::REPEAT);
@@ -240,11 +236,11 @@ void DrawFrame(
     inFlight->Wait();
     inFlight->Reset();
 
-    context.Send(BeginFrameMsg{frameId});
+    context.BeginFrame();
 
     bool menuActive = true;
 
-    Ref<Semaphore> imgAvailable = r.imgAvailableSemaphores[frameId];
+    Ref<Semaphore> imgAvailable = context.Get<Synchronization>().BorrowBinarySemaphore(false);
 
     uint32_t imageIndex = context.Get<PresentFeature>().AcquireNextImage(imgAvailable);
 
@@ -271,7 +267,7 @@ void DrawFrame(
         buffer, set.vkSet
     );
 
-    Ref<Semaphore> renderInCurrentImageFinish = r.renderFinish[imageIndex];
+    Ref<Semaphore> renderInCurrentImageFinish = context.Get<Synchronization>().BorrowBinarySemaphore(true);
 
     context.Get<CommandPool>().Submit(cmd, 
         {{imgAvailable, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}}, 
@@ -293,7 +289,9 @@ void Run() {
     windowDescription.height = 600;
     windowDescription.hint = "VkEngine";
     RenderContext context;
+    const uint32_t framesInFlight = 3;
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
+           .WithFeature<FrameDispatcher>(framesInFlight)
            .WithFeature<GraphicsFeature>()
            .WithFeature<Registry>("examples/resources")
            .Initialize();
@@ -301,7 +299,6 @@ void Run() {
 
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
-    const uint32_t framesInFlight = 3;
 
     _Resources resources = PrepareResources(context, framesInFlight);
     glfwSwapInterval(1);

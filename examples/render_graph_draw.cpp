@@ -209,8 +209,7 @@ void DrawFrame(
     _Resources& r
 ) {
     context.BeginFrame();
-    uint32_t frameId = 0;
-    // uint32_t frameId = context.Get<FrameDispatcher>().frameInFlightIndex();
+    uint32_t frameId = context.Get<FrameDispatcher>().frameInFlightIndex();
 
     bool menuActive = true;
 
@@ -264,10 +263,10 @@ void Run() {
     windowDescription.hint = "VkEngine";
     RenderContext context;
 
-    const uint32_t framesInFlight = 1;
+    const uint32_t framesInFlight = 3;
 
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
-        //    .WithFeature<FrameDispatcher>(framesInFlight)
+           .WithFeature<FrameDispatcher>(framesInFlight)
            .WithFeature<GraphicsFeature>()
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
