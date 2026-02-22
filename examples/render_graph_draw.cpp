@@ -27,64 +27,17 @@ VEC3(color, 1) \
 VEC2(uv, 2)
 #include <gen_vertex_data.h>
 
-/*
-expands to:
-struct Vertex {
-    glm::vec3 position;
-    glm::vec3 color;
-    glm::vec2 uv;
-
-    //... other required binding information
-};
-*/
-
 #define BLOCK_NAME ShaderInput
 #define BLOCK \
 UNIFORM_BUFFER(transforms, 0, Stage::Vertex) \
 IMAGE_SAMPLER(img, 1, Stage::Fragment)
 #include <gen_bindings.h>
 
-#define BLOCK_NAME ShaderInputImg
-#define BLOCK \
-UNIFORM_BUFFER(transforms, 0, Stage::Fragment)
-#include <gen_bindings.h>
-
-/*
-expands to:
-struct ShaderInput {
-    Buffer* transforms;
-    ImageView* img;
-    Sampler* img_sampler;
-
-    //... other required binding information
-};
-*/
-
 #define BLOCK_NAME Attachments
 #define BLOCK \
 COLOR(color, LoadOp::Clear) \
 DEPTH(depth, LoadOp::Clear) 
 #include <gen_attachments.h>
-
-#define BLOCK_NAME AttachmentsImg
-#define BLOCK \
-COLOR(color, LoadOp::Clear)
-#include <gen_attachments.h>
-
-/*
-expands to:
-struct ShaderInput {
-    ImageView* color;
-    ImageView* depthl
-
-    struct Formats {
-        VkFormat color;
-        VkFormat depth;
-    };
-
-    //... other required binding information
-};
-*/
 
 struct UniformData {
     glm::mat4 model;
@@ -110,8 +63,6 @@ _Resources PrepareResources(
     const uint32_t framesInFlight) {
 
     _Resources r{};
-
-    
     
     ShaderBinary vertexBin = context.Get<ShaderLoader>().Get("shaders/basic.vert", Stage::Vertex);
     ShaderBinary fragmentBin = context.Get<ShaderLoader>().Get("shaders/basic.frag", Stage::Fragment);
@@ -129,13 +80,16 @@ _Resources PrepareResources(
     r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
         ImageUsage::DepthStencil);
     context.Get<Resources>().GiveName(r.depth, "depth");
+
     r.depth2 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
         ImageUsage::DepthStencil);
     context.Get<Resources>().GiveName(r.depth2, "depth2");
+
     r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
         ImageUsage::ColorAttachment | ImageUsage::Sampled);
     context.Get<Resources>().GiveName(r.image, "image");
     r.image->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
+    
     r.resourceImg = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
     
