@@ -94,6 +94,7 @@ private:
     std::vector<ResourceId> _availableIds;
     std::vector<uint32_t> _generations;
     std::vector<std::optional<T>> _storage;
+    std::vector<std::optional<uint32_t>> _parents;
 };
 
 template<typename T>
