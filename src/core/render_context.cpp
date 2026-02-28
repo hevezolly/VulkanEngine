@@ -8,6 +8,7 @@
 #include <descriptor_pool.h>
 #include <registry.h>
 #include <shader_loader.h>
+#include <frame_dispatcher.h>
 
 
 static VkResult checkLayersSupport(std::vector<const char*>& layers) {
@@ -46,7 +47,13 @@ RenderContext::RenderContext(): _handling(false) {
         .WithFeature<Resources>()
         .WithFeature<Descriptors>()
         .WithFeature<ShaderLoader>()
-        .WithFeature<Registry>();
+        .WithFeature<Registry>()
+        .WithFeature<FrameDispatcher>();
+}
+
+void RenderContext::BeginFrame() {
+    // Send(BeginFrameMsg{0});
+    Get<FrameDispatcher>().BeginFrame();
 }
 
 void RenderContext::Initialize() {
@@ -56,12 +63,7 @@ void RenderContext::Initialize() {
     std::vector<const char*> requiredExtensions{};
     std::vector<const char*> requiredLayers{};
 
-    LOG("collecting instance data")
-
     Send(CollectInstanceRequirementsMsg{&requiredExtensions, &requiredLayers}, true);
-
-    LOG("extensions: " << requiredExtensions.size())
-    LOG("layers: " << requiredLayers.size())
 
     VK(checkLayersSupport(requiredLayers))
 

@@ -34,7 +34,6 @@ void ImguiUI::OnMessage(InitMsg*) {
     style.FontScaleDpi = main_scale;
 
     ImGui_ImplGlfw_InitForVulkan(context.Get<PresentFeature>().window->pWindow, true);
-    LOG(7)
     _descriptorPool = new DescriptorPool(&context, {
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE}
     }, true);

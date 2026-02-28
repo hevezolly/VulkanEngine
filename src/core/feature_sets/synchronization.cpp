@@ -1,5 +1,7 @@
 #include <synchronization.h>
 #include <render_context.h>
+#include <present_feature.h>
+#include <swap_chain.h>
 
 Semaphore::Semaphore(RenderContext* ctx): context(ctx){}
 Fence::Fence(RenderContext* ctx): context(ctx){}
@@ -84,10 +86,22 @@ void Synchronization::OnMessage(DestroyMsg*) {
     _semaphoresPool.clear();
 }
 
-Ref<Semaphore> Synchronization::BorrowSemaphore(bool timeline) {
-    if (_semaphoresPool.isEmpty()) {
-        _semaphoresPool.Insert(CreateSemaphore(timeline));
+void Synchronization::OnMessage(ImageAquiredMsg* m) {
+    _semaphoresPerSwapChainImg.SetFrame(m->imageIndex);
+}
+
+Ref<Semaphore> Synchronization::BorrowBinarySemaphore(bool perSwapchainImg) {
+
+    FramedObjectPool<Ref<Semaphore>>* pool = &_semaphoresPool;
+    if (perSwapchainImg) {
+        assert(context.Has<PresentFeature>());
+
+        pool = &_semaphoresPerSwapChainImg;
     }
 
-    return _semaphoresPool.Borrow();
+    if (pool->isEmpty()) {
+        pool->Insert(CreateSemaphore(false));
+    }
+
+    return pool->Borrow();
 }

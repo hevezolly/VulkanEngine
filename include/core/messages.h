@@ -14,6 +14,10 @@ struct API BeginFrameMsg{
     const uint32_t inFlightFrame;
 };
 
+struct API BeginFrameLateMsg{
+    const uint32_t inFlightFrame;
+};
+
 struct API EndFrameMsg {};
 
 struct API CollectInstanceRequirementsMsg: InstantMessage{

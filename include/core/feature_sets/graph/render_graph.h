@@ -15,6 +15,7 @@ struct NodeWrapper {
     MemChunk<NodeDependency> outpnputDependency;
     MemChunk<uint32_t> outputVersions;
     RenderNode* node;
+    uint32_t sortedIndex;
 };
 
 struct VersionedResource {
@@ -74,7 +75,8 @@ struct API RenderGraph: FeatureSet,
             MemChunk<uint32_t>::Null(),
             MemChunk<NodeDependency>::Null(),
             MemChunk<uint32_t>::Null(),
-            node
+            node,
+            0
         });
 
         return *node;

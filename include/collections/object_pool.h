@@ -5,6 +5,9 @@ template<typename T>
 struct Borrowed;
 
 template<typename T>
+struct ObjectPoolData;
+
+template<typename T>
 struct API ObjectPool
 {
     struct Node {
@@ -17,11 +20,11 @@ struct API ObjectPool
     };
 
     bool isEmpty() {
-        return nextAvailable == nullptr;
+        return !_data || _data->nextAvailable == nullptr;
     }
 
     void Reset() {
-        nextAvailable = end;
+        _data->nextAvailable = _data->end;
     }
 
     Borrowed<T> Borrow();
@@ -35,100 +38,87 @@ struct API ObjectPool
 
     void Insert(T&& value) {
         Node* newNode = new Node(std::move(value));
-        Return(newNode);
+        _data->Return(newNode);
     }
 
-    ObjectPool(): begin(nullptr), end(nullptr), nextAvailable(nullptr) {
-        _storage = new ObjectPool*;
-        *_storage = this;
+    ObjectPool() {
+        _data = std::make_shared<ObjectPoolData<T>>();
     }
 
     ~ObjectPool() {
-        if (_storage == nullptr)
+        if (!_data)
             return;
 
-        delete _storage;
-
-        Node* iterator = begin;
+        
+        Node* iterator = _data->begin;
         while (iterator != nullptr) {
             Node* next = iterator->next;
             delete iterator;
             iterator = next;
         }
         
+        _data.reset();
     }
 
     ObjectPool(const ObjectPool&) = delete; 
     
-    ObjectPool& operator=(const ObjectPool&) = delete; 
-    
-    ObjectPool(ObjectPool&& other) noexcept {
-        *this = std::move(other);
-    }
-    
-    ObjectPool& operator=(ObjectPool&& other) noexcept {
-        if (this == &other) {
-            return *this;
-        }
+    ObjectPool& operator=(const ObjectPool&) = delete;
 
-        begin = other.begin;
-        nextAvailable = other.nextAvailable;
-        end = other.end;
-        *_storage = this;
-        other._storage = nullptr;
-        other.begin = nullptr;
-        other.end = nullptr;
-        other.nextAvailable = nullptr;
-
-        return *this;
-    }
+    ObjectPool(ObjectPool&&) = default; 
+    
+    ObjectPool& operator=(ObjectPool&&) = default;
 
     void TransferAvailableTo(ObjectPool& other) {
-        if (other._storage == _storage)
+        if (other._data == _data)
             return;
         
-        if (nextAvailable == nullptr)
+        if (_data->nextAvailable == nullptr)
             return;
 
-        Node* rangeStart = begin;
-        Node* rangeEnd = nextAvailable;
+        Node* rangeStart = _data->begin;
+        Node* rangeEnd = _data->nextAvailable;
 
-        begin = nextAvailable->next;
+        _data->begin = _data->nextAvailable->next;
 
-        if (nextAvailable == end)
-            end = nullptr;
+        if (_data->nextAvailable == _data->end)
+            _data->end = nullptr;
         
-        nextAvailable = nullptr;
+        _data->nextAvailable = nullptr;
 
-        rangeEnd->next = other.begin;
+        rangeEnd->next = other._data->begin;
 
-        if (other.begin != nullptr)
-            other.begin->previous = rangeEnd;
+        if (other._data->begin != nullptr)
+            other._data->begin->previous = rangeEnd;
 
         rangeStart->previous = nullptr;
-        other.begin = rangeStart;
+        other._data->begin = rangeStart;
 
-        if (other.nextAvailable == nullptr)
-            other.nextAvailable = rangeEnd;
+        if (other._data->nextAvailable == nullptr)
+            other._data->nextAvailable = rangeEnd;
         
-        if (other.end == nullptr)
-            other.end = rangeEnd;
+        if (other._data->end == nullptr)
+            other._data->end = rangeEnd;
     }
 
     friend Borrowed;
 private:
 
-    ObjectPool** _storage;
-    Node* begin;
-    Node* nextAvailable;
-    Node* end;
+    std::shared_ptr<ObjectPoolData<T>> _data;
+};
 
-    void Return(Node* node) {
+template<typename T>
+struct ObjectPoolData {
+
+    typename ObjectPool<T>::Node* begin;
+    typename ObjectPool<T>::Node* nextAvailable;
+    typename ObjectPool<T>::Node* end;
+
+    void Return(typename ObjectPool<T>::Node* node) {
         assert(node != nullptr);
         assert(node != nextAvailable);
         
-        Node* prev = node->previous;
-        Node* next = node->next;
+        typename ObjectPool<T>::Node* prev = node->previous;
+        typename ObjectPool<T>::Node* next = node->next;
 
         if (node == end)
             end = prev;
@@ -183,17 +173,18 @@ struct API Borrowed {
 
     void Forget() {
         _ptr = nullptr;
-        _storage = nullptr;
+        _data.reset();
     }
 
-    Borrowed(ObjectPool<T>** storage, typename ObjectPool<T>::Node* p): _storage(storage), _ptr(p){}
+    Borrowed(std::shared_ptr<ObjectPoolData<T>> storage, typename ObjectPool<T>::Node* p): 
+        _data(storage), _ptr(p){}
 
     ~Borrowed() {
 
-        if (_storage == nullptr)
+        if (_data == nullptr)
             return;
 
-        (*_storage)->Return(_ptr);
+        _data->Return(_ptr);
     }
 
     Borrowed(const Borrowed&) = delete; 
@@ -202,14 +193,14 @@ struct API Borrowed {
     
     Borrowed(Borrowed&& other) noexcept {
         _ptr = other._ptr;
-        _storage = other._storage;
+        _data = std::move(other._data);
         other.Forget();
     }
     
     Borrowed& operator=(Borrowed&& other) noexcept {
         if (this != &other) {
             _ptr = other._ptr;
-            _storage = other._storage;
+            _data = std::move(other._data);
             other.Forget();
         }
 
@@ -218,15 +209,15 @@ struct API Borrowed {
 
 private:
     typename ObjectPool<T>::Node* _ptr;
-    ObjectPool<T>** _storage;
+    std::shared_ptr<ObjectPoolData<T>> _data;
 };
 
 template<typename T>
 Borrowed<T> ObjectPool<T>::Borrow() {
     assert(!isEmpty());
 
-    Node* extracted = nextAvailable;
-    nextAvailable = nextAvailable->previous;
+    Node* extracted = _data->nextAvailable;
+    _data->nextAvailable = _data->nextAvailable->previous;
 
-    return Borrowed(_storage, extracted);
+    return Borrowed(_data, extracted);
 }

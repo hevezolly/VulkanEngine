@@ -64,7 +64,8 @@ void createCommandPoolsSet(
     RenderContext& context,
     VkCommandPool& graphicsCommandPool,
     VkCommandPool& compueCommandPool,
-    VkCommandPool& transferCommandPool
+    VkCommandPool& transferCommandPool,
+    const std::string& nameSuffix = ""
 ) {
     graphicsCommandPool = VK_NULL_HANDLE;
     compueCommandPool = VK_NULL_HANDLE;
@@ -198,7 +199,7 @@ GraphicsCommandBuffer CommandPool::CreateGraphicsBuffer() {
 TransferCommandBuffer CommandPool::CreateTransferBuffer(bool transient) {
 
     if (transient)
-        return BorrowCommandBuffer(QueueType::Transfer);
+        return *BorrowCommandBuffer(QueueType::Transfer);
 
 
     VkCommandBuffer buffer;
@@ -323,7 +324,7 @@ void TransferCommandBuffer::Barrier(uint32_t count, const ResourceId* ids, const
     vkCmdPipelineBarrier2(buffer, &dep);
 }
 
-TransferCommandBuffer CommandPool::BorrowCommandBuffer(QueueType queue) {
+std::unique_ptr<TransferCommandBuffer> CommandPool::BorrowCommandBuffer(QueueType queue) {
     assert(queue == QueueType::Graphics || queue == QueueType::Compute || queue == QueueType::Transfer);
 
     if (queue == QueueType::Graphics && !context.Has<GraphicsFeature>())
@@ -356,17 +357,17 @@ TransferCommandBuffer CommandPool::BorrowCommandBuffer(QueueType queue) {
     switch (queue)
     {
     case QueueType::Graphics:
-        return GraphicsCommandBuffer(result, &context);
+        return std::make_unique<GraphicsCommandBuffer>(result, &context);
     
     case QueueType::Compute:
-        return ComputeCommandBuffer(result, &context);
+        return std::make_unique<ComputeCommandBuffer>(result, &context);
 
     default:
-        return TransferCommandBuffer(result, &context);
+        return std::make_unique<TransferCommandBuffer>(result, &context);
     }
 }
 
-void CommandPool::OnMessage(BeginFrameMsg* msg) {
+void CommandPool::OnMessage(BeginFrameLateMsg* msg) {
     framedCommandPools.SetFrame(msg->inFlightFrame);
     for (int i = 0; i < framedCommandPools.val().size(); i++) {
         if (framedCommandPools.val()[i] != VK_NULL_HANDLE)

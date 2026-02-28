@@ -10,8 +10,9 @@ struct FramedStorage {
     }
 
     void SetFrame(uint32_t frame) {
-        if (_storage.size() <= frame)
+        if (_storage.size() <= frame) {
             _storage.resize(frame+1);
+        }
 
         currentFrame = frame;
     }

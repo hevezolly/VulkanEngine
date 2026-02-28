@@ -38,7 +38,7 @@ void PresentNode::Record(ExecutionContext executionContext) {
     MemBuffer<VkSemaphore> semaphores = context.Get<Allocator>()
         .BumpAllocate<VkSemaphore>(executionContext.executionStart.size());
 
-    for (int i = 0; i < semaphores.capacity(); i++) {
+    for (int i = 0; i < executionContext.executionStart.size(); i++) {
         semaphores.push_back(executionContext.executionStart[i]->vk);
     }
 

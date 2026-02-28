@@ -261,16 +261,12 @@ ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFo
     description.height = imageData.y;
     description.depth = 1;
     description.format = format;
-
-    LOG(description.width _S_ description.height)
     
     ResourceRef<Image> result = CreateImage(description, usage | ImageUsage::TransferDst);
     GiveName(result, path);
     Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, imageData.size(), imageData.data);
     imageData.Free();
-    LOG("1")
     TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
-    LOG("2")
     cmd.Begin();
 
     cmd.ImageBarrier(result, 

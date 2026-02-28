@@ -8,7 +8,6 @@ struct FramedObjectPool {
     void SetFrame(uint32_t currentFrame) {
         storage.SetFrame(currentFrame);
         storage->Reset();
-
         if (currentFrame != _currentFrame) {
             storage.get(_currentFrame).TransferAvailableTo(storage.get(currentFrame));
             _currentFrame = currentFrame;

@@ -95,17 +95,21 @@ uint32_t PresentFeature::AcquireNextImage(Ref<Semaphore> imageReady) {
     else {
         VK(result)
     }
-
+    currentSwapchainImage = nextImage;
     ResourceId img = swapChain->images[nextImage];
     context.Get<Resources>().SetSynchronizationContext(img, imageReady);
-
+    context.Send(ImageAquiredMsg{currentSwapchainImage});
     return nextImage;
+}
+
+uint32_t PresentFeature::getCurrentSwapchainImage() {
+    return currentSwapchainImage;
 }
 
 ResourceRef<Image> PresentFeature::AcquireNextImage() {
 
     Synchronization& sync = context.Get<Synchronization>();
-    Ref<Semaphore> imageReady = sync.BorrowSemaphore(false);
+    Ref<Semaphore> imageReady = sync.BorrowBinarySemaphore(false);
 
     uint32_t nextImage = 0;
     VkResult result = vkAcquireNextImageKHR(context.device(), swapChain->swapChain, UINT64_MAX, imageReady->vk, VK_NULL_HANDLE, &nextImage);
@@ -118,9 +122,11 @@ ResourceRef<Image> PresentFeature::AcquireNextImage() {
         VK(result)
     }
 
+    currentSwapchainImage = nextImage;
     ResourceRef<Image> img = swapChain->images[nextImage];
     context.Get<Resources>().SetSynchronizationContext(img, imageReady);
 
+    context.Send(ImageAquiredMsg{currentSwapchainImage});
     return img;
 }
 

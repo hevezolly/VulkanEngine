@@ -100,6 +100,13 @@ struct GraphicsNode: RenderNode {
     }
 
     virtual void Record(ExecutionContext commandBuffer) {
+
+        assert(commandBuffer.commandBuffer != nullptr);
+
+        GraphicsCommandBuffer* c = dynamic_cast<GraphicsCommandBuffer*>(commandBuffer.commandBuffer);
+
+        assert(c != nullptr);
+
         GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(*commandBuffer.commandBuffer);
         
         const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>()

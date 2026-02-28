@@ -68,6 +68,8 @@ struct API RenderContext {
 
     VkDevice device();
 
+    void BeginFrame();
+
     void Initialize();
 
     void NameVkObject(VkObjectType type, uint64_t handle, const std::string& name);
@@ -175,7 +177,7 @@ struct API RenderContext {
 
             for (int i = 0; i < _featureInitOrder.size(); i++) {
                 FeatureSet* feature = _features[_featureInitOrder[i]];
-                auto h = dynamic_cast<CanHandle<T>*>(feature);
+                auto* h = dynamic_cast<CanHandle<T>*>(feature);
                 if (!h)
                     continue;
 

@@ -132,8 +132,13 @@ void Descriptors::OnMessage(EarlyDestroyMsg*) {
 void Descriptors::OnMessage(BeginFrameMsg* m) {
     frameId = m->inFlightFrame;
     if (_allocatedDescriptors.size() > frameId) {
-        for (auto& pair : *_allocatedDescriptors[frameId])
+        
+        if (!_allocatedDescriptors[frameId])
+            return;
+
+        for (auto& pair : *_allocatedDescriptors[frameId]) {
             pair.second.Reset();
+        }
     }
 }
 
