@@ -115,6 +115,7 @@ private:
     std::unordered_map<ResourceId, ResourceState> _states;
     std::unordered_map<ResourceId, std::string> _names;
     std::unordered_map<ResourceId, Ref<Semaphore>> _synchronization;
+    std::unordered_map<ResourceId, std::vector<Buffer>> _bufferChildren;
     
     ResourceStorage<Buffer> _buffers;
     ResourceStorage<Image> _images;
