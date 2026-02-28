@@ -18,6 +18,7 @@
 #include <render_graph.h>
 #include <shader_loader.h>
 #include <present_node.h>
+#include <frame_dispatcher.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -26,64 +27,17 @@ VEC3(color, 1) \
 VEC2(uv, 2)
 #include <gen_vertex_data.h>
 
-/*
-expands to:
-struct Vertex {
-    glm::vec3 position;
-    glm::vec3 color;
-    glm::vec2 uv;
-
-    //... other required binding information
-};
-*/
-
 #define BLOCK_NAME ShaderInput
 #define BLOCK \
 UNIFORM_BUFFER(transforms, 0, Stage::Vertex) \
 IMAGE_SAMPLER(img, 1, Stage::Fragment)
 #include <gen_bindings.h>
 
-#define BLOCK_NAME ShaderInputImg
-#define BLOCK \
-UNIFORM_BUFFER(transforms, 0, Stage::Fragment)
-#include <gen_bindings.h>
-
-/*
-expands to:
-struct ShaderInput {
-    Buffer* transforms;
-    ImageView* img;
-    Sampler* img_sampler;
-
-    //... other required binding information
-};
-*/
-
 #define BLOCK_NAME Attachments
 #define BLOCK \
 COLOR(color, LoadOp::Clear) \
 DEPTH(depth, LoadOp::Clear) 
 #include <gen_attachments.h>
-
-#define BLOCK_NAME AttachmentsImg
-#define BLOCK \
-COLOR(color, LoadOp::Clear)
-#include <gen_attachments.h>
-
-/*
-expands to:
-struct ShaderInput {
-    ImageView* color;
-    ImageView* depthl
-
-    struct Formats {
-        VkFormat color;
-        VkFormat depth;
-    };
-
-    //... other required binding information
-};
-*/
 
 struct UniformData {
     glm::mat4 model;
@@ -98,9 +52,11 @@ struct _Resources {
     ResourceRef<Buffer> vertexBuffer;
     ResourceRef<Buffer> indexBuffer;
     ResourceRef<Image> image;
+    ResourceRef<Image> image2;
     ResourceRef<Image> resourceImg;
     ResourceRef<Image> depth;
     ResourceRef<Image> depth2;
+    ResourceRef<Image> depth3;
     ResourceRef<Sampler> sampler;
 };
 
@@ -109,9 +65,6 @@ _Resources PrepareResources(
     const uint32_t framesInFlight) {
 
     _Resources r{};
-
-    
-    LOG("RESOURCES1")
     
     ShaderBinary vertexBin = context.Get<ShaderLoader>().Get("shaders/basic.vert", Stage::Vertex);
     ShaderBinary fragmentBin = context.Get<ShaderLoader>().Get("shaders/basic.frag", Stage::Fragment);
@@ -119,42 +72,37 @@ _Resources PrepareResources(
     ShaderBinary vertexBinImg = context.Get<ShaderLoader>().Get("shaders/full_screen.vert", Stage::Vertex);
     ShaderBinary fragmentBinImg = context.Get<ShaderLoader>().Get("shaders/test_full_screen.frag", Stage::Fragment);
 
-    LOG("RESOURCES2")
 
     VkFormat dsFormat = context.Get<Device>().SelectSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
         VK_IMAGE_TILING_OPTIMAL,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-    LOG("RESOURCES3")
 
     r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
         ImageUsage::DepthStencil);
-    LOG("RESOURCES4")
     context.Get<Resources>().GiveName(r.depth, "depth");
-    LOG("RESOURCES5")
+
     r.depth2 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
         ImageUsage::DepthStencil);
-    LOG("RESOURCES6")
     context.Get<Resources>().GiveName(r.depth2, "depth2");
-    LOG("RESOURCES7")
+
+    r.depth3 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
+        ImageUsage::DepthStencil);
+    context.Get<Resources>().GiveName(r.depth3, "depth3");
+
     r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
         ImageUsage::ColorAttachment | ImageUsage::Sampled);
-    LOG("RESOURCES8")
     context.Get<Resources>().GiveName(r.image, "image");
-    LOG("RESOURCES9")
-    r.image->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
-    LOG("RESOURCES10")
+
+    r.image2 = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
+        ImageUsage::ColorAttachment | ImageUsage::Sampled);
+    context.Get<Resources>().GiveName(r.image2, "image2");
+    r.image2->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
+    
     r.resourceImg = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
-    LOG("RESOURCES11")
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
     
-    LOG("RESOURCES11")
-
-    LOG("RESOURCES4")
-
-    LOG("RESOURCES5")
-
     r.pipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
         .SetVertex<Vertex>()
@@ -200,8 +148,6 @@ _Resources PrepareResources(
         
     }
 
-    LOG("RESOURCES6")
-
     return r;
 }
 
@@ -215,7 +161,7 @@ void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
     UniformData d{};
     d.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     d.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    d.proj = glm::perspective(glm::radians(45.0f), swapChain->extent.width / (float) swapChain->extent.height, 0.1f, 10.0f);
+    d.proj = glm::perspective(glm::radians(25.0f), swapChain->extent.width / (float) swapChain->extent.height, 0.1f, 10.0f);
     
     d.proj[1][1] *= -1;
     d.time = time;
@@ -224,10 +170,10 @@ void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
 
 void DrawFrame(
     RenderContext& context,
-    _Resources& r,
-    uint32_t frameId
+    _Resources& r
 ) {
-    context.Send(BeginFrameMsg{frameId});
+    context.BeginFrame();
+    uint32_t frameId = context.Get<FrameDispatcher>().frameInFlightIndex();
 
     bool menuActive = true;
 
@@ -235,35 +181,50 @@ void DrawFrame(
 
     UpdateShaderData(context, *r.uniformBuffers[frameId]);
     
-    auto& node2 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
-
+    auto& node0 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+    node0.SetName("draw1");
     Attachments attachments;
     attachments.color = r.image;
     attachments.depth = r.depth2;
-    node2.SetAttachments(attachments);
+    node0.SetAttachments(attachments);
 
     ShaderInput data{};
     data.transforms = r.uniformBuffers.back();
     data.img = r.resourceImg;
     data.img_sampler = r.sampler;
+    node0.SetBindings(data);
+
+    node0.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
+    node0.SetVertexBuffer<Vertex>(r.vertexBuffer);
+
+    auto& node1 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+    node1.SetName("draw2");
+    attachments.color = r.image2;
+    attachments.depth = r.depth3;
+    node1.SetAttachments(attachments);
+
+    data.transforms = r.uniformBuffers.back();
+    data.img = r.image;
+    data.img_sampler = r.sampler;
+    node1.SetBindings(data);
+
+    node1.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
+    node1.SetVertexBuffer<Vertex>(r.vertexBuffer);
+
+    auto& node2 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
+    node2.SetName("draw2");
+
+    attachments.color = outputImage;
+    attachments.depth = r.depth;
+    node2.SetAttachments(attachments);
+
+    data.img = r.image2;
     node2.SetBindings(data);
 
     node2.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
     node2.SetVertexBuffer<Vertex>(r.vertexBuffer);
 
-    auto& node = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
-
-    attachments.color = outputImage;
-    attachments.depth = r.depth;
-    node.SetAttachments(attachments);
-
-    data.img = r.image;
-    node.SetBindings(data);
-
-    node.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
-    node.SetVertexBuffer<Vertex>(r.vertexBuffer);
-
-    context.Get<RenderGraph>().AddNode<PresentNode>(outputImage);
+    context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 
     context.Get<RenderGraph>().Run();
 }
@@ -279,7 +240,11 @@ void Run() {
     windowDescription.height = 600;
     windowDescription.hint = "VkEngine";
     RenderContext context;
+
+    const uint32_t framesInFlight = 3;
+
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
+           .WithFeature<FrameDispatcher>(framesInFlight)
            .WithFeature<GraphicsFeature>()
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
@@ -288,17 +253,14 @@ void Run() {
 
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
-    const uint32_t framesInFlight = 3;
 
     _Resources resources = PrepareResources(context, framesInFlight);
     glfwSwapInterval(1);
-    uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
         DrawFrame(
             context, 
-            resources,
-            (currentFrame++) % framesInFlight
+            resources
         );
     }
 }
