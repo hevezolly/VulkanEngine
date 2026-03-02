@@ -352,7 +352,7 @@ std::unique_ptr<TransferCommandBuffer> CommandPool::BorrowCommandBuffer(QueueTyp
         allocatedBuffers[index].Insert(std::move(buffer));
     }
 
-    VkCommandBuffer result = allocatedBuffers[index].Borrow();
+    VkCommandBuffer result = allocatedBuffers[index].BorrowAndForget();
 
     switch (queue)
     {
@@ -375,6 +375,6 @@ void CommandPool::OnMessage(BeginFrameLateMsg* msg) {
     }
 
     for (int i = 0; i < allocatedBuffers.size(); i++) {
-        allocatedBuffers[i].SetFrame(msg->inFlightFrame);
+        allocatedBuffers[i].SetFrameWithReset(msg->inFlightFrame);
     }
 }

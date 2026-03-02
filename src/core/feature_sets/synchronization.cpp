@@ -79,7 +79,7 @@ Refs<Fence> Synchronization::CreateFences(uint32_t size, bool signaled) {
 }
 
 void Synchronization::OnMessage(BeginFrameMsg* m) {
-    _semaphoresPool.SetFrame(m->inFlightFrame);
+    _semaphoresPool.SetFrameWithReset(m->inFlightFrame);
 }
 
 void Synchronization::OnMessage(DestroyMsg*) {
@@ -87,7 +87,7 @@ void Synchronization::OnMessage(DestroyMsg*) {
 }
 
 void Synchronization::OnMessage(ImageAquiredMsg* m) {
-    _semaphoresPerSwapChainImg.SetFrame(m->imageIndex);
+    _semaphoresPerSwapChainImg.SetFrameWithReset(m->imageIndex);
 }
 
 Ref<Semaphore> Synchronization::BorrowBinarySemaphore(bool perSwapchainImg) {
@@ -103,5 +103,5 @@ Ref<Semaphore> Synchronization::BorrowBinarySemaphore(bool perSwapchainImg) {
         pool->Insert(CreateSemaphore(false));
     }
 
-    return pool->Borrow();
+    return pool->BorrowAndForget();
 }

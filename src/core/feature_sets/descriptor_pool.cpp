@@ -119,6 +119,17 @@ DescriptorSet::~DescriptorSet() {
     pool->OnReturnOne(vkSet);
 }
 
+Descriptors::Descriptors(RenderContext& c): 
+    FeatureSet(c),
+    _layouts(), 
+    _descriptorPools(), 
+    _descriptorSetPool(),
+    _preallocatedDescriptorSets(),
+    frameId(0)
+{
+    _identityCache = std::make_shared<DescriptorSetIdentity>();
+}
+
 void Descriptors::OnMessage(DestroyMsg*) {
     for (auto p : _layouts) {
         vkDestroyDescriptorSetLayout(context.device(), p.second, nullptr); 
@@ -126,19 +137,24 @@ void Descriptors::OnMessage(DestroyMsg*) {
 }
 
 void Descriptors::OnMessage(EarlyDestroyMsg*) {
-    _allocatedDescriptors.clear();
+
+    for (auto& pair : _preallocatedDescriptorSets) {
+        pair.second.Forget();
+    }
+    _preallocatedDescriptorSets.clear();
+
+    for (auto& pair : _descriptorSetPool) {
+        pair.second.clear();
+    }
+    _descriptorSetPool.clear();
 }
 
 void Descriptors::OnMessage(BeginFrameMsg* m) {
-    frameId = m->inFlightFrame;
-    if (_allocatedDescriptors.size() > frameId) {
-        
-        if (!_allocatedDescriptors[frameId])
-            return;
 
-        for (auto& pair : *_allocatedDescriptors[frameId]) {
-            pair.second.Reset();
-        }
+    frameId = m->inFlightFrame;
+
+    for (auto& pair : _descriptorSetPool) {
+        pair.second.SetFrame(m->inFlightFrame);
     }
 }
 

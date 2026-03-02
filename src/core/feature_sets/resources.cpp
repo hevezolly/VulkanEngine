@@ -405,11 +405,6 @@ void Resources::DestroyImmediate(ResourceId resource) {
     {
     case ResourceType::Buffer:
         _buffers.TryRemove(resource);
-        
-        auto it = _bufferChildren.find(resource);
-        if ()
-
-        _bufferChildren.erase(resource);
         break;
     case ResourceType::Image:
         _images.TryRemove(resource);

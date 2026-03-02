@@ -5,6 +5,8 @@
 #include <handles.h>
 #include <object_pool.h>
 #include <resource_id.h>
+#include <descriptor_identity.h>
+#include <framed_object_pool.h>
 
 struct DescriptorPool 
 {
@@ -25,34 +27,21 @@ Allocator& API __get_alloc(RenderContext*);
 
 struct API DescriptorSet {
     VkDescriptorSet vkSet;
+    std::shared_ptr<DescriptorSetIdentity> identity;
 
-    DescriptorSet(VkDescriptorSet set, SpecializedDescriptorPool* p, RenderContext* ctx): 
-        vkSet(set), pool(p), context(ctx), currentIds(MemChunk<ResourceId>::Null()) {}
+    DescriptorSet(
+        VkDescriptorSet set, 
+        SpecializedDescriptorPool* p, 
+        RenderContext* ctx): 
+        vkSet(set), pool(p), context(ctx), identity(nullptr) {}
 
-    template<typename T>
-    void Update(T& value) {
-
-        if (currentIds.size != T::size_resources()) {
-            __deallocate(context, currentIds);
-            currentIds = __get_alloc(context).HeapAllocate<ResourceId>(T::size_resources());
-        }
-
-        if (!value.FillUsedResources(currentIds.data)) {
-
-            MemChunk<VkWriteDescriptorSet> writes = value.CollectDescriptorWrites(*context, vkSet);
     
-            vkUpdateDescriptorSets(__device(context), writes.size, writes.data, 0, nullptr);
-    
-            __deallocate(context, writes, true);
-        }
-    }
 
     RULE_5(DescriptorSet)
 
 private: 
     SpecializedDescriptorPool* pool;
     RenderContext* context;
-    MemChunk<ResourceId> currentIds;
 };
 
 struct API SpecializedDescriptorPool 
@@ -84,7 +73,7 @@ struct API Descriptors : FeatureSet,
     CanHandle<EarlyDestroyMsg>,
     CanHandle<BeginFrameMsg>
 {
-    using FeatureSet::FeatureSet;
+    Descriptors(RenderContext&);
 
     template<typename T>
     void Preallocate(uint32_t countInstances = 1) {
@@ -98,6 +87,8 @@ struct API Descriptors : FeatureSet,
         for (int i = 0; i < countDescriptors; i++) {
             sizes[i].descriptorCount *= countInstances;
         }
+
+        _preallocatedPoolSize[id] += countInstances;
 
         if (_descriptorPools.find(id) == _descriptorPools.end())
             _descriptorPools[id] = std::vector<Ref<SpecializedDescriptorPool>>{};
@@ -149,7 +140,7 @@ struct API Descriptors : FeatureSet,
         }
 
         if (selectedPool.isNull()) {
-            Preallocate<T>();
+            Preallocate<T>(std::max(_preallocatedPoolSize[id], 1));
             selectedPool = _descriptorPools[id].back();
         }
 
@@ -159,22 +150,44 @@ struct API Descriptors : FeatureSet,
     template<typename T>
     DescriptorSet& BorrowDescriptorSet(T& values) 
     {
-        if (_allocatedDescriptors.size() < frameId + 1)
-            _allocatedDescriptors.resize(frameId + 1);
+        _identityCache->clear();
+        values.FillDescriptorSetIdentity(*_identityCache);
+
+        auto existing = _preallocatedDescriptorSets.find(_identityCache);
 
         TypeId id = getTypeId<T>();
 
-        if (!_allocatedDescriptors[frameId])
-            _allocatedDescriptors[frameId] = std::make_unique<std::unordered_map<TypeId, ObjectPool<DescriptorSet>>>();
+        auto it = _descriptorSetPool.find(id);
+        if (it == _descriptorSetPool.end()) {
+            _descriptorSetPool[id].SetFrame(frameId);
+        }
 
-        ObjectPool<DescriptorSet>& pool = (*_allocatedDescriptors[frameId])[id];
+        if (existing != _preallocatedDescriptorSets.end()) {
+            existing->second.MoveTo(_descriptorSetPool[id].CurrentPool());
+            return existing->second;
+        }
 
-        if (pool.isEmpty())
-            pool.Insert(CreateDescriptorSet<T>());
+        if (_descriptorSetPool[id].isEmpty()) {
+            _descriptorSetPool[id].Insert(CreateDescriptorSet<T>())
+        }
 
-        DescriptorSet& set = pool.BorrowAndForget();
-        set.Update<T>(values);
-        return set;
+        Borrowed<DescriptorSet> set = _descriptorSetPool[id].Borrow();
+
+        auto toReplace = _preallocatedDescriptorSets.find(set->identity);
+        if (toReplace != _preallocatedDescriptorSets.end()) {
+            toReplace->second.Forget();
+            _preallocatedDescriptorSets.erase(toReplace);
+        }
+
+        MemChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(*context, set->vkSet);
+        vkUpdateDescriptorSets(__device(context), writes.size, writes.data, 0, nullptr);
+        __deallocate(context, writes, true);
+
+        set->identity = std::make_shared(*_identityCache);
+
+        auto result = _preallocatedDescriptorSets.emplace(set->identity, std::move(set));
+
+        return *(result->second);
     }
 
     virtual void OnMessage(DestroyMsg*);
@@ -182,12 +195,36 @@ struct API Descriptors : FeatureSet,
     virtual void OnMessage(EarlyDestroyMsg*);
 
 private:
+
+    struct HashDSIByValue {
+        std::size_t operator()(const std::shared_ptr<DescriptorSetIdentity> ptr) const {
+            if (ptr == nullptr) {
+                return 0;
+            }
+
+            return std::hash<DescriptorSetIdentity>()(*ptr);
+        }
+    };
+
+    struct EqualDSIByValue{
+        bool operator()(const std::shared_ptr<DescriptorSetIdentity> ptr1, const std::shared_ptr<DescriptorSetIdentity> ptr2) const {
+            if (ptr1 == nullptr && ptr2 == nullptr) return true;
+            if (ptr1 == nullptr || ptr2 == nullptr) return false;
+
+            return *ptr1 == *ptr2;
+        }
+    };
+
     Ref<SpecializedDescriptorPool> CreateDescriptorPool(
         uint32_t, uint32_t, VkDescriptorSetLayout, MemChunk<VkDescriptorPoolSize> sizes);
     std::unordered_map<TypeId, VkDescriptorSetLayout> _layouts;
     std::unordered_map<TypeId, std::vector<Ref<SpecializedDescriptorPool>>> _descriptorPools;
-    
-    std::vector<std::unique_ptr<std::unordered_map<TypeId, ObjectPool<DescriptorSet>>>> _allocatedDescriptors;
+    std::unordered_map<TypeId, uint32_t> _preallocatedPoolSize;
 
+    std::unordered_map<std::shared_ptr<DescriptorSetIdentity>, Borrowed<DescriptorSet>, HashDSIByValue, EqualDSIByValue> _preallocatedDescriptorSets;
+
+    std::unordered_map<TypeId, FramedObjectPool<DescriptorSet>> _descriptorSetPool;
+
+    std::shared_ptr<DescriptorSetIdentity> _identityCache;
     uint32_t frameId;
 };

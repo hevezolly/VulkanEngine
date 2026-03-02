@@ -7,6 +7,14 @@ struct FramedObjectPool {
 
     void SetFrame(uint32_t currentFrame) {
         storage.SetFrame(currentFrame);
+        if (currentFrame != _currentFrame) {
+            storage.get(_currentFrame).TransferAvailableTo(storage.get(currentFrame));
+            _currentFrame = currentFrame;
+        }
+    }
+
+    void SetFrameWithReset(uint32_t currentFrame) {
+        storage.SetFrame(currentFrame);
         storage->Reset();
         if (currentFrame != _currentFrame) {
             storage.get(_currentFrame).TransferAvailableTo(storage.get(currentFrame));
@@ -22,8 +30,16 @@ struct FramedObjectPool {
         storage->Insert(std::move(value));
     }
 
-    T& Borrow() {
+    T& BorrowAndForget() {
         return storage->BorrowAndForget();
+    }
+
+    Borrowed<T> Borrow() {
+        return storage->Borrow();
+    }
+
+    ObjectPool<T>& CurrentPool() {
+        return *storage;
     }
 
     void clear() {

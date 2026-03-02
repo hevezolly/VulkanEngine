@@ -34,10 +34,10 @@ namespace ResourceIdLimits {
 }
 
 enum struct ResourceType: uint8_t {
-    Image = 0,
-    Buffer = 1,
-    Sampler = 2,
-    Other = 3
+    Other = 0,
+    Image = 1,
+    Buffer = 2,
+    Sampler = 3
 };
 
 struct API ResourceId {

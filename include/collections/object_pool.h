@@ -45,20 +45,7 @@ struct API ObjectPool
         _data = std::make_shared<ObjectPoolData<T>>();
     }
 
-    ~ObjectPool() {
-        if (!_data)
-            return;
-
-        
-        Node* iterator = _data->begin;
-        while (iterator != nullptr) {
-            Node* next = iterator->next;
-            delete iterator;
-            iterator = next;
-        }
-        
-        _data.reset();
-    }
+    ~ObjectPool() = default;
 
     ObjectPool(const ObjectPool&) = default; 
     
@@ -144,6 +131,23 @@ struct ObjectPoolData {
         if (end == nullptr)
             end = begin;
     }
+
+    ObjectPoolData(const ObjectPoolData&) = delete; 
+    
+    ObjectPoolData& operator=(const ObjectPoolData&) = delete;
+
+    ObjectPoolData(ObjectPoolData&&) = delete; 
+    
+    ObjectPoolData& operator=(ObjectPoolData&&) = delete;
+
+    ~ObjectPoolData() {
+        auto* iterator = begin;
+        while (iterator != nullptr) {
+            auto* next = iterator->next;
+            delete iterator;
+            iterator = next;
+        }
+    }
 };
 
 template<typename T>
@@ -205,6 +209,49 @@ struct API Borrowed {
         }
 
         return *this;
+    }
+
+    void MoveTo(ObjectPool<T>& other) {
+        if (_data == other._data)
+            return;
+        
+        auto* prev = _ptr->previous;
+        auto* next = _ptr->next;
+
+        if (_data->nextAvailable == _ptr) {
+            _data->nextAvailable = prev;
+        }
+
+        if (_data->begin == _ptr) {
+            _data->begin = next;
+        }
+
+        if (_data->end == _ptr) {
+            _data->end = prev;
+        }
+
+        if (prev != nullptr) {
+            prev->next = next;
+        }
+
+        if (next != nullptr) {
+            next->previous = prev;
+        }
+
+        _data = other._data;
+
+        _ptr->next = nullptr;
+
+        if (_data->end != nullptr) {
+            _data->end->next = _ptr;
+        }
+        else {
+            assert(_data->nextAvailable == nullptr);
+            _data->begin = _ptr;
+        }
+
+        _ptr->previous = _data->end;
+        _data->end = _ptr;
     }
 
 private:
