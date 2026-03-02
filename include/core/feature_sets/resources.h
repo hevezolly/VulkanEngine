@@ -117,7 +117,7 @@ private:
     std::unordered_map<ResourceId, Ref<Semaphore>> _synchronization;
     std::unordered_map<ResourceId, std::vector<Buffer>> _bufferChildren;
     
-    ResourceStorage<Buffer> _buffers;
-    ResourceStorage<Image> _images;
+    ResourceStorageWithChildren<Buffer> _buffers;
+    ResourceStorageWithChildren<Image> _images;
     ResourceStorage<Sampler> _samplers;
 };

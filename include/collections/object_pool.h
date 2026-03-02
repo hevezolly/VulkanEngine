@@ -60,9 +60,9 @@ struct API ObjectPool
         _data.reset();
     }
 
-    ObjectPool(const ObjectPool&) = delete; 
+    ObjectPool(const ObjectPool&) = default; 
     
-    ObjectPool& operator=(const ObjectPool&) = delete;
+    ObjectPool& operator=(const ObjectPool&) = default;
 
     ObjectPool(ObjectPool&&) = default; 
     
