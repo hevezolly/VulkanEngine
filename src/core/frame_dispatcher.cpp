@@ -7,6 +7,11 @@ FrameDispatcher::FrameDispatcher(RenderContext& c, uint32_t framesInFlight):
     assert(framesInFlight > 0);
 }
 
+uint32_t FrameDispatcher::getFramesInFlight() {
+    return framesInFlight;
+}
+
+
 uint64_t FrameDispatcher::frameIndex() {
     return currentFrame == 0 ? 0 : currentFrame - 1;
 }

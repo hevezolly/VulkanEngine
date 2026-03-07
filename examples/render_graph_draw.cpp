@@ -19,6 +19,7 @@
 #include <shader_loader.h>
 #include <present_node.h>
 #include <frame_dispatcher.h>
+#include <dynamic_uniforms.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -29,7 +30,7 @@ VEC2(uv, 2)
 
 #define BLOCK_NAME ShaderInput
 #define BLOCK \
-UNIFORM_BUFFER(transforms, 0, Stage::Vertex) \
+DYNAMIC_UNIFORM(transforms, 0, Stage::Vertex) \
 IMAGE_SAMPLER(img, 1, Stage::Fragment)
 #include <gen_bindings.h>
 
@@ -47,7 +48,6 @@ struct UniformData {
 };
 
 struct _Resources {
-    ResourceRefs<Buffer> uniformBuffers;
     Ref<GraphicsPipeline> pipeline;
     ResourceRef<Buffer> vertexBuffer;
     ResourceRef<Buffer> indexBuffer;
@@ -140,18 +140,10 @@ _Resources PrepareResources(
 
     r.sampler = context.Get<Resources>().CreateSampler(SamplerFilter::LINEAR, SamplerAddressMode::REPEAT);
 
-    r.uniformBuffers.reserve(framesInFlight);
-    for (int i = 0; i < framesInFlight; i++) {
-        r.uniformBuffers.push_back(context.Get<Resources>()
-            .CreateBuffer<UniformData>(BufferPreset::UNIFORM, 1));
-        context.Get<Resources>().GiveName(r.uniformBuffers[i], "uniform_buffer_" + std::to_string(i));
-        
-    }
-
     return r;
 }
 
-void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
+UniformData GetShaderData(RenderContext& context) {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     auto currentTime = std::chrono::high_resolution_clock::now();
@@ -165,7 +157,7 @@ void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
     
     d.proj[1][1] *= -1;
     d.time = time;
-    memcpy(uniformBuffer.memory.PersistentMap().data(), &d, sizeof(d));
+    return d;
 } 
 
 void DrawFrame(
@@ -179,8 +171,8 @@ void DrawFrame(
 
     ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 
-    UpdateShaderData(context, *r.uniformBuffers[frameId]);
-    
+    BufferRegion transforms = context.Get<DynamicUniforms>().Allocate(GetShaderData(context));  
+
     auto& node0 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
     node0.SetName("draw1");
     Attachments attachments;
@@ -189,7 +181,7 @@ void DrawFrame(
     node0.SetAttachments(attachments);
 
     ShaderInput data{};
-    data.transforms = r.uniformBuffers.back();
+    data.transforms = transforms;
     data.img = r.resourceImg;
     data.img_sampler = r.sampler;
     node0.SetBindings(data);
@@ -203,7 +195,7 @@ void DrawFrame(
     attachments.depth = r.depth3;
     node1.SetAttachments(attachments);
 
-    data.transforms = r.uniformBuffers.back();
+    data.transforms = transforms;
     data.img = r.image;
     data.img_sampler = r.sampler;
     node1.SetBindings(data);
@@ -248,6 +240,7 @@ void Run() {
            .WithFeature<GraphicsFeature>()
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
+           .WithFeature<DynamicUniforms>()
            .Initialize();
     volkLoadInstance(context.vkInstance);
 

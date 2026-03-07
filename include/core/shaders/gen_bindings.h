@@ -71,7 +71,19 @@ BLOCK
         return value;
     }
 
-    void write_inputs(NodeDependency* dependencies) {
+    static constexpr uint32_t size_dynamic_states() {
+        uint32_t value = 0;
+
+        #define WRAPPER(...)
+        #define BUFFERS(dc, buffer_value, offset, size, buffer_id, dynamic) if constexpr (dynamic) {value++;}
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef BUFFERS
+        return value;
+    }
+
+    void write_inputs(NodeDependency* dependencies) const {
         uint32_t index = 0;
 
         #define RESOURCES
@@ -85,7 +97,7 @@ BLOCK
         #undef RESOURCES
     }
 
-    void write_outputs(NodeDependency* dependencies) {
+    void write_outputs(NodeDependency* dependencies) const {
         uint32_t index = 0;
 
         #define RESOURCES
@@ -162,7 +174,7 @@ BLOCK
         return chunk;
     }
 
-    void FillDescriptorSetIdentity(DescriptorSetIdentity& setId) {
+    void FillDescriptorSetIdentity(DescriptorSetIdentity& setId) const {
         #define WRAPPER(...)
         #define IMAGES(dc, image_value, sampler_value, image_layout, main_id, second_id) { \
             DescriptorIdentity id; \
@@ -170,10 +182,10 @@ BLOCK
             id.additional.sampler = second_id; \
             setId.add(id); \
         }
-        #define BUFFERS(dc, buffer_value, offset, size, buffer_id) { \
+        #define BUFFERS(dc, buffer_value, offset, size, buffer_id, dynamic) { \
             DescriptorIdentity id; \
             id.resource = main_id; \
-            id.additional.bufferRange = {offset, size} \
+            id.additional.bufferRange = {dynamic ? 0 : offset, size} \
             setId.add(id); \
         }
         #include "define_shader_bindings.h"
@@ -183,7 +195,7 @@ BLOCK
         #undef BUFFERS
     }
 
-    MemChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set) {
+    MemChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set, uint32_t* dynamicState) const {
         Allocator& allocator = context.Get<Allocator>();
         auto writes = allocator.BumpAllocate<VkWriteDescriptorSet>(size());
         uint32_t index;
@@ -225,6 +237,7 @@ BLOCK
         #undef WRAPPER
 
         index = 0;
+        uint32_t dynamicStateIndex = 0;
         #define WRAPPER(...)
         #define IMAGES(dc, image_value, sampler_value, image_layout, image_id, sampler_id) { \
             uint32_t i = index++; \
@@ -238,17 +251,20 @@ BLOCK
             } \
             writes[i].pImageInfo = imageInfo; \
         }
-        #define BUFFERS(dc, buffer_value, offset, size, buffer_id) { \
+        #define BUFFERS(dc, buffer_value, offset, size, buffer_id, dynamic) { \
             uint32_t i = index++; \
             writes[i].pImageInfo = nullptr; \
             writes[i].pTexelBufferView = nullptr; \
             VkDescriptorBufferInfo* bufferInfo = allocator.BumpAllocate<VkDescriptorBufferInfo>(dc).data; \
             for (int __descriptor = 0; __descriptor < dc; __descriptor++) { \
                 bufferInfo[__descriptor].buffer = buffer_value; \
-                bufferInfo[__descriptor].offset = offset; \
+                bufferInfo[__descriptor].offset = dynamic ? 0 : offset; \
                 bufferInfo[__descriptor].range = size; \
             } \
             writes[i].pBufferInfo = bufferInfo; \
+            if constexpr (dynamic) { \
+                dynamicState[dynamicStateIndex++] = offset; \
+            } \
         }
         #include "define_shader_bindings.h"
         BLOCK

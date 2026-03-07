@@ -212,8 +212,6 @@ struct API Borrowed {
     }
 
     void MoveTo(ObjectPool<T>& other) {
-        if (_data == other._data)
-            return;
         
         auto* prev = _ptr->previous;
         auto* next = _ptr->next;

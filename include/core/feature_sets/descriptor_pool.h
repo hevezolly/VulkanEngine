@@ -7,6 +7,7 @@
 #include <resource_id.h>
 #include <descriptor_identity.h>
 #include <framed_object_pool.h>
+#include <helper_functions.h>
 
 struct DescriptorPool 
 {
@@ -21,10 +22,6 @@ private:
     RenderContext* context;
 };
 
-void API __deallocate(RenderContext*, RawMemChunk memory, bool force=false);
-VkDevice API __device(RenderContext*);
-Allocator& API __get_alloc(RenderContext*);
-
 struct API DescriptorSet {
     VkDescriptorSet vkSet;
     std::shared_ptr<DescriptorSetIdentity> identity;
@@ -35,13 +32,17 @@ struct API DescriptorSet {
         RenderContext* ctx): 
         vkSet(set), pool(p), context(ctx), identity(nullptr) {}
 
-    
-
     RULE_5(DescriptorSet)
 
 private: 
     SpecializedDescriptorPool* pool;
     RenderContext* context;
+};
+
+struct API ShaderInputInstance {
+    DescriptorSet* descriptor;
+    uint32_t dynamicOffsetsCount;
+    uint32_t* pDynamicOffsets;
 };
 
 struct API SpecializedDescriptorPool 
@@ -81,6 +82,8 @@ struct API Descriptors : FeatureSet,
 
         assert(countInstances >= 1);
 
+        auto _ = Helpers::allocator(&context).BeginContext();
+
         uint32_t countDescriptors = 0;
         MemChunk<VkDescriptorPoolSize> sizes = T::FillDescriptorSizes(context, countDescriptors);
         
@@ -97,8 +100,6 @@ struct API Descriptors : FeatureSet,
             countInstances, countDescriptors, GetLayout<T>(), sizes);
 
         _descriptorPools[id].push_back(pool);
-
-        __deallocate(&context, sizes, true);
     }
 
     template<typename T>
@@ -107,6 +108,7 @@ struct API Descriptors : FeatureSet,
 
         if (_layouts.find(id) == _layouts.end()) {
             
+            auto _ = Helpers::allocator(&context).BeginContext();
             TypeId id = getTypeId<T>();
 
             _layouts[id] = VK_NULL_HANDLE;
@@ -118,8 +120,7 @@ struct API Descriptors : FeatureSet,
             createInfo.flags = 0;
             createInfo.pBindings = bindings.data;
 
-            vkCreateDescriptorSetLayout(__device(&context), &createInfo, nullptr, &_layouts[id]);
-            __deallocate(&context, bindings, true);
+            vkCreateDescriptorSetLayout(Helpers::device(&context), &createInfo, nullptr, &_layouts[id]);
         }
 
         return _layouts[id];
@@ -148,7 +149,7 @@ struct API Descriptors : FeatureSet,
     }
 
     template<typename T>
-    DescriptorSet& BorrowDescriptorSet(T& values) 
+    ShaderInputInstance BorrowDescriptorSet(const T& values) 
     {
         _identityCache->clear();
         values.FillDescriptorSetIdentity(*_identityCache);
@@ -179,15 +180,16 @@ struct API Descriptors : FeatureSet,
             _preallocatedDescriptorSets.erase(toReplace);
         }
 
-        MemChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(*context, set->vkSet);
-        vkUpdateDescriptorSets(__device(context), writes.size, writes.data, 0, nullptr);
-        __deallocate(context, writes, true);
-
-        set->identity = std::make_shared(*_identityCache);
-
         auto result = _preallocatedDescriptorSets.emplace(set->identity, std::move(set));
+        
+        return UpdateDescriptorSetPreloaded(result->second, values);
+    }
 
-        return *(result->second);
+    template<typename T>
+    ShaderInputInstance UpdateDescriptorSet(DescriptorSet& set, const T& values) {
+        _identityCache->clear();
+        values.FillDescriptorSetIdentity(*_identityCache);
+        return UpdateDescriptorSetPreloaded(set, values);
     }
 
     virtual void OnMessage(DestroyMsg*);
@@ -195,6 +197,43 @@ struct API Descriptors : FeatureSet,
     virtual void OnMessage(EarlyDestroyMsg*);
 
 private:
+
+    template <typename T>
+    ShaderInputInstance UpdateDescriptorSetPreloaded(DescriptorSet& set, const T& values) {
+        Allocator& alloc = Helpers::allocator(&context);
+
+        MemChunk<uint32_t> dynamicStates = alloc.BumpAllocate<uint32_t>(T::size_dynamic_states());
+
+        auto _ = alloc.BeginContext();
+        MemChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(*context, set->vkSet, dynamicStates.data);
+        MemBuffer<VkWriteDescriptorSet> actualWrites = alloc.BumpAllocate<VkWriteDescriptorSet>(writes.size);
+
+        if (set.identity == nullptr) {
+            vkUpdateDescriptorSets(Helpers::device(context), writes.size, writes.data, 0, nullptr);
+            set.identity = std::make_shared(*_identityCache);
+            return;
+        }
+
+        assert(set.identity->identities.size() == _identityCache->identities.size());
+        assert(set.identity->identities.size() == writes.size);
+        for (int i = 0; i < set.identity->identities.size(); i++) {
+            if (set.identity->identities[i] == _identityCache->identities[i])
+                continue;
+
+            actualWrites.push_back(writes[i]);
+        }
+        
+        if (actualWrites.size() > 0) {
+            vkUpdateDescriptorSets(Helpers::device(context), actualWrites.size(), actualWrites.data(), 0, nullptr);
+            set.identity = std::make_shared(*_identityCache);
+        }
+
+        return ShaderInputInstance {
+            &set,
+            dynamicStates.size,
+            dynamicStates.data
+        };
+    }
 
     struct HashDSIByValue {
         std::size_t operator()(const std::shared_ptr<DescriptorSetIdentity> ptr) const {

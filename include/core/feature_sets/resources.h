@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <resource_storage.h>
 #include <synchronization.h>
+#include <framed_storage.h>
 
 struct API Resources: FeatureSet,
     CanHandle<InitMsg>,

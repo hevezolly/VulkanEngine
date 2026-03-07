@@ -9,6 +9,8 @@
 #include <resource_id.h>
 #include <resource_storage.h>
 #include <framed_object_pool.h>
+#include <optional>
+#include <initializer_list>
 
 struct API TransferCommandBuffer {
     VkCommandBuffer buffer;
@@ -33,7 +35,15 @@ protected:
 struct API ComputeCommandBuffer: TransferCommandBuffer {
     using TransferCommandBuffer::TransferCommandBuffer;
     virtual QueueType queueType();
+    void EndRenderPass();
+
+    void BindShaderInput(uint32_t count, const ShaderInputInstance* input);
+    void BindShaderInput(std::initializer_list<ShaderInputInstance> input);
+
     friend struct CommandPool;
+protected: 
+    //TODO: bound state
+    std::optional<VkPipelineBindPoint> currentPipeline;
 };
 
 struct API GraphicsCommandBuffer: ComputeCommandBuffer {
@@ -41,7 +51,6 @@ struct API GraphicsCommandBuffer: ComputeCommandBuffer {
     virtual QueueType queueType();
     
     void BeginRenderPass(Ref<GraphicsPipeline> pipeline, const FrameBuffer& frameBuffer);
-    void EndRenderPass();
     friend struct CommandPool;
 };
 

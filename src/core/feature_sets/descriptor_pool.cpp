@@ -1,18 +1,6 @@
 #include <descriptor_pool.h>
 #include <render_context.h>
 
-Allocator& __get_alloc(RenderContext* ctx) {
-    return ctx->Get<Allocator>();
-}
-
-void __deallocate(RenderContext* context, RawMemChunk memory, bool force) {
-    context->Get<Allocator>().Free(memory, force);
-}
-
-VkDevice __device(RenderContext* context) {
-    return context->device();
-}
-
 DescriptorPool::DescriptorPool(
     RenderContext* c, 
     uint32_t count,

@@ -5,6 +5,7 @@ struct FrameDispatcher: FeatureSet
 {
     FrameDispatcher(RenderContext&, uint32_t framesInFlight=1);
     
+    uint32_t getFramesInFlight();
     uint64_t frameIndex();
     uint32_t frameInFlightIndex();
 

@@ -226,6 +226,8 @@ void TransferCommandBuffer::Reset() {
 }
 
 void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, const FrameBuffer& frameBuffer) {
+    assert(!currentPipeline.has_value());
+    
     VkRenderPassBeginInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     renderPassInfo.renderPass = pipeline->renderPass;
     renderPassInfo.framebuffer = frameBuffer.frameBuffer;
@@ -239,10 +241,44 @@ void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, cons
     vkCmdBeginRenderPass(buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+    currentPipeline = VK_PIPELINE_BIND_POINT_GRAPHICS;
 }
 
-void GraphicsCommandBuffer::EndRenderPass() {
+void ComputeCommandBuffer::EndRenderPass() {
+    assert(currentPipeline.has_value());
     vkCmdEndRenderPass(buffer);
+    currentPipeline = std::nullopt;
+}
+
+void ComputeCommandBuffer::BindShaderInput(uint32_t count, const ShaderInputInstance* input) {
+    assert(currentPipeline.has_value());
+    
+    uint32_t dynamicStateSize = 0;
+    for (int i = 0; i < count; i++) {
+        dynamicStateSize += input[i].dynamicOffsetsCount;
+    }
+
+    Allocator& alloc = context->Get<Allocator>();
+    auto _ = alloc.BeginContext();
+    MemChunk<uint32_t> dynamicStates = alloc.BumpAllocate<uint32_t>(dynamicStateSize);
+    MemChunk<VkDescriptorSet> descriptorSets = alloc.BumpAllocate<VkDescriptorSet>(count);
+
+    dynamicStateSize = 0;
+    for (int i = 0; i < count; i++) {
+        descriptorSets[i] = input[i].descriptor->vkSet;
+        
+        uint32_t dCount = input[i].dynamicOffsetsCount;
+        if (dCount > 0) {
+            std::memcpy(dynamicStates.data + dynamicStateSize, input[i].pDynamicOffsets, dCount * sizeof(uint32_t));
+            dynamicStateSize += dCount;
+        }
+    }
+
+    
+}
+
+void ComputeCommandBuffer::BindShaderInput(std::initializer_list<ShaderInputInstance> input) {
+    BindShaderInput(static_cast<uint32_t>(input.size()), input.begin());
 }
 
 void TransferCommandBuffer::ImageBarrier(ResourceRef<Image> img, const ResourceState& newState) {
