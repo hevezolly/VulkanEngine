@@ -32,6 +32,8 @@ protected:
     RenderContext* context;
 };
 
+
+
 struct API ComputeCommandBuffer: TransferCommandBuffer {
     using TransferCommandBuffer::TransferCommandBuffer;
     virtual QueueType queueType();
@@ -42,8 +44,14 @@ struct API ComputeCommandBuffer: TransferCommandBuffer {
 
     friend struct CommandPool;
 protected: 
+
+    struct BoundPipelineData {
+        VkPipelineBindPoint bindPoint;
+        VkPipelineLayout layout;
+    };
+
     //TODO: bound state
-    std::optional<VkPipelineBindPoint> currentPipeline;
+    std::optional<BoundPipelineData> currentPipeline;
 };
 
 struct API GraphicsCommandBuffer: ComputeCommandBuffer {

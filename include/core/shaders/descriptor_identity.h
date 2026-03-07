@@ -9,8 +9,8 @@ struct DescriptorIdentity {
     union Additional
     {
         struct BufferRange{
-            uint32_t offset;
-            uint32_t size;
+            uint64_t offset;
+            uint64_t size;
         } bufferRange;
         ResourceId sampler;
     } additional;
@@ -72,6 +72,7 @@ struct DescriptorSetIdentity {
         return true;
     }
 
+    DescriptorSetIdentity(): identities(), hash(0){}
     DescriptorSetIdentity(DescriptorSetIdentity&&) = default;
     DescriptorSetIdentity& operator=(DescriptorSetIdentity&&) = default;
     DescriptorSetIdentity(const DescriptorSetIdentity&) = default;

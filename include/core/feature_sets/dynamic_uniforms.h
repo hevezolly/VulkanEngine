@@ -22,7 +22,7 @@ struct DynamicUniforms: FeatureSet,
         BufferRegion region = AllocateRange(sizeof(T));
 
         std::memcpy(
-            region.buffer->memory.PersistentMap().data() + region.offset
+            static_cast<unsigned char*>(region.buffer->memory.PersistentMap().data()) + region.offset,
             &value, sizeof(T)
         );
 

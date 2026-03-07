@@ -241,7 +241,10 @@ void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, cons
     vkCmdBeginRenderPass(buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
-    currentPipeline = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    currentPipeline = BoundPipelineData {
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline->layout
+    };
 }
 
 void ComputeCommandBuffer::EndRenderPass() {
@@ -274,7 +277,13 @@ void ComputeCommandBuffer::BindShaderInput(uint32_t count, const ShaderInputInst
         }
     }
 
-    
+    if (descriptorSets.size > 0) {
+        vkCmdBindDescriptorSets(
+            buffer, 
+            currentPipeline.value().bindPoint, 
+            currentPipeline.value().layout, 
+            0, descriptorSets.size, descriptorSets.data, dynamicStates.size, dynamicStates.data);
+    }
 }
 
 void ComputeCommandBuffer::BindShaderInput(std::initializer_list<ShaderInputInstance> input) {

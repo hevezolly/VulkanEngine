@@ -179,7 +179,7 @@ void RecordCommandBuffer(
     ResourceRef<Buffer> indexBuffer,
     Ref<GraphicsPipeline> pipeline, 
     const FrameBuffer& frameBuffer,
-    VkDescriptorSet descriptorSet
+    ShaderInputInstance input
 ) {
     cmd.Begin();
     cmd.BeginRenderPass(pipeline, frameBuffer);
@@ -202,7 +202,8 @@ void RecordCommandBuffer(
     vkCmdBindVertexBuffers(cmd.buffer, 0, 1, &vertexBuffer->vkBuffer, &offset);
 
     vkCmdBindIndexBuffer(cmd.buffer, indexBuffer->vkBuffer, 0, VkIndexType::VK_INDEX_TYPE_UINT16);
-    vkCmdBindDescriptorSets(cmd.buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, 1, &descriptorSet, 0, nullptr);
+
+    cmd.BindShaderInput({input});
 
     vkCmdDrawIndexed(cmd.buffer, indexBuffer->count<uint16_t>(), 1, 0, 0, 0);
 
@@ -253,7 +254,7 @@ void DrawFrame(
     data.img = r.image;
     data.img_sampler = r.sampler;
 
-    DescriptorSet& set = context.Get<Descriptors>().BorrowDescriptorSet(data);
+    ShaderInputInstance input = context.Get<Descriptors>().BorrowDescriptorSet(data);
 
     Attachments attachments;
     attachments.color = context.Get<PresentFeature>().swapChain->images[imageIndex];
@@ -264,7 +265,7 @@ void DrawFrame(
 
     cmd.Reset();
     RecordCommandBuffer(cmd, r.vertexBuffer, r.indexBuffer, r.pipeline, 
-        buffer, set.vkSet
+        buffer, input
     );
 
     Ref<Semaphore> renderInCurrentImageFinish = context.Get<Synchronization>().BorrowBinarySemaphore(true);

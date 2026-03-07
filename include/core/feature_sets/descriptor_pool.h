@@ -165,11 +165,11 @@ struct API Descriptors : FeatureSet,
 
         if (existing != _preallocatedDescriptorSets.end()) {
             existing->second.MoveTo(_descriptorSetPool[id].CurrentPool());
-            return existing->second;
+            return existing->second; //TODO
         }
 
         if (_descriptorSetPool[id].isEmpty()) {
-            _descriptorSetPool[id].Insert(CreateDescriptorSet<T>())
+            _descriptorSetPool[id].Insert(CreateDescriptorSet<T>());
         }
 
         Borrowed<DescriptorSet> set = _descriptorSetPool[id].Borrow();
@@ -182,7 +182,7 @@ struct API Descriptors : FeatureSet,
 
         auto result = _preallocatedDescriptorSets.emplace(set->identity, std::move(set));
         
-        return UpdateDescriptorSetPreloaded(result->second, values);
+        return UpdateDescriptorSetPreloaded(result.first, values);
     }
 
     template<typename T>

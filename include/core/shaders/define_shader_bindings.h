@@ -10,11 +10,11 @@
 
     #ifdef RESOURCES
 
-        #define IMAGE_SAMPLER(name, binding, stage) WRAPPER(ResourceRef<Image>, name, binding, stage, true, false)
-        #define IMAGE(name, binding, stage) WRAPPER(ResourceRef<Image>, name, binding, stage, true, false)
+        #define IMAGE_SAMPLER(name, binding, stage) WRAPPER(ResourceRef<Image>, name##.id, binding, stage, true, false)
+        #define IMAGE(name, binding, stage) WRAPPER(ResourceRef<Image>, name##.id, binding, stage, true, false)
         #define SAMPLER(name, binding, stage)
-        #define UNIFORM_BUFFER(name, binding, stage) WRAPPER(BufferRegion, name, binding, stage, true, false)
-        #define DYNAMIC_UNIFORM(name, binding, stage) WRAPPER(BufferRegion, name, binding, stage, true, false)
+        #define UNIFORM_BUFFER(name, binding, stage) WRAPPER(BufferRegion, name##.buffer.id, binding, stage, true, false)
+        #define DYNAMIC_UNIFORM(name, binding, stage) WRAPPER(BufferRegion, name##.buffer.id, binding, stage, true, false)
 
     #elif defined(IMAGES) || defined(BUFFERS)
 

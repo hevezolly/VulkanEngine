@@ -87,9 +87,9 @@ BLOCK
         uint32_t index = 0;
 
         #define RESOURCES
-        #define WRAPPER(t, n, b, s, in, out) \
+        #define WRAPPER(t, id, b, s, in, out) \
         if constexpr (in) { \
-        dependencies[index].resource = n##.id; \
+        dependencies[index].resource = id; \
         dependencies[index++].state = ResourceState {VK_ACCESS_2_SHADER_READ_BIT, ToVkPipelineStage(s), VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};}
         #include "define_shader_bindings.h"
         BLOCK
@@ -101,9 +101,9 @@ BLOCK
         uint32_t index = 0;
 
         #define RESOURCES
-        #define WRAPPER(t, n, b, s, in, out) \
+        #define WRAPPER(t, id, b, s, in, out) \
         if constexpr (out) { \
-        dependencies[index].resource = n##.id; \
+        dependencies[index].resource = id; \
         dependencies[index++].state = ResourceState { \
             VK_ACCESS_2_SHADER_WRITE_BIT | (in ? VK_ACCESS_2_SHADER_READ_BIT : 0), \
             ToVkPipelineStage(s), \
@@ -177,16 +177,16 @@ BLOCK
     void FillDescriptorSetIdentity(DescriptorSetIdentity& setId) const {
         #define WRAPPER(...)
         #define IMAGES(dc, image_value, sampler_value, image_layout, main_id, second_id) { \
-            DescriptorIdentity id; \
-            id.resource = main_id; \
-            id.additional.sampler = second_id; \
-            setId.add(id); \
+            DescriptorIdentity _id; \
+            _id.resource = main_id; \
+            _id.additional.sampler = second_id; \
+            setId.add(_id); \
         }
         #define BUFFERS(dc, buffer_value, offset, size, buffer_id, dynamic) { \
-            DescriptorIdentity id; \
-            id.resource = main_id; \
-            id.additional.bufferRange = {dynamic ? 0 : offset, size} \
-            setId.add(id); \
+            DescriptorIdentity _id; \
+            _id.resource = buffer_id; \
+            _id.additional.bufferRange = {dynamic ? 0 : offset, size}; \
+            setId.add(_id); \
         }
         #include "define_shader_bindings.h"
         BLOCK
@@ -251,19 +251,19 @@ BLOCK
             } \
             writes[i].pImageInfo = imageInfo; \
         }
-        #define BUFFERS(dc, buffer_value, offset, size, buffer_id, dynamic) { \
+        #define BUFFERS(dc, buffer_value, _offset, size, buffer_id, dynamic) { \
             uint32_t i = index++; \
             writes[i].pImageInfo = nullptr; \
             writes[i].pTexelBufferView = nullptr; \
             VkDescriptorBufferInfo* bufferInfo = allocator.BumpAllocate<VkDescriptorBufferInfo>(dc).data; \
             for (int __descriptor = 0; __descriptor < dc; __descriptor++) { \
                 bufferInfo[__descriptor].buffer = buffer_value; \
-                bufferInfo[__descriptor].offset = dynamic ? 0 : offset; \
+                bufferInfo[__descriptor].offset = dynamic ? 0 : _offset; \
                 bufferInfo[__descriptor].range = size; \
             } \
             writes[i].pBufferInfo = bufferInfo; \
             if constexpr (dynamic) { \
-                dynamicState[dynamicStateIndex++] = offset; \
+                dynamicState[dynamicStateIndex++] = _offset; \
             } \
         }
         #include "define_shader_bindings.h"

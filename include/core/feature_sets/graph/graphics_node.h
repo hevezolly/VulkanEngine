@@ -5,22 +5,19 @@
 #include <render_context.h>
 #include <graphics_feature.h>
 #include <allocator_feature.h>
-
-#define BLOCK_NAME NullBindings
-#define BLOCK
-#include <gen_bindings.h>
+#include <tuple>
+#include <utility>
 
 
-template<typename Attachments, typename Bindings = NullBindings>
+template<typename Attachments, typename... Bindings>
 struct GraphicsNode: RenderNode {
 
     void SetAttachments(const Attachments& a) {
         _attachments = a;
     }
 
-    void SetBindings(const Bindings& b) {
-        static_assert(!std::is_same<Bindings, NullBindings>::value, "no bindings time is defined");
-        _bindings = b;
+    void SetBindings(Bindings&... b) {
+        _bindings = std::tuple<Bindings...>(std::forward<Bindings>(b)...);
     }
 
     GraphicsNode(
@@ -48,8 +45,8 @@ struct GraphicsNode: RenderNode {
 
     virtual uint32_t getInputDependenciesCount() {
         uint32_t size = 0;
-        if (_bindings.has_value())
-            size += Bindings::size_inputs();
+        size = size + (Bindings::size_inputs() + ... + 0);
+
         if (_vertexBuffer.has_value())
             size++;
         if (_indexBuffer.has_value())
@@ -57,19 +54,17 @@ struct GraphicsNode: RenderNode {
         return size;
     }
 
-    virtual uint32_t getOutputDependenciesCount() {
+    virtual constexpr uint32_t getOutputDependenciesCount() {
         uint32_t size = Attachments::size();
-        if (_bindings.has_value())
-            size += Bindings::size_outputs();
+
+        size = size + (Bindings::size_outputs() + ... + 0);
         return size;
     }
 
     virtual void getInputDependencies(NodeDependency* dependencies) {
-        uint32_t written = 0;
-        if (_bindings.has_value() && Bindings::size_inputs() > 0) {
-            _bindings.value().write_inputs(dependencies);
-            written += Bindings::size_inputs();
-        }
+        uint32_t written = (Bindings::size_inputs() + ... + 0);
+
+        WriteInputsEach(dependencies, 0, std::index_sequence_for<Bindings...>{});
         
         if (_vertexBuffer.has_value()) {
             dependencies[written++] = NodeDependency {
@@ -94,9 +89,8 @@ struct GraphicsNode: RenderNode {
 
     virtual void getOutputDependencies(NodeDependency* dependencies) {
         _attachments.write_outputs(dependencies);
-        
-        if (_bindings.has_value() && Bindings::size_outputs() > 0)
-            _bindings.value().write_outputs(dependencies + Attachments::size());
+
+        WriteOutputsEach(dependencies, Attachments::size(), std::index_sequence_for<Bindings...>{});
     }
 
     virtual void Record(ExecutionContext commandBuffer) {
@@ -137,12 +131,15 @@ struct GraphicsNode: RenderNode {
             vkCmdBindIndexBuffer(cmd.buffer, _indexBuffer.value()->vkBuffer, 0, _indexType);
         }
 
-        if (_bindings.has_value()) {
+        auto _ = context.Get<Allocator>().BeginContext();
+        MemChunk<ShaderInputInstance> inputBuffer = 
+            context.Get<Allocator>().BumpAllocate<ShaderInputInstance>(sizeof...(Bindings));
 
-            DescriptorSet& set = context.Get<Descriptors>().BorrowDescriptorSet(_bindings.value());
+        Descriptors& descriptors = context.Get<Descriptors>();
 
-            vkCmdBindDescriptorSets(cmd.buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, 1, &set.vkSet, 0, nullptr);
-        }
+        FillShaderInstances(inputBuffer.data, descriptors, std::index_sequence_for<Bindings...>{});
+
+        cmd.BindShaderInput(inputBuffer.size, inputBuffer.data);
 
         if (_indexBuffer.has_value()) {
             
@@ -180,12 +177,28 @@ struct GraphicsNode: RenderNode {
     }
 
 private:
+
+    template<size_t... Is>
+    void FillShaderInstances(ShaderInputInstance* buffer, Descriptors& descriptors, std::index_sequence<Is...>) {
+        (new (buffer + Is) ShaderInputInstance(descriptors.BorrowDescriptorSet(std::get<Is>(_bindings))), ...);
+    }
+
+    template<size_t... Is>
+    void WriteOutputsEach(NodeDependency* dependencies, uint32_t offset, std::index_sequence<Is...>) {
+        (std::get<Is>(_bindings).write_outputs(dependencies + offset + Is), ...);
+    }
+
+    template<size_t... Is>
+    void WriteInputsEach(NodeDependency* dependencies, uint32_t offset, std::index_sequence<Is...>) {
+        (std::get<Is>(_bindings).write_inputs(dependencies + offset + Is), ...);
+    }
+
     Ref<GraphicsPipeline> pipeline;
     std::optional<uint32_t> _drawCount;
     uint32_t _vertexSize;
     VkIndexType _indexType;
     std::optional<ResourceRef<Buffer>> _vertexBuffer;
     std::optional<ResourceRef<Buffer>> _indexBuffer;
-    std::optional<Bindings> _bindings;
+    std::tuple<Bindings...> _bindings;
     Attachments _attachments;
 };

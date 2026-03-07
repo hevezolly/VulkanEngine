@@ -132,6 +132,8 @@ struct ObjectPoolData {
             end = begin;
     }
 
+    ObjectPoolData(): begin(nullptr), end(nullptr), nextAvailable(nullptr){}
+
     ObjectPoolData(const ObjectPoolData&) = delete; 
     
     ObjectPoolData& operator=(const ObjectPoolData&) = delete;

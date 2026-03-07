@@ -5,6 +5,7 @@
 #include <optional>
 #include <unordered_set>
 #include <array>
+#include <utility>
 
 template<typename T>
 struct ResourceStorage {
@@ -26,6 +27,10 @@ struct ResourceStorage {
     }
 
     T& GetUnchecked(ResourceId id) {
+        return _storage[id.index()].value();
+    }
+
+    const T& GetUnchecked(ResourceId id) const {
         return _storage[id.index()].value();
     }
 
@@ -65,7 +70,7 @@ struct ResourceStorage {
 
         _generations[index] = id.generation();
         assert(!_storage[index].has_value());
-        _storage[index].emplace(std::forward(item));
+        _storage[index].emplace(std::forward<T>(item));
 
         return id;
     }
@@ -86,7 +91,7 @@ struct ResourceStorage {
         if (!_storage[index].has_value())
             return false;
 
-        RemoveUnchecked(id.index());
+        RemoveUnchecked(id);
     }
 
     void Replace(ResourceId& id, T&& newValue) {
@@ -100,10 +105,10 @@ struct ResourceStorage {
     }
 
 protected:
-    void RemoveUnchecked(uint32_t index) {
+    void RemoveUnchecked(ResourceId id) {
         _availableIds.push_back(id.NextGeneration());
-        _storage[index].reset();
-        _generations[index] = UINT32_MAX;
+        _storage[id.index()].reset();
+        _generations[id.index()] = UINT32_MAX;
     }
 
     std::vector<ResourceId> _availableIds;
@@ -111,112 +116,112 @@ protected:
     std::vector<std::optional<T>> _storage;
 };
 
-template<typename T>
-struct ResourceStorageWithChildren: ResourceStorage<T> {
+// template<typename T>
+// struct ResourceStorageWithChildren: ResourceStorage<T> {
 
-private:
-struct ChildData {
-    uint32_t child;
-    uint32_t parent;
+// private:
+// struct ChildData {
+//     uint32_t child;
+//     uint32_t parent;
 
-    ChildData(): 
-        parent(UINT32_MAX), 
-        child(UINT32_MAX)
-        {}
-};
+//     ChildData(): 
+//         parent(UINT32_MAX), 
+//         child(UINT32_MAX)
+//         {}
+// };
 
-std::vector<ChildData> _childData;
+// std::vector<ChildData> _childData;
 
-public:
+// public:
 
-    ResourceStorageWithChildren(): ResourceStorage(), _childData() {}
+//     ResourceStorageWithChildren(): ResourceStorage(), _childData() {}
 
-    ResourceId Insert(T&& item) override {
+//     ResourceId Insert(T&& item) override {
         
-        ResourceId result = ResourceStorage::Insert(std::forward(item));
+//         ResourceId result = ResourceStorage::Insert(std::forward(item));
 
-        if (_childData.size() <= result.index())
-            _childData.resize(result.index() + 1);
-    }
+//         if (_childData.size() <= result.index())
+//             _childData.resize(result.index() + 1);
+//     }
 
-    ResourceId InsertChild(T&& item, ResourceId parent) {
-        assert(_childData[parent.index()].parent == UINT32_MAX);
+//     ResourceId InsertChild(T&& item, ResourceId parent) {
+//         assert(_childData[parent.index()].parent == UINT32_MAX);
         
-        ResourceId childId = Insert(std::forward(item));
+//         ResourceId childId = Insert(std::forward(item));
 
-        ChildData oldChildData = _childData[parent.index()];
-        if (oldChildData.child != UINT32_MAX) {
-            _childData[oldChildData.child].parent = childId.index();
-        }
-        oldChildData.parent = parent.index();
-        _childData[childId.index()] = oldChildData;
+//         ChildData oldChildData = _childData[parent.index()];
+//         if (oldChildData.child != UINT32_MAX) {
+//             _childData[oldChildData.child].parent = childId.index();
+//         }
+//         oldChildData.parent = parent.index();
+//         _childData[childId.index()] = oldChildData;
 
-        _childData[parent.index].child = childId.index();
+//         _childData[parent.index].child = childId.index();
 
-        return childId;
-    }
+//         return childId;
+//     }
 
-    bool TryRemove(ResourceId item) override {
+//     bool TryRemove(ResourceId item) override {
 
-        if (id.type() != type)
-            return false;
+//         if (id.type() != type)
+//             return false;
 
-        uint32_t generation = id.generation();
-        uint32_t index = id.index();
+//         uint32_t generation = id.generation();
+//         uint32_t index = id.index();
 
-        if (index >= _generations.size())
-            return false;
+//         if (index >= _generations.size())
+//             return false;
 
-        if (_generations[index] != generation)
-            return false;
+//         if (_generations[index] != generation)
+//             return false;
 
-        if (!_storage[index].has_value())
-            return false;
+//         if (!_storage[index].has_value())
+//             return false;
 
-        // removing someones child
-        ChildData* childData = &_childData[item.index()];
-        if (childData->parent != UINT32_MAX) {
+//         // removing someones child
+//         ChildData* childData = &_childData[item.index()];
+//         if (childData->parent != UINT32_MAX) {
             
-            RemoveUnchecked(item);
+//             RemoveUnchecked(item);
 
-            if (childData->child != UINT32_MAX) {
-                _childData[childData->child].parent = childData->parent;
-            }
+//             if (childData->child != UINT32_MAX) {
+//                 _childData[childData->child].parent = childData->parent;
+//             }
 
-            _childData[childData->parent].child = childData->child;
-            *childData = ChildData();
+//             _childData[childData->parent].child = childData->child;
+//             *childData = ChildData();
             
-            return true;
-        }
+//             return true;
+//         }
 
-        // first removing all the children and then the parent
-        while (childData->child != UINT32_MAX) {
-            uint32_t childIndex = childData.child;
+//         // first removing all the children and then the parent
+//         while (childData->child != UINT32_MAX) {
+//             uint32_t childIndex = childData.child;
             
-            RemoveUnchecked(childIndex);
+//             RemoveUnchecked(childIndex);
             
-            *childData = ChildData();
-            childData = &_childData[childIndex];
-        }
-        *childData = ChildData();
+//             *childData = ChildData();
+//             childData = &_childData[childIndex];
+//         }
+//         *childData = ChildData();
 
-        RemoveUnchecked(item);
+//         RemoveUnchecked(item);
 
-        return true;
-    }
+//         return true;
+//     }
 
-    void clear() override {
-        for (uint32_t i = 0; i < _storage.size(); i++) {
-            if (!_storage[i].has_value())
-                continue;
+//     void clear() override {
+//         for (uint32_t i = 0; i < _storage.size(); i++) {
+//             if (!_storage[i].has_value())
+//                 continue;
 
-            ResourceId id = ResourceId::Compose(type, i, _generations[i]);
-            TryRemove(id);
-        }
-        ResourceStorage::clear();
-        _childData.clear();
-    }
-};
+//             ResourceId id = ResourceId::Compose(type, i, _generations[i]);
+//             TryRemove(id);
+//         }
+//         ResourceStorage::clear();
+//         _childData.clear();
+//     }
+// };
 
 template<typename T>
 ResourceStorage<T>::~ResourceStorage() {
@@ -234,6 +239,10 @@ struct ResourceRef {
         return _storage->GetUnchecked(id);
     }
 
+    const T& val() const {
+        return _storage->GetUnchecked(id);
+    }
+
     T* try_get() {
         return _storage->TryGet(id);
     }
@@ -243,6 +252,10 @@ struct ResourceRef {
     }
 
     T* operator ->() {
+        return &val();
+    }
+
+    const T* operator ->() const {
         return &val();
     }
 
