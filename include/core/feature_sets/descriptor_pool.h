@@ -8,6 +8,8 @@
 #include <descriptor_identity.h>
 #include <framed_object_pool.h>
 #include <helper_functions.h>
+#include <memory>
+#include <algorithm>
 
 struct DescriptorPool 
 {
@@ -141,7 +143,7 @@ struct API Descriptors : FeatureSet,
         }
 
         if (selectedPool.isNull()) {
-            Preallocate<T>(std::max(_preallocatedPoolSize[id], 1));
+            Preallocate<T>(std::max(_preallocatedPoolSize[id], static_cast<uint32_t>(1)));
             selectedPool = _descriptorPools[id].back();
         }
 
@@ -165,7 +167,7 @@ struct API Descriptors : FeatureSet,
 
         if (existing != _preallocatedDescriptorSets.end()) {
             existing->second.MoveTo(_descriptorSetPool[id].CurrentPool());
-            return existing->second; //TODO
+            return FormInput(*existing->second, values);
         }
 
         if (_descriptorSetPool[id].isEmpty()) {
@@ -180,16 +182,19 @@ struct API Descriptors : FeatureSet,
             _preallocatedDescriptorSets.erase(toReplace);
         }
 
+        UpdateDescriptorSetPreloaded(*set, values);
+
         auto result = _preallocatedDescriptorSets.emplace(set->identity, std::move(set));
-        
-        return UpdateDescriptorSetPreloaded(result.first, values);
+
+        return FormInput(*(result.first->second), values);
     }
 
     template<typename T>
     ShaderInputInstance UpdateDescriptorSet(DescriptorSet& set, const T& values) {
         _identityCache->clear();
         values.FillDescriptorSetIdentity(*_identityCache);
-        return UpdateDescriptorSetPreloaded(set, values);
+        UpdateDescriptorSetPreloaded(set, values);
+        return FormInput(set, values);
     }
 
     virtual void OnMessage(DestroyMsg*);
@@ -199,18 +204,17 @@ struct API Descriptors : FeatureSet,
 private:
 
     template <typename T>
-    ShaderInputInstance UpdateDescriptorSetPreloaded(DescriptorSet& set, const T& values) {
+    void UpdateDescriptorSetPreloaded(DescriptorSet& set, const T& values) {
         Allocator& alloc = Helpers::allocator(&context);
 
-        MemChunk<uint32_t> dynamicStates = alloc.BumpAllocate<uint32_t>(T::size_dynamic_states());
 
         auto _ = alloc.BeginContext();
-        MemChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(*context, set->vkSet, dynamicStates.data);
+        MemChunk<VkWriteDescriptorSet> writes = values.CollectDescriptorWrites(context, set.vkSet);
         MemBuffer<VkWriteDescriptorSet> actualWrites = alloc.BumpAllocate<VkWriteDescriptorSet>(writes.size);
 
         if (set.identity == nullptr) {
-            vkUpdateDescriptorSets(Helpers::device(context), writes.size, writes.data, 0, nullptr);
-            set.identity = std::make_shared(*_identityCache);
+            vkUpdateDescriptorSets(Helpers::device(&context), writes.size, writes.data, 0, nullptr);
+            set.identity = std::make_shared<DescriptorSetIdentity>(*_identityCache);
             return;
         }
 
@@ -224,19 +228,36 @@ private:
         }
         
         if (actualWrites.size() > 0) {
-            vkUpdateDescriptorSets(Helpers::device(context), actualWrites.size(), actualWrites.data(), 0, nullptr);
-            set.identity = std::make_shared(*_identityCache);
+            vkUpdateDescriptorSets(Helpers::device(&context), actualWrites.size(), actualWrites.data(), 0, nullptr);
+            set.identity = std::make_shared<DescriptorSetIdentity>(*_identityCache);
+        }
+    }
+    
+    template <typename T>
+    ShaderInputInstance FormInput(DescriptorSet& set, const T& values) {
+        const uint32_t sizeDynamic = T::size_dynamic_states();
+
+        if constexpr (sizeDynamic > 0 ) {
+            MemChunk<uint32_t> dynamicStates = Helpers::allocator(&context)
+                .BumpAllocate<uint32_t>(sizeDynamic);
+            values.FillDynamicState(dynamicStates.data);
+            
+            return ShaderInputInstance {
+                &set,
+                sizeDynamic,
+                dynamicStates.data
+            };
         }
 
         return ShaderInputInstance {
             &set,
-            dynamicStates.size,
-            dynamicStates.data
+            0,
+            nullptr
         };
     }
 
     struct HashDSIByValue {
-        std::size_t operator()(const std::shared_ptr<DescriptorSetIdentity> ptr) const {
+        std::size_t operator()(const std::shared_ptr<DescriptorSetIdentity>& ptr) const {
             if (ptr == nullptr) {
                 return 0;
             }
@@ -246,11 +267,15 @@ private:
     };
 
     struct EqualDSIByValue{
-        bool operator()(const std::shared_ptr<DescriptorSetIdentity> ptr1, const std::shared_ptr<DescriptorSetIdentity> ptr2) const {
+        bool operator()(const std::shared_ptr<DescriptorSetIdentity>& ptr1, const std::shared_ptr<DescriptorSetIdentity>& ptr2) const {
+
             if (ptr1 == nullptr && ptr2 == nullptr) return true;
             if (ptr1 == nullptr || ptr2 == nullptr) return false;
 
-            return *ptr1 == *ptr2;
+            bool result = *ptr1 == *ptr2;
+
+
+            return result;
         }
     };
 

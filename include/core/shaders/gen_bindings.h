@@ -71,7 +71,7 @@ BLOCK
         return value;
     }
 
-    static constexpr uint32_t size_dynamic_states() {
+    static const constexpr uint32_t size_dynamic_states() {
         uint32_t value = 0;
 
         #define WRAPPER(...)
@@ -195,7 +195,21 @@ BLOCK
         #undef BUFFERS
     }
 
-    MemChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set, uint32_t* dynamicState) const {
+    void FillDynamicState(uint32_t* dynamicState) const {
+        uint32_t dynamicStateIndex = 0;
+        #define WRAPPER(...)
+        #define BUFFERS(dc, buffer_value, _offset, size, buffer_id, dynamic) { \
+            if constexpr (dynamic) { \
+                dynamicState[dynamicStateIndex++] = _offset; \
+            } \
+        }
+        #include "define_shader_bindings.h"
+        BLOCK
+        #undef WRAPPER
+        #undef BUFFERS
+    }
+
+    MemChunk<VkWriteDescriptorSet> CollectDescriptorWrites(RenderContext& context, VkDescriptorSet set) const {
         Allocator& allocator = context.Get<Allocator>();
         auto writes = allocator.BumpAllocate<VkWriteDescriptorSet>(size());
         uint32_t index;
@@ -237,7 +251,6 @@ BLOCK
         #undef WRAPPER
 
         index = 0;
-        uint32_t dynamicStateIndex = 0;
         #define WRAPPER(...)
         #define IMAGES(dc, image_value, sampler_value, image_layout, image_id, sampler_id) { \
             uint32_t i = index++; \
@@ -262,9 +275,6 @@ BLOCK
                 bufferInfo[__descriptor].range = size; \
             } \
             writes[i].pBufferInfo = bufferInfo; \
-            if constexpr (dynamic) { \
-                dynamicState[dynamicStateIndex++] = _offset; \
-            } \
         }
         #include "define_shader_bindings.h"
         BLOCK
