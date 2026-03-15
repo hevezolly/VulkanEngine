@@ -4,7 +4,7 @@
 #include <shader_loader.h>
 
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
-    context(&context)
+    PipelineBuilder<GraphicsPipelineBuilder>(context)
 {
     inputAssembly = {VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -51,37 +51,6 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
 
     subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-}
-
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(const std::string& path, Stage stage) {
-    return AddShaderStage(context->Get<ShaderLoader>().Get(path, stage));
-}
-
-
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddShaderStage(
-    const ShaderBinary& binary
-) {
-    VkShaderModule vkModule;
-    VkShaderModuleCreateInfo moduleInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    moduleInfo.codeSize = binary.size_in_bytes();
-    moduleInfo.pCode = binary.spirVWords.data();
-
-    VK(vkCreateShaderModule(context->device(), &moduleInfo, nullptr, &vkModule))
-
-    shaderModules.emplace_back(vkModule, context->device());
-    
-    VkPipelineShaderStageCreateInfo stageInfo{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-    stageInfo.stage = ToVkShaderStage(binary.stage);
-    stageInfo.module = vkModule;
-    stageInfo.pName = "main";
-
-    stages.push_back(stageInfo);
-
-    return *this;
-}
-
-Descriptors& GraphicsPipelineBuilder::getDescriptors() {
-    return context->Get<Descriptors>();
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddDynamicState(VkDynamicState state) {
@@ -146,31 +115,9 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetAlphaBlending(BlendMethod& 
 
 Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     assert(dsState.has_value() == dsRef.has_value());
-    Ref<GraphicsPipeline> pipeline = context->New<GraphicsPipeline>();
-    pipeline->context = context;
-
-    VkPipelineLayoutCreateInfo pipelineLayout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    pipelineLayout.setLayoutCount = descriptorLayouts.size();
-    pipelineLayout.pSetLayouts = descriptorLayouts.data();
-    pipelineLayout.pushConstantRangeCount = 0;
-    pipelineLayout.pPushConstantRanges = nullptr;
-    pipelineLayout.flags = 0;
-
-    VK(vkCreatePipelineLayout(
-        context->device(), 
-        &pipelineLayout, 
-        nullptr, 
-        &pipeline->layout
-    ));
-
-    //TODO: fix
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    VkPipeline pipeline;
+    VkRenderPass renderPass;
+    VkPipelineLayout layout = createLayout();
 
     subpass.colorAttachmentCount = colorAttachmentRef.size();
     subpass.pColorAttachments = colorAttachmentRef.data();
@@ -183,15 +130,15 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
+    renderPassInfo.dependencyCount = 0;
+    renderPassInfo.pDependencies = nullptr;
     renderPassInfo.flags = 0;
 
     VK(vkCreateRenderPass(
         context->device(), 
         &renderPassInfo, 
         nullptr, 
-        &pipeline->renderPass
+        &renderPass
     ));
 
 
@@ -228,8 +175,8 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
         pipelineInfo.pDepthStencilState = &dsState.value();
     pipelineInfo.pColorBlendState = &blendingCreateInfo;
     pipelineInfo.pDynamicState = &dynamicStateInfo;
-    pipelineInfo.layout = pipeline->layout;
-    pipelineInfo.renderPass = pipeline->renderPass;
+    pipelineInfo.layout = layout;
+    pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
@@ -238,42 +185,35 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     VK(vkCreateGraphicsPipelines(
         context->device(), 
         VK_NULL_HANDLE,
-        1, &pipelineInfo, nullptr, &pipeline->pipeline
+        1, &pipelineInfo, nullptr, &pipeline
     ));
 
-    return pipeline;
+    return context->New<GraphicsPipeline>(context->device(), pipeline, layout, renderPass);
 }
-
-GraphicsPipeline::GraphicsPipeline() {}
 
 GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) noexcept {
     if (&other == this)
         return *this;
     
-    layout = other.layout;
-    context = other.context;
+    Pipeline::operator=(std::move(other));
+
     renderPass = other.renderPass;
-    pipeline = other.pipeline;
-    other.pipeline = VK_NULL_HANDLE;
-    other.layout = VK_NULL_HANDLE;
-    other.context = nullptr;
     other.renderPass = VK_NULL_HANDLE;
 
     return *this;
 }
 
-GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) noexcept {
-    *this = std::move(other);
+GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) noexcept:
+    Pipeline(std::move(other)) {
+    renderPass = other.renderPass;
+    other.renderPass = VK_NULL_HANDLE;
 }
 
 GraphicsPipeline::~GraphicsPipeline() {
-    if (context == nullptr)
+    if (device == VK_NULL_HANDLE)
         return;
         
-    vkDestroyPipeline(context->device(), pipeline, nullptr);
-    vkDestroyPipelineLayout(context->device(), layout, nullptr);
-    vkDestroyRenderPass(context->device(), renderPass, nullptr);
-    context = nullptr;
+    vkDestroyRenderPass(device, renderPass, nullptr);
 }
 
 GraphicsPipelineBuilder GraphicsFeature::NewGraphicsPipeline() {
@@ -284,19 +224,12 @@ void GraphicsFeature::OnMessage(CollectRequiredQueueTypesMsg* m){
     m->requiredTypes |= QueueType::Graphics;
 }
 
-Allocator& GraphicsFeature::getAllocator() {
-    return context.Get<Allocator>();
-}
-
 void GraphicsFeature::OnMessage(BeginFrameMsg* m) {
-    currentFrame = m->inFlightFrame;
 
-    if (_frameBuffers.size() > currentFrame) {
-        _frameBuffers[currentFrame].clear();
-    }
+    _frameBuffers.SetFrame(m->inFlightFrame);
+    _frameBuffers->clear();
 }
 
 void GraphicsFeature::OnMessage(DestroyMsg*) {
-    currentFrame = 0;
     _frameBuffers.clear();
 }

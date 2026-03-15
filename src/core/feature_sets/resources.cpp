@@ -47,11 +47,10 @@ Buffer createStandaloneBuffer(RenderContext& c, BufferPreset preset, uint32_t si
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size_bytes;
     bufferInfo.usage = preset.usageFlags;
-    uint32_t usedQueuesCount;
-    MemChunk<uint32_t> usedQueues = c.Get<Device>().FillQueueUsages(preset.usedQueues, usedQueuesCount);
-    bufferInfo.sharingMode = usedQueuesCount > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
-    bufferInfo.queueFamilyIndexCount = usedQueuesCount;
-    bufferInfo.pQueueFamilyIndices = usedQueues.data;
+    MemBuffer<uint32_t> usedQueues = c.Get<Device>().FillQueueUsages(preset.usedQueues);
+    bufferInfo.sharingMode = usedQueues.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+    bufferInfo.queueFamilyIndexCount = usedQueues.size();
+    bufferInfo.pQueueFamilyIndices = usedQueues.data();
     VkBuffer buffer;
 
     VK(vkCreateBuffer(c.device(), &bufferInfo, nullptr, &buffer));
@@ -111,12 +110,11 @@ ResourceRef<Image> Resources::CreateImage(const ImageDescription& description, I
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = static_cast<VkImageUsageFlags>(usage);
-    uint32_t usedQueuesCount;
-    MemChunk<uint32_t> usedQueues = context.Get<Device>().FillQueueUsages(
-        QueueType::Transfer | QueueType::Graphics | QueueType::Compute, usedQueuesCount);
-    imageInfo.sharingMode = usedQueuesCount > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.queueFamilyIndexCount = usedQueuesCount;
-    imageInfo.pQueueFamilyIndices = usedQueues.data;
+    MemBuffer<uint32_t> usedQueues = context.Get<Device>().FillQueueUsages(
+        QueueType::Transfer | QueueType::Graphics | QueueType::Compute);
+    imageInfo.sharingMode = usedQueues.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.queueFamilyIndexCount = usedQueues.size();
+    imageInfo.pQueueFamilyIndices = usedQueues.data();
 
     VK(vkCreateImage(context.device(), &imageInfo, nullptr, &image));
     VkMemoryRequirements memRequirements;

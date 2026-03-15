@@ -959,5 +959,11 @@ void RenderGraph::Run() {
         *semaphoresPerQueue,
         *semaphoreValuesPerQueue
     );
+
+
+    for (auto& node: nodes) {
+        node.destructor(node.node);
+    }
+
     nodes.clear();
 }

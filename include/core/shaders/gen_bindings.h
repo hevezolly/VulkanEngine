@@ -12,6 +12,7 @@
 #include <render_node.h>
 #include <descriptor_identity.h>
 #include <buffer_region.h>
+#include <access_type.h>
 
 #ifndef BLOCK_NAME
 #error "BLOCK_NAME must be defined"

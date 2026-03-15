@@ -14,18 +14,6 @@ struct BLOCK_NAME {
 BLOCK
 #undef WRAPPER
 
-    static VkVertexInputBindingDescription GetBindingDescription() {
-
-        VkVertexInputBindingDescription bindingDescription{};
-
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(BLOCK_NAME);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescription;
-
-    }
-
     static constexpr uint32_t size() {
         uint32_t __counter = 0;
 #define WRAPPER(t, n, l, f) __counter++;
@@ -35,7 +23,7 @@ BLOCK
         return __counter;
     }
 
-    static void CollectAttributeDescription(std::vector<VkVertexInputAttributeDescription>& __attributes) {
+    static void CollectAttributeDescription(std::vector<VkVertexInputAttributeDescription>& __attributes, uint32_t binding) {
         uint32_t initialSize = __attributes.size();
         __attributes.resize(initialSize + size());
         
@@ -58,7 +46,7 @@ BLOCK
 #undef WRAPPER
 
         for (int i = initialSize; i < __attributes.size(); i++) {
-            __attributes[i].binding = 0;
+            __attributes[i].binding = binding;
         }
     }
 };

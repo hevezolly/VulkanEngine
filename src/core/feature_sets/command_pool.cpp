@@ -3,6 +3,7 @@
 #include <graphics_feature.h>
 #include <allocator_feature.h>
 #include <resources.h>
+#include <compute.h>
 
 TransferCommandBuffer::TransferCommandBuffer(VkCommandBuffer b, RenderContext* c):
     context(c),
@@ -40,7 +41,7 @@ VkCommandPool CreateCommandPool(VkDevice device, uint32_t queueFamily, bool tran
     VkCommandPool pool;
 
     VkCommandPoolCreateInfo info {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    info.flags = transient ? VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    info.flags = transient ? 0 : VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     info.queueFamilyIndex = queueFamily;
 
     VK(vkCreateCommandPool(device, &info, nullptr, &pool));
@@ -65,6 +66,7 @@ void createCommandPoolsSet(
     VkCommandPool& graphicsCommandPool,
     VkCommandPool& compueCommandPool,
     VkCommandPool& transferCommandPool,
+    bool transient,
     const std::string& nameSuffix = ""
 ) {
     graphicsCommandPool = VK_NULL_HANDLE;
@@ -77,26 +79,38 @@ void createCommandPoolsSet(
         graphicsCommandPool = CreateCommandPool(
             context.device(), 
             graphicsQueue,
-            false
+            transient
+        );
+    }
+
+    if (context.Has<Compute>()) {
+        uint32_t computeQueue = context.Get<Device>().queueFamilies.get(QueueType::Compute);
+        compueCommandPool = CreateCommandPool(
+            context.device(),
+            computeQueue,
+            transient
         );
     }
 
     transferCommandPool = CreateCommandPool(
         context.device(),
         transferQueue,
-        false
+        transient
     );
 }
 
 void CommandPool::OnMessage(InitMsg* m) {
 
-    createCommandPoolsSet(context, graphicsCommandPool, compueCommandPool, transferCommandPool);
+    createCommandPoolsSet(context, graphicsCommandPool, computeCommandPool, transferCommandPool, false);
     
 }
 
 void CommandPool::OnMessage(DestroyMsg* m) {
     if (graphicsCommandPool != VK_NULL_HANDLE)
         vkDestroyCommandPool(context.device(), graphicsCommandPool, nullptr);
+
+    if (computeCommandPool != VK_NULL_HANDLE)
+        vkDestroyCommandPool(context.device(), computeCommandPool, nullptr);
 
     vkDestroyCommandPool(context.device(), transferCommandPool, nullptr);
 
@@ -225,6 +239,17 @@ void TransferCommandBuffer::Reset() {
     vkResetCommandBuffer(buffer, 0);
 }
 
+void ComputeCommandBuffer::BeginComputePass(Ref<ComputePipeline> pipeline) {
+    assert(!currentPipeline.has_value());
+
+    vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+
+    currentPipeline = BoundPipelineData {
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        pipeline->layout
+    };
+}
+
 void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, const FrameBuffer& frameBuffer) {
     assert(!currentPipeline.has_value());
     
@@ -247,9 +272,12 @@ void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, cons
     };
 }
 
-void ComputeCommandBuffer::EndRenderPass() {
+void ComputeCommandBuffer::EndPass() {
     assert(currentPipeline.has_value());
-    vkCmdEndRenderPass(buffer);
+    
+    if (currentPipeline.value().bindPoint == VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS)
+        vkCmdEndRenderPass(buffer);
+    
     currentPipeline = std::nullopt;
 }
 
@@ -381,7 +409,7 @@ std::unique_ptr<TransferCommandBuffer> CommandPool::BorrowCommandBuffer(QueueTyp
         createCommandPoolsSet(context, 
             framedCommandPools.val()[static_cast<uint32_t>(QueueType::Graphics)],
             framedCommandPools.val()[static_cast<uint32_t>(QueueType::Compute)],
-            framedCommandPools.val()[static_cast<uint32_t>(QueueType::Transfer)]);
+            framedCommandPools.val()[static_cast<uint32_t>(QueueType::Transfer)], true);
     }
 
     if (allocatedBuffers.size() <= index) {

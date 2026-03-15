@@ -9,6 +9,8 @@
 #include <descriptor_pool.h>
 #include <allocator_feature.h>
 #include <shader_module.h>
+#include <pipeline_builder.h>
+#include <framed_storage.h>
 
 struct API BlendMethod {
     VkBlendFactor src;
@@ -16,24 +18,22 @@ struct API BlendMethod {
     VkBlendOp op;
 };
 
-struct API GraphicsPipeline {
-    VkPipelineLayout layout;
-    VkRenderPass renderPass;
-    VkPipeline pipeline;
-
-    GraphicsPipeline();
-
-    RULE_5(GraphicsPipeline)
-
-    friend struct GraphicsPipelineBuilder;
-private: 
-    RenderContext* context;
+enum struct VertexInputRate: uint32_t {
+    Vertex = VK_VERTEX_INPUT_RATE_VERTEX,
+    Instance = VK_VERTEX_INPUT_RATE_INSTANCE
 };
 
-struct API GraphicsPipelineBuilder {
+struct API GraphicsPipeline: Pipeline {
+    VkRenderPass renderPass;
+
+    GraphicsPipeline(VkDevice device, VkPipeline pipeline, VkPipelineLayout layout, VkRenderPass rp):
+        Pipeline(device, pipeline, layout), renderPass(rp){}
+
+    RULE_5(GraphicsPipeline)
+};
+
+struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
     
-    std::vector<ShaderModule> shaderModules;
-    std::vector<VkPipelineShaderStageCreateInfo> stages;
     std::vector<VkDynamicState> dynamicStates;
     std::optional<VkViewport> viewport;
     std::optional<VkRect2D> scissor;
@@ -45,16 +45,12 @@ struct API GraphicsPipelineBuilder {
     
     std::vector<VkVertexInputBindingDescription> vertexDescriptions;
     std::vector<VkVertexInputAttributeDescription> vertexAttributes;
-    std::vector<VkDescriptorSetLayout> descriptorLayouts;
 
     std::vector<VkAttachmentDescription> attachments;
     std::vector<VkAttachmentReference> colorAttachmentRef;
     std::optional<VkPipelineDepthStencilStateCreateInfo> dsState;
     std::optional<VkAttachmentReference> dsRef;
     VkSubpassDescription subpass;
-
-    GraphicsPipelineBuilder& AddShaderStage(const std::string& path, Stage stage);
-    GraphicsPipelineBuilder& AddShaderStage(const ShaderBinary& binary);
 
     GraphicsPipelineBuilder& AddDynamicState(VkDynamicState state);
 
@@ -77,17 +73,15 @@ struct API GraphicsPipelineBuilder {
     GraphicsPipelineBuilder& SetAlphaBlending(BlendMethod& method);
 
     template<typename T>
-    GraphicsPipelineBuilder& SetVertex() {
-        vertexDescriptions.resize(1);
-        vertexDescriptions[0] = T::GetBindingDescription();
-        vertexAttributes.clear();
-        T::CollectAttributeDescription(vertexAttributes);
-        return *this;
-    }
+    GraphicsPipelineBuilder& AddVertex(VertexInputRate inputRate = VertexInputRate::Vertex) {
 
-    template<typename T>
-    GraphicsPipelineBuilder& AddLayout() {
-        descriptorLayouts.push_back(getDescriptors().GetLayout<T>());
+        uint32_t binding = vertexDescriptions.size();
+
+        vertexDescriptions.push_back(VkVertexInputBindingDescription {
+            binding, sizeof(T), static_cast<VkVertexInputRate>(inputRate) 
+        });
+
+        T::CollectAttributeDescription(vertexAttributes, binding);
         return *this;
     }
 
@@ -121,11 +115,13 @@ struct API GraphicsPipelineBuilder {
 
     friend struct GraphicsFeature;
 
-private:
-    Descriptors& getDescriptors();
-    GraphicsPipelineBuilder(RenderContext& context);
+protected:
+    GraphicsPipelineBuilder& getSelf() {
+        return *this;
+    }
 
-    RenderContext* context;
+private:
+    GraphicsPipelineBuilder(RenderContext& context);
 };
 
 struct API GraphicsFeature: FeatureSet,
@@ -140,21 +136,16 @@ struct API GraphicsFeature: FeatureSet,
 
     template<typename T>
     const FrameBuffer& CreateFrameBuffer(T& args, VkRenderPass renderPass) {
-        Allocator& a = getAllocator();
+        Allocator& a = Helpers::allocator(&context);
+        auto _ = a.BeginContext();
         MemChunk<VkImageView> views = a.BumpAllocate<VkImageView>(T::size());
         MemChunk<VkClearValue> clearVals = a.BumpAllocate<VkClearValue>(T::size());
         args.FillAttachments(views.data, clearVals.data);
         FrameBuffer result(&context, renderPass, views.data, clearVals.data, views.size, args.width(), args.height());
-        a.Free(clearVals);
-        a.Free(views);
-        
-        if (_frameBuffers.size() <= currentFrame) {
-            _frameBuffers.resize(currentFrame + 1);
-        }
 
-        _frameBuffers[currentFrame].push_back(std::make_unique<FrameBuffer>(std::move(result)));
+        _frameBuffers->push_back(std::make_unique<FrameBuffer>(std::move(result)));
         
-        return *_frameBuffers[currentFrame].back();
+        return *(_frameBuffers->back());
     }
 
     virtual void OnMessage(BeginFrameMsg*);
@@ -164,9 +155,7 @@ struct API GraphicsFeature: FeatureSet,
     virtual void OnMessage(DestroyMsg*);
 
 private:
-    Allocator& getAllocator();
 
-    uint32_t currentFrame;
-    std::vector<std::vector<std::unique_ptr<FrameBuffer>>> _frameBuffers; 
+    FramedStorage<std::vector<std::unique_ptr<FrameBuffer>>> _frameBuffers;
 };
 

@@ -12,8 +12,6 @@
 #error "BLOCK_NAME must be defined"
 #endif
 
-#define FUNC_NAME(r) __##BLOCK_NAME##r
-
 //WRAPPER(name, sample_count, loadOp, storeOp, stenciLoadOp, stencilStoreOp, optimalLayout)
 
 struct BLOCK_NAME {

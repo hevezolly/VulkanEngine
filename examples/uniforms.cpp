@@ -112,7 +112,7 @@ _Resources PrepareResources(
 
     r.pipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
-        .SetVertex<Vertex>()
+        .AddVertex<Vertex>()
         .AddLayout<ShaderInput>()
         .SetAttachments<Attachments>(Attachments::Formats{
             context.Get<PresentFeature>().swapChain->format,
@@ -207,7 +207,7 @@ void RecordCommandBuffer(
 
     vkCmdDrawIndexed(cmd.buffer, indexBuffer->count<uint16_t>(), 1, 0, 0, 0);
 
-    cmd.EndRenderPass();
+    cmd.EndPass();
     cmd.End();
 }
 

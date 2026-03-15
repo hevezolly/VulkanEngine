@@ -11,6 +11,7 @@
 #include <framed_object_pool.h>
 #include <optional>
 #include <initializer_list>
+#include <compute.h>
 
 struct API TransferCommandBuffer {
     VkCommandBuffer buffer;
@@ -32,12 +33,11 @@ protected:
     RenderContext* context;
 };
 
-
-
 struct API ComputeCommandBuffer: TransferCommandBuffer {
     using TransferCommandBuffer::TransferCommandBuffer;
     virtual QueueType queueType();
-    void EndRenderPass();
+    void EndPass();
+    void BeginComputePass(Ref<ComputePipeline> pipeline);
 
     void BindShaderInput(uint32_t count, const ShaderInputInstance* input);
     void BindShaderInput(std::initializer_list<ShaderInputInstance> input);
@@ -50,7 +50,6 @@ protected:
         VkPipelineLayout layout;
     };
 
-    //TODO: bound state
     std::optional<BoundPipelineData> currentPipeline;
 };
 
@@ -68,7 +67,7 @@ struct API CommandPool: FeatureSet,
     CanHandle<BeginFrameLateMsg>
 {
     VkCommandPool graphicsCommandPool;
-    VkCommandPool compueCommandPool;
+    VkCommandPool computeCommandPool;
     VkCommandPool transferCommandPool;
     
     CommandPool(RenderContext&);

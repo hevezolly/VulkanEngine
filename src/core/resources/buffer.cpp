@@ -6,13 +6,13 @@
 const BufferPreset BufferPreset::VERTEX = {
     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    QueueType::Graphics | QueueType::Compute | QueueType::Transfer
+    QueueType::Graphics | QueueType::Transfer
 };
 
 const BufferPreset BufferPreset::INDEX = {
     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    QueueType::Graphics | QueueType::Compute | QueueType::Transfer
+    QueueType::Graphics | QueueType::Transfer
 };
 
 const BufferPreset BufferPreset::STAGING = {
@@ -26,6 +26,12 @@ const BufferPreset BufferPreset::UNIFORM = {
     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    QueueType::Graphics | QueueType::Compute
+};
+
+const BufferPreset BufferPreset::STORAGE = {
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     QueueType::Graphics | QueueType::Compute
 };
 

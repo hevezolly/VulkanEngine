@@ -14,6 +14,7 @@ struct API BufferPreset {
     static const BufferPreset INDEX;
     static const BufferPreset STAGING;
     static const BufferPreset UNIFORM;
+    static const BufferPreset STORAGE;
 };
 
 inline BufferPreset& operator |=(BufferPreset& lhs, BufferPreset rhs) {

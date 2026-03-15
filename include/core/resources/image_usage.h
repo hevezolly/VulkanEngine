@@ -1,11 +1,13 @@
 #pragma once
 #include <common.h>
 
-enum ImageUsage: VkFlags {
+enum struct ImageUsage: VkFlags {
     ColorAttachment = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
     DepthStencil = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    TransferSrc = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     TransferDst = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
     Sampled = VK_IMAGE_USAGE_SAMPLED_BIT,
+    Storage = VK_IMAGE_USAGE_STORAGE_BIT
 };
 
 inline ImageUsage operator |(ImageUsage l, ImageUsage r) {

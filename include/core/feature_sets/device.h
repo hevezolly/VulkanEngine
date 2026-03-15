@@ -58,7 +58,7 @@ struct API Device: FeatureSet,
     QueueFamiliesDescriptor queueFamilies;
     QueuesDescriptor<VkQueue> queues;
 
-    MemChunk<uint32_t> FillQueueUsages(QueueTypes tupes, uint32_t& actualCount);
+    MemBuffer<uint32_t> FillQueueUsages(QueueTypes tupes);
 
     using FeatureSet::FeatureSet;
     virtual void OnMessage(InitMsg*);

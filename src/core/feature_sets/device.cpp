@@ -22,14 +22,17 @@ static bool CheckQueueFits(
     switch (type)
     {
     case QueueType::Graphics:
-        return ((properties->queueFlags) & VK_QUEUE_GRAPHICS_BIT) > 0;
+        return ((properties->queueFlags) & (VK_QUEUE_GRAPHICS_BIT)) > 0;
     case QueueType::Present:
         VkBool32 support;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, surface, &support);
         return support == VK_TRUE;
     case QueueType::Transfer:
         suboptimal = ((properties->queueFlags) & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) > 0;
-        return (((properties->queueFlags) & VK_QUEUE_TRANSFER_BIT) > 0);
+        return (((properties->queueFlags) & (VK_QUEUE_TRANSFER_BIT | VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) > 0);
+    case QueueType::Compute:
+        suboptimal = ((properties->queueFlags) & (VK_QUEUE_GRAPHICS_BIT)) > 0;
+        return (properties->queueFlags) & (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT) > 0;
     default:
         std::stringstream ss;
         ss << "queue type " << (int)type << " is invalid";
@@ -55,8 +58,8 @@ static bool TryConfigureQueueFamilies(
             continue;
         }
 
-        bool suboptimalQueue = false;
         for (uint32_t i = 0; i < queueFamilies.size(); i++) {
+            bool suboptimalQueue = false;
             if (CheckQueueFits(&queueFamilies[i], i, device, surface, type, suboptimalQueue)) {
                 indices_vec[(int)type] = i;
                 queueFits = true;
@@ -122,6 +125,8 @@ static VkPhysicalDevice FindDeviceOfType(
         }
     }
 
+    LOG("NOT FOUND!")
+
     return VK_NULL_HANDLE;
 }
 
@@ -134,7 +139,6 @@ static VkDevice CreateLogicalDevice(
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies;
     float queuePriority = 1.f;
-    
     for (std::optional<uint32_t> queueFamilyIndex: queueDescriptors->queues) {
 
         if (!queueFamilyIndex.has_value()) {
@@ -235,9 +239,8 @@ void Device::OnMessage(DestroyMsg* m) {
     }
 }
 
-MemChunk<uint32_t> Device::FillQueueUsages(QueueTypes types, uint32_t& actualCount) {
-    actualCount = 0;
-    MemChunk<uint32_t> data = context.Get<Allocator>().BumpAllocate<uint32_t>(static_cast<uint32_t>(QueueType::None));
+MemBuffer<uint32_t> Device::FillQueueUsages(QueueTypes types) {
+    MemBuffer<uint32_t> data = context.Get<Allocator>().BumpAllocate<uint32_t>(static_cast<uint32_t>(QueueType::None));
     for (QueueType type = (QueueType)0; (int)type < (int)QueueType::None; type = (QueueType)((int)type + 1)) {
         if ((types & type) == 0)
             continue;
@@ -246,10 +249,10 @@ MemChunk<uint32_t> Device::FillQueueUsages(QueueTypes types, uint32_t& actualCou
         if (!queue.has_value())
             continue;
 
-        if (std::find(data.data, data.data + actualCount, queue.value()) != data.data + actualCount)
+        if (std::find(data.begin(), data.end(), queue.value()) != data.end())
             continue;
 
-        data[actualCount++] = queue.value();
+        data.push_back(queue.value());
     }
     return data;
 }

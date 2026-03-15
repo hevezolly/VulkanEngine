@@ -136,7 +136,7 @@ void ImguiUI::OnMessage(PresentMsg* m) {
     
     ImGui_ImplVulkan_RenderDrawData(draw_data, _commandBuffers[currentFrame].buffer);
 
-    _commandBuffers[currentFrame].EndRenderPass();
+    _commandBuffers[currentFrame].EndPass();
     _commandBuffers[currentFrame].End();
 
     Ref<Semaphore> startSemaphore = m->wait;

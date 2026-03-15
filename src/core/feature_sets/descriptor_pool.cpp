@@ -142,7 +142,7 @@ void Descriptors::OnMessage(BeginFrameMsg* m) {
     frameId = m->inFlightFrame;
 
     for (auto& pair : _descriptorSetPool) {
-        pair.second.SetFrame(m->inFlightFrame);
+        pair.second.SetFrameWithReset(m->inFlightFrame);
     }
 }
 

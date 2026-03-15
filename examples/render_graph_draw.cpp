@@ -69,9 +69,6 @@ _Resources PrepareResources(
     ShaderBinary vertexBin = context.Get<ShaderLoader>().Get("shaders/basic.vert", Stage::Vertex);
     ShaderBinary fragmentBin = context.Get<ShaderLoader>().Get("shaders/basic.frag", Stage::Fragment);
 
-    ShaderBinary vertexBinImg = context.Get<ShaderLoader>().Get("shaders/full_screen.vert", Stage::Vertex);
-    ShaderBinary fragmentBinImg = context.Get<ShaderLoader>().Get("shaders/test_full_screen.frag", Stage::Fragment);
-
 
     VkFormat dsFormat = context.Get<Device>().SelectSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
@@ -105,7 +102,7 @@ _Resources PrepareResources(
     
     r.pipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
-        .SetVertex<Vertex>()
+        .AddVertex<Vertex>()
         .AddLayout<ShaderInput>()
         .SetAttachments<Attachments>({
             context.Get<PresentFeature>().swapChain->format,
@@ -165,9 +162,6 @@ void DrawFrame(
     _Resources& r
 ) {
     context.BeginFrame();
-    uint32_t frameId = context.Get<FrameDispatcher>().frameInFlightIndex();
-
-    bool menuActive = true;
 
     ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 
@@ -187,7 +181,7 @@ void DrawFrame(
     node0.SetBindings(data);
 
     node0.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
-    node0.SetVertexBuffer<Vertex>(r.vertexBuffer);
+    node0.AddVertexBuffer(r.vertexBuffer);
 
     auto& node1 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
     node1.SetName("draw2");
@@ -201,10 +195,10 @@ void DrawFrame(
     node1.SetBindings(data);
 
     node1.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
-    node1.SetVertexBuffer<Vertex>(r.vertexBuffer);
+    node1.AddVertexBuffer(r.vertexBuffer);
 
     auto& node2 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
-    node2.SetName("draw2");
+    node2.SetName("draw3");
 
     attachments.color = outputImage;
     attachments.depth = r.depth;
@@ -214,7 +208,7 @@ void DrawFrame(
     node2.SetBindings(data);
 
     node2.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
-    node2.SetVertexBuffer<Vertex>(r.vertexBuffer);
+    node2.AddVertexBuffer(r.vertexBuffer);
 
     context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 
