@@ -210,6 +210,10 @@ GraphicsCommandBuffer CommandPool::CreateGraphicsBuffer() {
     return GraphicsCommandBuffer(buffer, &context);
 }
 
+GraphicsCommandBuffer CommandPool::BorrowGraphicsBuffer() {
+    return *static_cast<GraphicsCommandBuffer*>(BorrowCommandBuffer(QueueType::Graphics).get());
+}
+
 TransferCommandBuffer CommandPool::CreateTransferBuffer(bool transient) {
 
     if (transient)

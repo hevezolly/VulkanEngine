@@ -402,6 +402,7 @@ struct GraphInstance {
         MemChunk<SignalDescription> perQueueSignals = alloc.BumpAllocate<SignalDescription>((uint32_t)QueueType::None);
 
         for (uint32_t node : sortedNodes) {
+            
             uint32_t queueIndex = (uint32_t)nodes[node].queue;
 
             perQueueSignals.clearToZero();
@@ -454,10 +455,9 @@ struct GraphInstance {
                             break;
                         }
                     }
-
                     if (!found) {
                         usedSignals.push_back(SignalDescription {
-                            nodes[write.node].inputDependency[write.dependencyIndex].state.accessStage,
+                            nodes[write.node].outpnputDependency[write.dependencyIndex].state.accessStage,
                             syncContext
                         });
                     }
@@ -468,7 +468,6 @@ struct GraphInstance {
                 if (perQueueSignals[i].populated)
                     usedSignals.push_back(perQueueSignals[i]);
             }
-
             if (usedSignals.size() > 0)
                 queueTimelines[queueIndex].push_back(QueueTimeStep::Wait(std::move(usedSignals)));
 
@@ -484,11 +483,11 @@ struct GraphInstance {
 
     void simplifyTimelines() {
         PerQueueStorage<uint64_t> perQueueSignals;
-        std::unordered_map<ResourceId, uint32_t> perResourceSignals;
+        std::unordered_set<ResourceId> perResourceExternalSync;
 
         for (uint32_t queue = 0; queue < (uint32_t)QueueType::None; queue++) {
             perQueueSignals.clear_to_zero();
-            perResourceSignals.clear();
+            perResourceExternalSync.clear();
             auto it = queueTimelines[queue].begin();
             while (it != queueTimelines[queue].end()) {
                 if (it->type == QueueTimeStep::Type::Wait) {
@@ -499,13 +498,19 @@ struct GraphInstance {
                         SynchronizationContext& context = syncContexts[signal.syncContext];
 
                         uint64_t& compareValue = perQueueSignals[context.queue];
-                        if (context.externalSyncSource.has_value())
-                            compareValue = perResourceSignals[context.externalSyncSource.value()];
+                        bool hasExternalSync = context.externalSyncSource.has_value();
+                        bool inserted = true;
+                        if (hasExternalSync)
+                            inserted = perResourceExternalSync.insert(context.externalSyncSource.value()).second;
 
-                        if (compareValue > context.timelineValue) {
+                        bool eraseCondition = (!hasExternalSync && compareValue > context.timelineValue)
+                            || (hasExternalSync && !inserted);
+
+
+                        if (eraseCondition) {
                             it->signals.erase(it->signals.begin() + i);
                         }
-                        else {
+                        else if (!hasExternalSync) {
                             compareValue = context.timelineValue;
                         }
                     }
@@ -604,6 +609,17 @@ struct TimelineExecutionContext
     std::vector<Ref<Semaphore>>& timelineSemaphores;
     std::vector<uint64_t>& initialSemaphoreValues;
     std::unordered_map<QueueTimelineValue, Ref<Semaphore>>& binarySemaphores;
+    std::unordered_map<ResourceId, Ref<Semaphore>>& externalSyncContexts;
+
+    Ref<Semaphore> GetExternalSync(RenderContext& context, ResourceId id) {
+        auto it = externalSyncContexts.find(id);
+        if (it != externalSyncContexts.end())
+            return it->second;
+
+        Ref<Semaphore> result = context.Get<Resources>().ExtractSyncContext(id);
+        externalSyncContexts[id] = result;
+        return result;
+    }
 };
 
 void FillSemaphoreInfo(RenderContext& context,
@@ -623,16 +639,18 @@ void FillSemaphoreInfo(RenderContext& context,
         Ref<Semaphore> semaphore;
         uint64_t timelineValue = 0;
 
-        bool hasExternal = allowExtrnalSync && syncContext.externalSyncSource.has_value();
+        bool hasExternal = syncContext.externalSyncSource.has_value();
+        if (hasExternal && !allowExtrnalSync)
+            continue;
 
         if (hasExternal || syncContext.semaphoreRequirements != SemaphoreRequirements::Timeline) {
             if (hasExternal)
-                semaphore = context.Get<Resources>().ExtractSyncContext(syncContext.externalSyncSource.value());
+                semaphore = timelineContext.GetExternalSync(context, syncContext.externalSyncSource.value());
             else {
                 QueueTimelineValue key{syncContext.timelineValue, syncContext.queue};
                 auto it = timelineContext.binarySemaphores.find(key);
                 if (it != timelineContext.binarySemaphores.end())
-                    semaphore = it->second;
+                semaphore = it->second;
                 else{
                     bool semaphorePerSwapChain = syncContext.semaphoreRequirements == SemaphoreRequirements::BinaryPerSwapchainImage;
                     semaphore = context.Get<Synchronization>().BorrowBinarySemaphore(semaphorePerSwapChain);
@@ -693,11 +711,13 @@ void RunTimeline(
     do {
         if (timelineContext.step->type == QueueTimeStep::Type::Wait) {
             assert(waitContext.data() == nullptr);
+
             waitSemaphores = alloc.BumpAllocate<Ref<Semaphore>>(timelineContext.step->signals.size());
             waitContext = alloc.BumpAllocate<VkSemaphoreSubmitInfo>(timelineContext.step->signals.size());
 
-            FillSemaphoreInfo(context, instance, timelineContext, waitContext, true, &waitSemaphores);
-
+            FillSemaphoreInfo(context, instance, timelineContext, waitContext, 
+                queueType != QueueType::Present, &waitSemaphores);
+            
         }
         else if (timelineContext.step->type == QueueTimeStep::Type::Node) {
             NodeWrapper& node = instance.nodes[timelineContext.step->node];
@@ -708,7 +728,7 @@ void RunTimeline(
             node.node->Record(ExecutionContext {
                 cmd.get(),
                 waitSemaphores
-            });   
+            });
 
             if (cmd) {
                 EnqueuePostBarriers(instance, timelineContext.step->node, alloc, *cmd);
@@ -832,6 +852,7 @@ void RunGraph(
     uint32_t queueCount = static_cast<size_t>(QueueType::None);
     PerQueueStorage<uint64_t> maxTimelineValues;
     std::unordered_map<QueueTimelineValue, Ref<Semaphore>> binarySemaphores;
+    std::unordered_map<ResourceId, Ref<Semaphore>> externalSync;
 
     for (int queueIndex =0; queueIndex < queueCount; queueIndex++) {
 
@@ -846,7 +867,8 @@ void RunGraph(
             maxTimelineValues[queueIndex],
             semaphores,
             initialValuess,
-            binarySemaphores
+            binarySemaphores,
+            externalSync
         };
 
         while (executionContext.step != instance.queueTimelines[queueIndex].end())
@@ -918,6 +940,7 @@ void RenderGraph::Run() {
         alloc
     };
 
+
     uint32_t index = 0;
     for (NodeWrapper& node : nodes) {
         instance.populateNode(node, index++);
@@ -929,7 +952,7 @@ void RenderGraph::Run() {
     //     LOG("Input dependencies:")
     //     for (int i = 0; i < node.inputDependency.size; i++) {
     //         auto& d = node.inputDependency[i];
-    //         LOG("   " << context.Get<Resources>().GetName(d.resource))
+    //         LOG("   " << context.Get<Resources>().GetName(d.resource) << " " << d.resource.id)
     //         LOG("   state: " << d.state.accessStage)
     //         LOG("   version: " << node.inputVersions[i])
     //         LOG("")
@@ -938,7 +961,7 @@ void RenderGraph::Run() {
     //     LOG("Output dependencies:")
     //     for (int i = 0; i < node.outpnputDependency.size; i++) {
     //         auto& d = node.outpnputDependency[i];
-    //         LOG("   " << context.Get<Resources>().GetName(d.resource))
+    //         LOG("   " << context.Get<Resources>().GetName(d.resource) << " " << d.resource.id)
     //         LOG("   stage: " << d.state.accessStage)
     //         LOG("   version: " << node.outputVersions[i])
     //         LOG("")
@@ -947,19 +970,17 @@ void RenderGraph::Run() {
     //     LOG("")
     //     index++;
     // }
-
+    
     instance.sortNodes();
     instance.defineSyncronizationContexts(context);
     instance.buildTimelines();
     instance.simplifyTimelines();
-
     RunGraph(
         context, 
         instance, 
         *semaphoresPerQueue,
         *semaphoreValuesPerQueue
     );
-
 
     for (auto& node: nodes) {
         node.destructor(node.node);

@@ -131,33 +131,43 @@ static VkPhysicalDevice FindDeviceOfType(
 }
 
 static VkDevice CreateLogicalDevice(
+    RenderContext& context,
     const QueueFamiliesDescriptor* queueDescriptors, 
     VkPhysicalDevice physicalDevice,
-    std::vector<const char*> deviceExtensions
+    std::vector<const char*> deviceExtensions,
+    QueuesDescriptor<VkQueue>& queues
 ) {
 
+    Allocator& alloc = context.Get<Allocator>();
+    auto _ = alloc.BeginContext();
+
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies;
-    float queuePriority = 1.f;
+    std::unordered_map<uint32_t, uint32_t> queuesCountPerFamily;
+    
     for (std::optional<uint32_t> queueFamilyIndex: queueDescriptors->queues) {
 
         if (!queueFamilyIndex.has_value()) {
             continue;
         }
 
-        if (uniqueQueueFamilies.count(queueFamilyIndex.value())) {
-            continue;
+        queuesCountPerFamily[queueFamilyIndex.value()]++;
+    }
+
+    for (auto& pair : queuesCountPerFamily) {
+
+        MemChunk<float> priorities = alloc.BumpAllocate<float>(pair.second);
+        for (int i = 0; i < pair.second; i++) {
+            priorities[i] = 1.0f;
         }
 
-        uniqueQueueFamilies.insert(queueFamilyIndex.value());
-
         VkDeviceQueueCreateInfo queueCreateInfo{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-        queueCreateInfo.queueFamilyIndex = queueFamilyIndex.value();
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
-
+        queueCreateInfo.queueFamilyIndex = pair.first;
+        queueCreateInfo.queueCount = pair.second;
+        queueCreateInfo.pQueuePriorities = priorities.data;
+    
         queueCreateInfos.push_back(queueCreateInfo);
     }
+
 
     VkPhysicalDeviceFeatures deviceFeatures{};
 
@@ -170,13 +180,28 @@ static VkDevice CreateLogicalDevice(
 
     VkDeviceCreateInfo createInfo{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     createInfo.pNext = &vk12Features;
-    createInfo.queueCreateInfoCount = static_cast<uint32_t>(uniqueQueueFamilies.size());
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     VkDevice device;
     VK(vkCreateDevice(physicalDevice, &createInfo, nullptr, &device));
+
+    queuesCountPerFamily.clear();
+
+    queues.queues.resize(queueDescriptors->queues.size());
+    for (int i = 0; i < queueDescriptors->queues.size(); i++) {
+        if (!queueDescriptors->queues[i]) {
+            continue;
+        }
+
+        uint32_t family = queueDescriptors->queues[i].value();
+        uint32_t index = queuesCountPerFamily[family]++;
+
+        vkGetDeviceQueue(device, family, index, &queues.queues[i].emplace(VK_NULL_HANDLE));
+    }
+
     return device;
 }
 
@@ -217,19 +242,8 @@ void Device::OnMessage(InitMsg* m) {
             VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, 
             surface, &queueFamilies, deviceExtensions);
     }
-
-    device = CreateLogicalDevice(&queueFamilies, vkPhysicalDevice, deviceExtensions);
-
-    std::vector<std::optional<VkQueue>> preparedQueues(queueFamilies.queues.size());
-
-    for (int i = 0; i < preparedQueues.size(); i++) {
-        if (queueFamilies.queues[i].has_value()) {
-
-            vkGetDeviceQueue(device, queueFamilies.queues[i].value(), 0, &preparedQueues[i].emplace(VK_NULL_HANDLE)); 
-        }
-    }
-
-    queues.queues = std::move(preparedQueues);
+    
+    device = CreateLogicalDevice(context, &queueFamilies, vkPhysicalDevice, deviceExtensions, queues);
 }
 
 void Device::OnMessage(DestroyMsg* m) {

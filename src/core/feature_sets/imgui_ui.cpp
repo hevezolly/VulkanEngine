@@ -10,8 +10,7 @@ static void check_vk_result(VkResult err)
 
 #define BLOCK_NAME UiAttachments
 #define BLOCK \
-COLOR(color, LoadOp::Load) \
-INITIAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) FINAL_LAYOUT(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+COLOR(color, LoadOp::Load)
 #include <gen_attachments.h>
 
 
@@ -86,14 +85,7 @@ void ImguiUI::OnMessage(InitMsg*) {
     init_info.CheckVkResultFn = check_vk_result;
     ImGui_ImplVulkan_Init(&init_info);
 
-    _commandBuffers.reserve(framesInFlight);
-
-    for (int i = 0; i < framesInFlight; i++) {
-        _commandBuffers.push_back(context.Get<CommandPool>().CreateGraphicsBuffer());
-    }
-
     _waitFences = context.Get<Synchronization>().CreateFences(framesInFlight, true);
-    _presentReady = context.Get<Synchronization>().CreateSemaphores(context.Get<PresentFeature>().swapChainSize());
     readyToRender = false;
 }
 
@@ -107,21 +99,14 @@ void ImguiUI::OnMessage(BeginFrameMsg* m) {
     readyToRender = true;
 }
 
-void ImguiUI::OnMessage(PresentMsg* m) {
-
-    assert(readyToRender);
+void ImguiUI::Record(ResourceRef<Image> output, GraphicsCommandBuffer& commandBuffer) {
 
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
 
-    _waitFences[currentFrame]->Wait();
-    _waitFences[currentFrame]->Reset();
-
-    _commandBuffers[currentFrame].Reset();
-    _commandBuffers[currentFrame].Begin();
-
     UiAttachments a;
-    a.color = context.Get<PresentFeature>().swapChain->images[m->swapChainIndex];
+    a.color = output;
+
     const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>().CreateFrameBuffer(a, renderPass);    
 
     VkRenderPassBeginInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
@@ -132,26 +117,55 @@ void ImguiUI::OnMessage(PresentMsg* m) {
 
     renderPassInfo.framebuffer = frameBuffer.frameBuffer;
 
-    vkCmdBeginRenderPass(_commandBuffers[currentFrame].buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(commandBuffer.buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     
-    ImGui_ImplVulkan_RenderDrawData(draw_data, _commandBuffers[currentFrame].buffer);
+    ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer.buffer);
 
-    _commandBuffers[currentFrame].EndPass();
-    _commandBuffers[currentFrame].End();
+    vkCmdEndRenderPass(commandBuffer.buffer);
+}
+
+void ImguiUI::OnMessage(PresentMsg* m) {
+
+    assert(readyToRender);
+
+    _waitFences[currentFrame]->Wait();
+    _waitFences[currentFrame]->Reset();
+
+    GraphicsCommandBuffer cmd = context.Get<CommandPool>().BorrowGraphicsBuffer();
+
+    cmd.Begin();
+
+    ResourceRef<Image> output = context.Get<PresentFeature>().swapChain->images[m->swapChainIndex];
+    
+    cmd.ImageBarrier(output, ResourceState{
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VkImageLayout::VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL
+    });
+
+    Record(output, cmd);
+    
+    cmd.ImageBarrier(output, ResourceState{
+        VK_ACCESS_2_NONE,
+        VK_PIPELINE_STAGE_2_NONE,
+        VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+    });
+    cmd.End();
 
     Ref<Semaphore> startSemaphore = m->wait;
-    Ref<Semaphore> endSemaphore = _presentReady[m->swapChainIndex];
+    Ref<Semaphore> endSemaphore = context.Get<Synchronization>().BorrowBinarySemaphore(true);
     m->wait = endSemaphore;
 
+
     context.Get<CommandPool>().Submit(
-        _commandBuffers[currentFrame], 
+        cmd, 
         {{startSemaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}}, 
         {endSemaphore}, 
         _waitFences[currentFrame]
     );
 
     readyToRender = false;
-}   
+}
 
 void ImguiUI::OnMessage(DestroyMsg*) {
     ImGui_ImplVulkan_Shutdown();

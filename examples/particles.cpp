@@ -24,6 +24,8 @@
 #include <access_type.h>
 #include <random>
 #include <compute_node.h>
+#include <imgui_ui.h>
+#include <imgui_node.h>
 
 static const uint32_t PARTICLES_COUNT = 1024;
 static const uint32_t THREAD_GROUP_SIZE = 32;
@@ -141,6 +143,7 @@ _Resources PrepareResources(
         BufferPreset::VERTEX | BufferPreset::STORAGE,
         particles
     );
+    context.Get<Resources>().GiveName(r.particlesBuffer, "particlesBuffer");
 
     std::vector<Vertex> vertices = {
         {{-0.02, -0.02}},
@@ -153,6 +156,7 @@ _Resources PrepareResources(
         BufferPreset::VERTEX,
         vertices
     );
+    context.Get<Resources>().GiveName(r.vertexBuffer, "vertexBuffer");
 
     std::vector<uint16_t> indices = {
         0, 1, 2, 2, 3, 0
@@ -162,6 +166,7 @@ _Resources PrepareResources(
         BufferPreset::INDEX,
         indices
     );
+    context.Get<Resources>().GiveName(r.indexBuffer, "indexBuffer");
 
     r.lastTime = std::chrono::high_resolution_clock::now();
 
@@ -179,6 +184,8 @@ void DrawFrame(
     r.lastTime = currentTume;
     
     context.BeginFrame();
+
+    ImGui::ShowDemoWindow();
 
     ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 
@@ -210,6 +217,8 @@ void DrawFrame(
     });
     drawParticlesNode.SetInstanceCount(PARTICLES_COUNT);
 
+    context.Get<RenderGraph>().AddNode<ImguiNode>(outputImage).SetName("ui");
+
     context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 
     context.Get<RenderGraph>().Run();
@@ -236,6 +245,7 @@ void Run() {
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
            .WithFeature<DynamicUniforms>()
+           .WithFeature<ImguiUI>()
            .Initialize();
     volkLoadInstance(context.vkInstance);
 

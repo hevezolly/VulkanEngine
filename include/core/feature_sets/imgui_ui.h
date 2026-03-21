@@ -6,6 +6,8 @@
 #include <descriptor_pool.h>
 #include <present_feature.h>
 #include <command_pool.h>
+#include <resource_storage.h>
+#include <image.h>
 
 struct API ImguiUI: FeatureSet,
     CanHandle<InitMsg>,
@@ -19,12 +21,12 @@ struct API ImguiUI: FeatureSet,
     virtual void OnMessage(DestroyMsg*);
     virtual void OnMessage(BeginFrameMsg*);
     virtual void OnMessage(PresentMsg*);
+    
+    void Record(ResourceRef<Image> output, GraphicsCommandBuffer& commandBuffer);
 
 private:
     DescriptorPool* _descriptorPool;
-    std::vector<GraphicsCommandBuffer> _commandBuffers;
     Refs<Fence> _waitFences;
-    Refs<Semaphore> _presentReady;
     VkRenderPass renderPass;
     uint32_t currentFrame;
     bool readyToRender;

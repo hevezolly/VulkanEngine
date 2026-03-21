@@ -358,7 +358,20 @@ const std::string& Resources::GetName(ResourceId id) {
     if (it != _names.end())
         return it->second;
     
-    return "";
+    switch (id.type())
+    {
+    case ResourceType::Image:
+        return "unknown image";
+    
+    case ResourceType::Buffer:
+        return "unknown buffer";
+
+    case ResourceType::Sampler:
+        return "unknown sampler";
+
+    default:
+        return "";
+    }
 }
 
 

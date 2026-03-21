@@ -7,6 +7,7 @@
 
 struct API Semaphore {
     VkSemaphore vk;
+    bool binary = true;
 
     Semaphore(RenderContext*);
     ~Semaphore();

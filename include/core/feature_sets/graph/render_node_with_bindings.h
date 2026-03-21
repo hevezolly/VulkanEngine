@@ -28,7 +28,7 @@ struct RenderNodeWithBindings: RenderNode {
     }
 
     virtual void getOutputDependencies(NodeDependency* dependencies) {
-        WriteOutputsEach(dependencies, Attachments::size(), std::index_sequence_for<Bindings...>{});
+        WriteOutputsEach(dependencies, 0, std::index_sequence_for<Bindings...>{});
     }
 
 private:

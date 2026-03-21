@@ -25,10 +25,17 @@ void main() {
 
     vec2 velocity = particles[index].velocity;
     vec2 position = particles[index].position + velocity * ubo.deltaTime;
-    if (position.x < -1 || position.x > 1)
-        velocity.x *= -1;
-    if (position.y < -1 || position.y > 1)
-        velocity.y *= -1;
+
+    if (position.x < -1)
+        velocity.x = abs(velocity.x);
+    if (position.x > 1)
+        velocity.x = -abs(velocity.x);
+
+    if (position.y < -1)
+        velocity.y = abs(velocity.y);
+    if (position.y > 1)
+        velocity.y = -abs(velocity.y);
+
     position = clamp(position, vec2(-1), vec2(1));
     particles[index].velocity = velocity;
     particles[index].position = position;

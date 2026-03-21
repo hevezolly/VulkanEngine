@@ -30,13 +30,13 @@ Fence::~Fence() {
 
 Ref<Semaphore> Synchronization::CreateSemaphore(bool timeline) {
     Ref<Semaphore> s = context.New<Semaphore>(&context);
-
+    s->binary = !timeline;
     VkSemaphoreCreateInfo info {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
 
     VkSemaphoreTypeCreateInfo timelineCreateInfo;
     if (timeline) {
         timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-        timelineCreateInfo.pNext = NULL;
+        timelineCreateInfo.pNext = nullptr;
         timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
         timelineCreateInfo.initialValue = 0;
         info.pNext = &timelineCreateInfo;
