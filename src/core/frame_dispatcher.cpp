@@ -16,6 +16,10 @@ uint64_t FrameDispatcher::frameIndex() {
     return currentFrame == 0 ? 0 : currentFrame - 1;
 }
 
+uint32_t FrameDispatcher::nextFrameInFlightIndex() {
+    return currentFrame == 0 ? 0 : (currentFrame % framesInFlight);
+}
+
 uint32_t FrameDispatcher::frameInFlightIndex() {
     return frameIndex() % framesInFlight;
 }

@@ -173,7 +173,7 @@ void DrawFrame(
     auto& updateParticlesNode = context.Get<RenderGraph>()
         .AddNode<ComputeNode<ParticlesBindings>>(r.computePipeline);
     updateParticlesNode.SetName("update particles node");
-    
+
     updateParticlesNode.SetBindings(
         ParticlesBindings{
             context.Get<DynamicUniforms>().Allocate(ParticleUniforms{
@@ -187,6 +187,7 @@ void DrawFrame(
         (PARTICLES_COUNT + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE
     );
 
+
     auto& drawParticlesNode = context.Get<RenderGraph>()
         .AddNode<GraphicsNode<Attachments>>(r.graphicsPipeline);
     drawParticlesNode.SetName("draw particles");
@@ -198,6 +199,7 @@ void DrawFrame(
     });
     drawParticlesNode.SetInstanceCount(PARTICLES_COUNT);
 
+    
     context.Get<RenderGraph>().AddNode<ImguiNode>(outputImage).SetName("ui");
     context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 

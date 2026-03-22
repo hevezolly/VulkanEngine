@@ -8,6 +8,7 @@ struct API FrameDispatcher: FeatureSet
     uint32_t getFramesInFlight();
     uint64_t frameIndex();
     uint32_t frameInFlightIndex();
+    uint32_t nextFrameInFlightIndex();
 
     void BeginFrame();
 

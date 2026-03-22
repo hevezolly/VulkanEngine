@@ -229,9 +229,9 @@ void UpdateShaderData(RenderContext& context, Buffer& uniformBuffer) {
 
 void DrawFrame(
     RenderContext& context,
-    _Resources& r,
-    uint32_t frameId
+    _Resources& r
 ) {
+    uint32_t frameId = context.Get<FrameDispatcher>().nextFrameInFlightIndex();    
     Ref<Fence> inFlight = r.inFlightFences[frameId];
     inFlight->Wait();
     inFlight->Reset();
@@ -297,14 +297,13 @@ void Run() {
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
 
+
     _Resources resources = PrepareResources(context, framesInFlight);
-    uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
         DrawFrame(
             context, 
-            resources,
-            (currentFrame++) % framesInFlight
+            resources
         );
     }
 }
