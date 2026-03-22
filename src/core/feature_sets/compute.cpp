@@ -10,7 +10,7 @@ ComputePipelineBuilder Compute::NewComputePipeline() {
 }
 
 Ref<ComputePipeline> ComputePipelineBuilder::Build() {
-    assert(stages.size() == 1);
+    ASSERT(stages.size() == 1);
     
     VkPipeline pipeline;
     VkPipelineLayout layout = createLayout();

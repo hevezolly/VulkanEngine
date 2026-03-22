@@ -44,7 +44,7 @@ Memory::Memory(VkDeviceMemory mem, VkDevice device, uint32_t size):
 }
 
 Memory::Memory(Memory* parent, uint32_t offset, uint32_t size) {
-    assert(parent->size_bytes > offset + size);
+    ASSERT(parent->size_bytes > offset + size);
 
     vkDevice = VK_NULL_HANDLE;
     vkMemory = parent->vkMemory;
@@ -91,9 +91,9 @@ Memory::Memory(Memory&& other) noexcept {
 Memory::~Memory() {
     Unmap();
     if (vkDevice != VK_NULL_HANDLE) {
-        assert(mapData != nullptr);
-        assert(mapData->childCount == 0);
-        assert(mapData->mappings == 0);
+        ASSERT(mapData != nullptr);
+        ASSERT(mapData->childCount == 0);
+        ASSERT(mapData->mappings == 0);
         delete mapData;
         vkFreeMemory(vkDevice, vkMemory, nullptr);
     } else if (mapData) {
@@ -122,7 +122,7 @@ MemoryMapToken::MemoryMapToken(MemoryChunkData* mapData, uint32_t o, uint32_t si
 
 void* MemoryMapToken::data() {
     if (mem) {
-        assert(offset >= mem->mappingStart);
+        ASSERT(offset >= mem->mappingStart);
         return static_cast<char*>(mem->mappedptr) + (offset - mem->mappingStart);
     }
     return nullptr;
@@ -151,7 +151,7 @@ MemoryMapToken::MemoryMapToken(MemoryMapToken&& other) noexcept {
 }
 
 MemoryMapToken Memory::Map(uint32_t size, uint32_t o) {
-    assert(o + size <= size_bytes);
+    ASSERT(o + size <= size_bytes);
     return MemoryMapToken(mapData, offset + o, size);
 }
 

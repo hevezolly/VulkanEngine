@@ -11,8 +11,8 @@ struct RenderNodeWithBindings: RenderNode {
 
     using RenderNode::RenderNode;
 
-    void SetBindings(Bindings&... b) {
-        _bindings = std::tuple<Bindings...>(std::forward<Bindings>(b)...);
+    void SetBindings(const Bindings&... b) {
+        _bindings = std::tuple<Bindings...>(b...);
     }
 
     virtual uint32_t getInputDependenciesCount() {

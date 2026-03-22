@@ -55,12 +55,12 @@ DescriptorSet::DescriptorSet(DescriptorSet&& other) noexcept {
 }
 
 SpecializedDescriptorPool::~SpecializedDescriptorPool() {
-    assert(availableInstances == maxInstances);
+    ASSERT(availableInstances == maxInstances);
 }
 
 void SpecializedDescriptorPool::OnReturnOne(VkDescriptorSet set) 
 {
-    assert(availableInstances < maxInstances);
+    ASSERT(availableInstances < maxInstances);
 
     vkFreeDescriptorSets(pool.context->device(), pool.vkPool, 1, &set);
 
@@ -68,7 +68,7 @@ void SpecializedDescriptorPool::OnReturnOne(VkDescriptorSet set)
 }
 
 DescriptorSet SpecializedDescriptorPool::Allocate() {
-    assert(!empty());
+    ASSERT(!empty());
     
     VkDescriptorSet set;
 

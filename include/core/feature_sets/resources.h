@@ -42,7 +42,7 @@ struct API Resources: FeatureSet,
 
     ResourceRef<Sampler> CreateSampler(const SamplerFilter& filter, const SamplerAddressMode& addressMode);
 
-    ResourceRef<Image> CreateImage(const ImageDescription& dsecription, ImageUsage usage);
+    ResourceRef<Image> CreateImage(const ImageDescription& dsecription);
 
     ResourceRef<Image> LoadImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
 
@@ -52,21 +52,17 @@ struct API Resources: FeatureSet,
     ResourceRef<T> Register(T&& value, const ResourceState& resourceState) {
         static_assert(std::is_same_v<T, Image> ||
                       std::is_same_v<T, Buffer>);
-        return ResourceRef<T>();
-    }
 
-    template<>
-    ResourceRef<Image> Resources::Register<Image>(Image&& img, const ResourceState& resourceState) {
-        ResourceId id = _images.Insert(std::move(img));
-        _states[id] = resourceState;
-        return {id, &_images};
-    } 
-
-    template<>
-    ResourceRef<Buffer> Resources::Register<Buffer>(Buffer&& buffer, const ResourceState& resourceState) {
-        ResourceId id = _buffers.Insert(std::move(buffer));
-        _states[id] = resourceState;
-        return {id, &_buffers};
+        if constexpr (std::is_same_v<T, Image>) {
+            ResourceId id = _images.Insert(std::move(value));
+            _states[id] = resourceState;
+            return {id, &_images};
+        }
+        else if constexpr (std::is_same_v<T, Buffer>) {
+            ResourceId id = _buffers.Insert(std::move(value));
+            _states[id] = resourceState;
+            return {id, &_buffers};
+        }
     }
 
     template <typename T>
@@ -74,25 +70,15 @@ struct API Resources: FeatureSet,
         static_assert(std::is_same_v<T, Image> ||
                       std::is_same_v<T, Buffer> ||
                       std::is_same_v<T, Sampler>);
-        return ResourceRef<T>();
-    }
 
-    template<>
-    ResourceRef<Image> Resources::Get<Image>(ResourceId id) {
-        assert(id.type() == ResourceType::Image);
-        return {id, &_images};
-    } 
-
-    template<>
-    ResourceRef<Buffer> Resources::Get<Buffer>(ResourceId id) {
-        assert(id.type() == ResourceType::Buffer);
-        return {id, &_buffers};
-    }
-
-    template<>
-    ResourceRef<Sampler> Resources::Get<Sampler>(ResourceId id) {
-        assert(id.type() == ResourceType::Sampler);
-        return {id, &_samplers};
+        if constexpr (std::is_same_v<T, Image>) {
+            return {id, &_images};
+        }
+        else if constexpr (std::is_same_v<T, Buffer>) {
+            return {id, &_buffers};
+        } else if constexpr (std::is_same_v<T, Sampler>) {
+            return {id, &_samplers};
+        }
     }
 
     void GiveName(ResourceId id, const std::string& name);
@@ -102,6 +88,12 @@ struct API Resources: FeatureSet,
     ResourceState GetState(ResourceId id);
     void SetState(ResourceId id, const ResourceState& state);
     ResourceState UpdateState(ResourceId id, const ResourceState& state);
+
+    ResourceRef<Image> Resize(ResourceRef<Image>, uint32_t width, uint32_t height);
+    
+    inline ResourceRef<Image> Resize(ResourceRef<Image> image, VkExtent2D extent) {
+        return Resize(image, extent.width, extent.height);
+    }
 
     virtual void OnMessage(InitMsg*);
     virtual void OnMessage(DestroyMsg*);

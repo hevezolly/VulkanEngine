@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(VulkanEngine LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
+add_compile_options(/Z7)
 
 foreach(OUTPUTCONFIG IN LISTS CMAKE_CONFIGURATION_TYPES)
     string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG_UP)
@@ -44,7 +44,7 @@ add_library(VulkanEngine
     ${SOURCE_FILES}
 )
 
-target_compile_features(VulkanEngine PUBLIC cxx_std_17)
+target_compile_features(VulkanEngine PUBLIC cxx_std_23)
 target_compile_definitions(VulkanEngine PUBLIC 
     VOLK_STATIC_DEFINES
     $<$<BOOL:${BUILD_SHARED_LIBS}>:VULKAN_ENGINE_SHARED>

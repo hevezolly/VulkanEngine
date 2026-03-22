@@ -114,7 +114,7 @@ public:
     }
 
     static VkAttachmentReference GetDepthStencilAttachmentReference() {
-        assert(size_depth_stencil() > 0);
+        ASSERT(size_depth_stencil() > 0);
         VkAttachmentReference result{};
         uint32_t attachmentIndex;
 

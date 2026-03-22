@@ -5,6 +5,7 @@
 #include <optional>
 #include <glm/glm.hpp>
 #include <resource_id.h>
+#include <image_usage.h>
 
 struct RenderContext;
 
@@ -15,10 +16,11 @@ struct API ImageDescription {
     uint32_t width;
     uint32_t height;
     uint32_t depth=1;
+    ImageUsage usage;
 
     ImageDescription()=default;
-    ImageDescription(VkFormat f, VkExtent2D extent, uint32_t d=1):
-        format(f), width(extent.width), height(extent.height), depth(d){}
+    ImageDescription(VkFormat f, ImageUsage u, VkExtent2D extent, uint32_t d=1):
+        usage(u), format(f), width(extent.width), height(extent.height), depth(d){}
 };
 
 struct API Image;

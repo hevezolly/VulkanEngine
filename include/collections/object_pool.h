@@ -101,8 +101,8 @@ struct ObjectPoolData {
     typename ObjectPool<T>::Node* end;
 
     void Return(typename ObjectPool<T>::Node* node) {
-        assert(node != nullptr);
-        assert(node != nextAvailable);
+        ASSERT(node != nullptr);
+        ASSERT(node != nextAvailable);
         
         typename ObjectPool<T>::Node* prev = node->previous;
         typename ObjectPool<T>::Node* next = node->next;
@@ -156,12 +156,12 @@ template<typename T>
 struct Borrowed {
     
     T& val() {
-        assert(_ptr != nullptr);
+        ASSERT(_ptr != nullptr);
         return _ptr->item;
     }
 
     T* try_get() {
-        assert(_ptr != nullptr);
+        ASSERT(_ptr != nullptr);
         return &(_ptr->item);
     }
 
@@ -246,7 +246,7 @@ struct Borrowed {
             _data->end->next = _ptr;
         }
         else {
-            assert(_data->nextAvailable == nullptr);
+            ASSERT(_data->nextAvailable == nullptr);
             _data->begin = _ptr;
         }
 
@@ -261,7 +261,7 @@ private:
 
 template<typename T>
 inline Borrowed<T> ObjectPool<T>::Borrow() {
-    assert(!isEmpty());
+    ASSERT(!isEmpty());
 
     Node* extracted = _data->nextAvailable;
     _data->nextAvailable = _data->nextAvailable->previous;

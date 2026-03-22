@@ -1,3 +1,4 @@
+#include <common.h>
 #include <resource_id.h>
 #include <bitset>
 
@@ -32,7 +33,7 @@ uint32_t ResourceId::generation() const {
 
 ResourceId ResourceId::Compose(ResourceType type, uint32_t id, uint32_t generation) {
     uint64_t typeBits = static_cast<uint64_t>(type);
-    assert(typeBits < ResourceIdLimits::RESOURCE_TYPES_COUNT);
+    ASSERT(typeBits < ResourceIdLimits::RESOURCE_TYPES_COUNT);
     
     uint64_t result = typeBits << (ResourceIdLimits::SIZE - ResourceIdLimits::TYPE_BITS) | 
                       static_cast<uint64_t>(generation) << (ResourceIdLimits::ID_BITS) |
@@ -42,9 +43,9 @@ ResourceId ResourceId::Compose(ResourceType type, uint32_t id, uint32_t generati
 }
 
 ResourceId ResourceId::NextGeneration() const {
-    assert(generation() < ResourceIdLimits::GENERATION_COUNT - 1);
+    ASSERT(generation() < ResourceIdLimits::GENERATION_COUNT - 1);
 
-    uint64_t result = id | (generation() + 1) << ResourceIdLimits::ID_BITS;
-    
-    return {result};
+    uint64_t result = id | (static_cast<uint64_t>(generation() + 1) << ResourceIdLimits::ID_BITS);
+    ResourceId resultId = {result};
+    return resultId;
 }

@@ -244,7 +244,7 @@ void TransferCommandBuffer::Reset() {
 }
 
 void ComputeCommandBuffer::BeginComputePass(Ref<ComputePipeline> pipeline) {
-    assert(!currentPipeline.has_value());
+    ASSERT(!currentPipeline.has_value());
 
     vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
 
@@ -255,7 +255,7 @@ void ComputeCommandBuffer::BeginComputePass(Ref<ComputePipeline> pipeline) {
 }
 
 void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, const FrameBuffer& frameBuffer) {
-    assert(!currentPipeline.has_value());
+    ASSERT(!currentPipeline.has_value());
     
     VkRenderPassBeginInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     renderPassInfo.renderPass = pipeline->renderPass;
@@ -277,7 +277,7 @@ void GraphicsCommandBuffer::BeginRenderPass(Ref<GraphicsPipeline> pipeline, cons
 }
 
 void ComputeCommandBuffer::EndPass() {
-    assert(currentPipeline.has_value());
+    ASSERT(currentPipeline.has_value());
     
     if (currentPipeline.value().bindPoint == VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS)
         vkCmdEndRenderPass(buffer);
@@ -286,7 +286,7 @@ void ComputeCommandBuffer::EndPass() {
 }
 
 void ComputeCommandBuffer::BindShaderInput(uint32_t count, const ShaderInputInstance* input) {
-    assert(currentPipeline.has_value());
+    ASSERT(currentPipeline.has_value());
     
     uint32_t dynamicStateSize = 0;
     for (int i = 0; i < count; i++) {
@@ -402,7 +402,7 @@ void TransferCommandBuffer::Barrier(uint32_t count, const ResourceId* ids, const
 }
 
 std::unique_ptr<TransferCommandBuffer> CommandPool::BorrowCommandBuffer(QueueType queue) {
-    assert(queue == QueueType::Graphics || queue == QueueType::Compute || queue == QueueType::Transfer);
+    ASSERT(queue == QueueType::Graphics || queue == QueueType::Compute || queue == QueueType::Transfer);
 
     if (queue == QueueType::Graphics && !context.Has<GraphicsFeature>())
         throw std::runtime_error("attempt to access graphics queue without GraphicsFeature enabled");

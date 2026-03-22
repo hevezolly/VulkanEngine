@@ -82,7 +82,7 @@ struct API Descriptors : FeatureSet,
     void Preallocate(uint32_t countInstances = 1) {
         TypeId id = getTypeId<T>();
 
-        assert(countInstances >= 1);
+        ASSERT(countInstances >= 1);
 
         auto _ = Helpers::allocator(&context).BeginContext();
 
@@ -218,8 +218,8 @@ private:
             return;
         }
 
-        assert(set.identity->identities.size() == _identityCache->identities.size());
-        assert(set.identity->identities.size() == writes.size);
+        ASSERT(set.identity->identities.size() == _identityCache->identities.size());
+        ASSERT(set.identity->identities.size() == writes.size);
         for (int i = 0; i < set.identity->identities.size(); i++) {
             if (set.identity->identities[i] == _identityCache->identities[i])
                 continue;

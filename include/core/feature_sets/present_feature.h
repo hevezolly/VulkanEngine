@@ -57,12 +57,15 @@ struct API PresentFeature: FeatureSet,
 
     uint32_t getCurrentSwapchainImage();
 
+    bool SwapchainWasRecreated();
+
     void Present(uint32_t swapchainIndex, uint32_t semaphoresCount, VkSemaphore* semaphores);
 
 private: 
     uint32_t currentSwapchainImage;
     WindowInitializer windowArgs;
     SwapChainInitializer swapChainArgs;
+    bool swapchainRecreated;
 
     void recreateSwapChain();
 };

@@ -94,7 +94,7 @@ Ref<Semaphore> Synchronization::BorrowBinarySemaphore(bool perSwapchainImg) {
 
     FramedObjectPool<Ref<Semaphore>>* pool = &_semaphoresPool;
     if (perSwapchainImg) {
-        assert(context.Has<PresentFeature>());
+        ASSERT(context.Has<PresentFeature>());
 
         pool = &_semaphoresPerSwapChainImg;
     }

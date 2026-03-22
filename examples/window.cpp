@@ -11,16 +11,13 @@ void RunEngine() {
     windowDescription.width = 800;
     windowDescription.height = 600;
     windowDescription.hint = "VkEngine";
-    std::cout << "before context" << std::endl;
     RenderContext context;
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .Initialize();
-    std::cout << "after context" << std::endl;
     
 
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
-        context.Send<BeginFrameMsg>({});
     }
 }
 

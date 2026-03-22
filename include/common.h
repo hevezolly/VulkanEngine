@@ -7,7 +7,47 @@
 #include <sstream>
 #include <string>
 #include <stdexcept>
-#include <cassert>
+#include <stacktrace>
+
+#ifdef NDEBUG
+    #define ASSERT(condition) ((void)0)
+    #define ASSERT_MSG(condition, msg) ((void)0)
+#else
+    #define ASSERT(condition) \
+        do { \
+            if (!(condition)) { \
+                auto trace = std::stacktrace::current(); \
+                fprintf(stderr, \
+                    "\n[ASSERT FAILED]\n" \
+                    "  Condition : %s\n" \
+                    "  File      : %s\n" \
+                    "  Line      : %d\n" \
+                    "  Function  : %s\n" \
+                    "Stacktrace:\n%s\n", \
+                    #condition, __FILE__, __LINE__, __FUNCTION__, \
+                    std::to_string(trace).c_str()); \
+                std::abort(); \
+            } \
+        } while(0)
+
+    #define ASSERT_MSG(condition, msg) \
+        do { \
+            if (!(condition)) { \
+                auto trace = CaptureStackTrace(); \
+                fprintf(stderr, \
+                    "\n[ASSERT FAILED]\n" \
+                    "  Condition : %s\n" \
+                    "  Message   : %s\n" \
+                    "  File      : %s\n" \
+                    "  Line      : %d\n" \
+                    "  Function  : %s\n" \
+                    "Stacktrace:\n%s\n", \
+                    #condition, msg, __FILE__, __LINE__, __FUNCTION__, \
+                    trace.c_str()); \
+                std::abort(); \
+            } \
+        } while(0)
+#endif
 
 #if defined(_WIN32) && defined(VULKAN_ENGINE_SHARED)
     #if defined(VulkanEngine_EXPORTS)

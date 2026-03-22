@@ -76,24 +76,24 @@ _Resources PrepareResources(
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 
-    r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
-        ImageUsage::DepthStencil);
+    r.depth = context.Get<Resources>().CreateImage({dsFormat, 
+        ImageUsage::DepthStencil, context.Get<PresentFeature>().swapChainExtent()});
     context.Get<Resources>().GiveName(r.depth, "depth");
 
-    r.depth2 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
-        ImageUsage::DepthStencil);
+    r.depth2 = context.Get<Resources>().CreateImage({dsFormat, 
+        ImageUsage::DepthStencil, {100, 100}});
     context.Get<Resources>().GiveName(r.depth2, "depth2");
 
-    r.depth3 = context.Get<Resources>().CreateImage({dsFormat, {100, 100}}, 
-        ImageUsage::DepthStencil);
+    r.depth3 = context.Get<Resources>().CreateImage({dsFormat, 
+        ImageUsage::DepthStencil, {100, 100}});
     context.Get<Resources>().GiveName(r.depth3, "depth3");
 
-    r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
-        ImageUsage::ColorAttachment | ImageUsage::Sampled);
+    r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, 
+        ImageUsage::ColorAttachment | ImageUsage::Sampled, {100, 100}});
     context.Get<Resources>().GiveName(r.image, "image");
 
-    r.image2 = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, {100, 100}}, 
-        ImageUsage::ColorAttachment | ImageUsage::Sampled);
+    r.image2 = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, 
+        ImageUsage::ColorAttachment | ImageUsage::Sampled, {100, 100}});
     context.Get<Resources>().GiveName(r.image2, "image2");
     r.image2->clearValue.color = {{1.0f, 1.0f, 1.0f, 1.0f}};
     
@@ -162,6 +162,10 @@ void DrawFrame(
     _Resources& r
 ) {
     context.BeginFrame();
+
+    if (context.Get<PresentFeature>().SwapchainWasRecreated()) {
+        r.depth = context.Get<Resources>().Resize(r.depth, context.Get<PresentFeature>().swapChainExtent());
+    }
 
     ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 

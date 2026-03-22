@@ -155,7 +155,7 @@ SwapChain::SwapChain(RenderContext* context, const SwapChainInitializer& args) {
     Resources& resources = context->Get<Resources>();
 
     for (int i = 0; i < premadeImages.size(); i++) {
-         ResourceRef<Image> img = resources.Register(
+        ResourceRef<Image> img = resources.Register(
             Image(premadeImages[i], *context, description), ResourceState());
         
         resources.GiveName(img, "swapChainImage_" + std::to_string(i));

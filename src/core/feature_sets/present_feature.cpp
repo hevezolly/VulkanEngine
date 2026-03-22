@@ -67,8 +67,15 @@ void UpdateSwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR vkSurface, Swa
     ));
 }
 
+bool PresentFeature::SwapchainWasRecreated() {
+    bool result = swapchainRecreated;
+    swapchainRecreated = false;
+    return result;
+}
+
 void PresentFeature::recreateSwapChain() {
 
+    swapchainRecreated = true;
     int width = 0, height = 0;
     glfwGetFramebufferSize(window->pWindow, &width, &height);
     while (width == 0 || height == 0) {

@@ -33,7 +33,7 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
     }
 
     void SetInstanceCount(uint32_t count) {
-        assert(count > 0);
+        ASSERT(count > 0);
         _instanceCount = count;
     }
 
@@ -95,15 +95,15 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
 
     virtual void Record(ExecutionContext commandBuffer) {
 
-        assert(commandBuffer.commandBuffer != nullptr);
+        ASSERT(commandBuffer.commandBuffer != nullptr);
 
         GraphicsCommandBuffer* c = dynamic_cast<GraphicsCommandBuffer*>(commandBuffer.commandBuffer);
 
-        assert(c != nullptr);
+        ASSERT(c != nullptr);
 
         GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(*commandBuffer.commandBuffer);
         
-        const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>()
+        const FrameBuffer& frameBuffer = this->context.Get<GraphicsFeature>()
             .CreateFrameBuffer(_attachments, pipeline->renderPass);
 
         cmd.BeginRenderPass(pipeline, frameBuffer);
@@ -122,12 +122,12 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
         scissor.extent = {frameBuffer.width, frameBuffer.height};
         vkCmdSetScissor(cmd.buffer, 0, 1, &scissor);
 
-        auto _ = context.Get<Allocator>().BeginContext();
+        auto _ = this->context.Get<Allocator>().BeginContext();
 
 
         if (_vertexBuffers.size() > 0) {
 
-            MemChunk<VkBuffer> vertexBuffers = context.Get<Allocator>().BumpAllocate<VkBuffer>(_vertexBuffers.size());
+            MemChunk<VkBuffer> vertexBuffers = this->context.Get<Allocator>().BumpAllocate<VkBuffer>(_vertexBuffers.size());
 
             for (int i = 0; i < vertexBuffers.size; i++) {
                 vertexBuffers[i] = _vertexBuffers[i]->vkBuffer;
@@ -140,7 +140,7 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
             vkCmdBindIndexBuffer(cmd.buffer, _indexBuffer.value()->vkBuffer, 0, _indexType);
         }
 
-        MemChunk<ShaderInputInstance> inputBuffer = getShaderInputs();
+        MemChunk<ShaderInputInstance> inputBuffer = this->getShaderInputs();
 
         cmd.BindShaderInput(inputBuffer.size, inputBuffer.data);
 
@@ -167,7 +167,7 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
         }
         else {
             uint32_t drawCount = 0;
-            assert(_drawCount.has_value());
+            ASSERT(_drawCount.has_value());
 
             drawCount = _drawCount.value();
             vkCmdDraw(cmd.buffer, drawCount, _instanceCount, 0, 0);

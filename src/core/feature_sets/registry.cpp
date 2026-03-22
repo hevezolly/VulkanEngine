@@ -53,7 +53,7 @@ RawMemChunk Registry::LoadResource(const char* path) {
 
     std::ifstream file(name.data, std::ios::binary | std::ios::ate);
 
-    assert(file.is_open());
+    ASSERT(file.is_open());
 
     uint32_t fileSize = static_cast<uint32_t>(file.tellg());
     file.seekg(0);
@@ -73,7 +73,7 @@ std::string Registry::LoadText(const char* path) {
 
     std::ifstream file(name.data);
 
-    assert(file.is_open());
+    ASSERT(file.is_open());
 
     std::stringstream buffer;
     buffer << file.rdbuf();
@@ -83,7 +83,7 @@ std::string Registry::LoadText(const char* path) {
 }
 
 RawImageData Registry::LoadImage(const char* path, int forceNumberOfComponents) {
-    assert(forceNumberOfComponents >= 0 && forceNumberOfComponents <= 4);
+    ASSERT(forceNumberOfComponents >= 0 && forceNumberOfComponents <= 4);
     
     Allocator& alloc = context.Get<Allocator>();
     RawMemChunk name = getFileName(alloc, resourcesBase, path);
@@ -91,7 +91,7 @@ RawImageData Registry::LoadImage(const char* path, int forceNumberOfComponents) 
 
     data.data = stbi_load(name.data, &data.x, &data.y, &data.num_components, forceNumberOfComponents);
     
-    assert(data.data != nullptr);
+    ASSERT(data.data != nullptr);
 
     if (forceNumberOfComponents != 0)
         data.num_components = forceNumberOfComponents;

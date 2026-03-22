@@ -133,7 +133,7 @@ void ImguiUI::Record(ResourceRef<Image> output, GraphicsCommandBuffer& commandBu
 
 void ImguiUI::OnMessage(PresentMsg* m) {
 
-    assert(readyToRender);
+    ASSERT(readyToRender);
 
     _waitFences[currentFrame]->Wait();
     _waitFences[currentFrame]->Reset();

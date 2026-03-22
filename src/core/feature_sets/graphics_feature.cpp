@@ -114,7 +114,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetAlphaBlending(BlendMethod& 
 
 
 Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
-    assert(dsState.has_value() == dsRef.has_value());
+    ASSERT(dsState.has_value() == dsRef.has_value());
     VkPipeline pipeline;
     VkRenderPass renderPass;
     VkPipelineLayout layout = createLayout();

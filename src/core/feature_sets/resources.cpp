@@ -96,7 +96,9 @@ ResourceRef<Buffer> Resources::CreateRawBuffer(BufferPreset preset, uint32_t siz
     return outputBuffer;
 }
 
-ResourceRef<Image> Resources::CreateImage(const ImageDescription& description, ImageUsage usage) {
+Image createRawImage(Resources* r, RenderContext& context, const ImageDescription& description) {
+    
+    auto _ = context.Get<Allocator>().BeginContext();
     VkImage image;
     VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     imageInfo.imageType = description.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
@@ -109,7 +111,7 @@ ResourceRef<Image> Resources::CreateImage(const ImageDescription& description, I
     imageInfo.format = description.format;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = static_cast<VkImageUsageFlags>(usage);
+    imageInfo.usage = static_cast<VkImageUsageFlags>(description.usage);
     MemBuffer<uint32_t> usedQueues = context.Get<Device>().FillQueueUsages(
         QueueType::Transfer | QueueType::Graphics | QueueType::Compute);
     imageInfo.sharingMode = usedQueues.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
@@ -120,12 +122,14 @@ ResourceRef<Image> Resources::CreateImage(const ImageDescription& description, I
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(context.device(), image, &memRequirements);
     
-    ResourceRef<Image> result = Register(Image(image, context, 
-        AllocateMemory(memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), 
-        description), ResourceState{});
+    return Image(image, context, 
+        r->AllocateMemory(memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), 
+        description);
+}
 
-    context.Get<Allocator>().Free(usedQueues);
-    return result;
+ResourceRef<Image> Resources::CreateImage(const ImageDescription& description) {
+    
+    return Register(createRawImage(this, context, description), ResourceState{});
 }
 
 int getStbiForceComponents(VkFormat format) 
@@ -241,7 +245,7 @@ VkFormat getFormatFromNativeComponents(int components)
         case 4:
             return VK_FORMAT_R8G8B8A8_SRGB;
         default:
-            assert(false);
+            ASSERT(false);
     }
 }
 
@@ -259,8 +263,9 @@ ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFo
     description.height = imageData.y;
     description.depth = 1;
     description.format = format;
+    description.usage = usage | ImageUsage::TransferDst;
     
-    ResourceRef<Image> result = CreateImage(description, usage | ImageUsage::TransferDst);
+    ResourceRef<Image> result = CreateImage(description);
     GiveName(result, path);
     Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, imageData.size(), imageData.data);
     imageData.Free();
@@ -372,6 +377,28 @@ const std::string& Resources::GetName(ResourceId id) {
     default:
         return "";
     }
+}
+
+ResourceRef<Image> Resources::Resize(ResourceRef<Image> image, uint32_t width, uint32_t height) {
+
+    ImageDescription newDescription = image->description;
+    newDescription.width = width;
+    newDescription.height = height;
+
+    ResourceId id = image.id;
+    ResourceId prevId = id;
+    _synchronization.erase(id);
+    _states.erase(id);
+
+    _images.Replace(id, createRawImage(this, context, newDescription));
+    
+    auto node = _names.extract(prevId);
+    if (!node.empty()) {
+        node.key() = id;
+        _names.insert(std::move(node));
+    }
+
+    return {id, &_images};
 }
 
 

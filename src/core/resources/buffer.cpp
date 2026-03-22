@@ -1,5 +1,4 @@
 #include <buffer.h>
-#include <cassert>
 #include <render_context.h>
 #include <resources.h>
 

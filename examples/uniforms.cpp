@@ -105,8 +105,7 @@ _Resources PrepareResources(
         VK_IMAGE_TILING_OPTIMAL,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-    r.depth = context.Get<Resources>().CreateImage({dsFormat, context.Get<PresentFeature>().swapChainExtent()}, 
-        ImageUsage::DepthStencil);
+    r.depth = context.Get<Resources>().CreateImage({dsFormat, ImageUsage::DepthStencil, context.Get<PresentFeature>().swapChainExtent()});
     r.image = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
 
 
@@ -280,9 +279,6 @@ void DrawFrame(
 }
 
 void Run() {
-
-    volkInitialize();
-
     WindowInitializer windowDescription{};
     SwapChainInitializer swapChainDescription{};
     swapChainDescription.desiredPresentMode = {VK_PRESENT_MODE_IMMEDIATE_KHR};
@@ -294,15 +290,14 @@ void Run() {
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .WithFeature<FrameDispatcher>(framesInFlight)
            .WithFeature<GraphicsFeature>()
-           .WithFeature<Registry>("examples/resources")
-           .Initialize();
-    volkLoadInstance(context.vkInstance);
+           .WithFeature<Registry>("examples/resources");
+
+    Initialize(context);
 
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
 
     _Resources resources = PrepareResources(context, framesInFlight);
-    glfwSwapInterval(1);
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();

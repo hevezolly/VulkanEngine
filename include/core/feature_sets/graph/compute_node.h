@@ -10,7 +10,7 @@ struct ComputeNode: RenderNodeWithBindings<Bindings...> {
     ComputeNode(RenderContext& c, Ref<ComputePipeline> pipeline, QueueType queue=QueueType::Compute): 
         RenderNodeWithBindings<Bindings...>(c), pipeline(pipeline), queue(queue), dispatchSize(1, 1, 1)
     {
-        assert(queue == QueueType::Compute || queue == QueueType::Graphics);
+        ASSERT(queue == QueueType::Compute || queue == QueueType::Graphics);
     }
 
     void SetGroups(uint32_t x, uint32_t y = 1, uint32_t z = 1) {
@@ -18,9 +18,9 @@ struct ComputeNode: RenderNodeWithBindings<Bindings...> {
     }
 
     void SetGroups(glm::uvec3 xyz) {
-        assert(xyz.x >= 1);
-        assert(xyz.y >= 1);
-        assert(xyz.z >= 1);
+        ASSERT(xyz.x >= 1);
+        ASSERT(xyz.y >= 1);
+        ASSERT(xyz.z >= 1);
         dispatchSize = xyz;
     }
 
@@ -29,15 +29,15 @@ struct ComputeNode: RenderNodeWithBindings<Bindings...> {
     }
 
     void Record(ExecutionContext executionContext) {
-        assert(executionContext.commandBuffer != nullptr);
+        ASSERT(executionContext.commandBuffer != nullptr);
 
         ComputeCommandBuffer& cmd = *static_cast<ComputeCommandBuffer*>(executionContext.commandBuffer);
 
         cmd.BeginComputePass(pipeline);
 
-        auto _ = Helpers::allocator(&context).BeginContext();
+        auto _ = Helpers::allocator(&this->context).BeginContext();
 
-        MemChunk<ShaderInputInstance> inputs = getShaderInputs();
+        MemChunk<ShaderInputInstance> inputs = this->getShaderInputs();
 
         cmd.BindShaderInput(inputs.size, inputs.data);
 

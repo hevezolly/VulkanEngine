@@ -17,12 +17,12 @@ struct MemChunk {
     AllocationType allocType;
 
     T& operator[](int index) {
-        assert(index >= 0 && index < size);
+        ASSERT(index >= 0 && index < size);
         return *(data + index);
     }
 
     const T& operator[](int index) const {
-        assert(index >= 0 && index < size);
+        ASSERT(index >= 0 && index < size);
         return *(data + index);
     }
 
@@ -102,39 +102,39 @@ struct MemBuffer {
     inline T* data() {return _data.data;}
 
     T& operator[](int index) {
-        assert(index >= 0 && index < _size);
+        ASSERT(index >= 0 && index < _size);
         return _data[index];
     }
 
     const T& operator[](int index) const {
-        assert(index >= 0 && index < _size);
+        ASSERT(index >= 0 && index < _size);
         return _data[index];
     }
 
     T& back() {
-        assert(_size > 0);
+        ASSERT(_size > 0);
         return _data[_size - 1];
     }
 
     const T& back() const {
-        assert(_size > 0);
+        ASSERT(_size > 0);
         return _data[_size - 1];
     }
 
     void push_back(const T& value) {
-        assert(_size < _data.size);
+        ASSERT(_size < _data.size);
 
         _data[_size++] = value;
     }
 
     void push_back(T&& value) {
-        assert(_size < _data.size);
+        ASSERT(_size < _data.size);
 
         _data[_size++] = std::move(value);
     }
 
     void pop_back() {
-        assert(_size > 0);
+        ASSERT(_size > 0);
         _size--;
     }
 
@@ -147,8 +147,8 @@ struct MemBuffer {
     }
 
     void fast_delete_at(uint32_t index) {
-        assert(_size > 0);
-        assert(index < _size);
+        ASSERT(_size > 0);
+        ASSERT(index < _size);
         if (index != _size-1) {
             std::swap(_data[_size-1], _data[index]);
         }
@@ -258,7 +258,7 @@ struct API Allocator: FeatureSet,
         size_t alignment = alignof(T);
         size_t allocationSize = sizeof(T) * count;
         uintptr_t alignedOffset = freeOffset + (alignment - freeOffset % alignment) % alignment;
-        assert(alignedOffset + allocationSize <= allocatedSize);
+        ASSERT(alignedOffset + allocationSize <= allocatedSize);
 
         freeOffset = alignedOffset + allocationSize;
         T* ptr = reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(chunk)+ alignedOffset); 
@@ -289,7 +289,7 @@ struct API Allocator: FeatureSet,
 
         uintptr_t b = reinterpret_cast<uintptr_t>(borrowed.data);
         uintptr_t c = reinterpret_cast<uintptr_t>(chunk);
-        assert(b >= c);
+        ASSERT(b >= c);
         uintptr_t chunkStart = b - c;
 
         if (force || (sizeof(T) * borrowed.size + chunkStart == freeOffset))

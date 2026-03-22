@@ -4,7 +4,7 @@
 FrameDispatcher::FrameDispatcher(RenderContext& c, uint32_t framesInFlight):
     FeatureSet(c), framesInFlight(framesInFlight), currentFrame(0) 
 {
-    assert(framesInFlight > 0);
+    ASSERT(framesInFlight > 0);
 }
 
 uint32_t FrameDispatcher::getFramesInFlight() {

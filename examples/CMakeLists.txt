@@ -26,7 +26,7 @@ foreach (tgt_full ${EXAMPLE_FILES})
             RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UP} ${CMAKE_BINARY_DIR}/${cfg}/bin/examples/${tgt})
     
         if(EXISTS "${SOURCE_RESOURCES}")
-            file(COPY "${SOURCE_RESOURCES}/" DESTINATION ${CMAKE_BINARY_DIR}/${cfg}/bin/examples/${tgt}/resources)
+            file(COPY "${SOURCE_RESOURCES}/" DESTINATION ${CMAKE_BINARY_DIR}/${cfg}/bin/examples/${tgt}/examples/resources)
         endif()
     endforeach()
 

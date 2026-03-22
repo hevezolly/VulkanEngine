@@ -280,15 +280,15 @@ struct GraphInstance {
                 incomingEdges[m].erase(node);
 
                 if (incomingEdges[m].size() == 0) {
-                    assert(initialNodes.size() <= capacity-1);
+                    ASSERT(initialNodes.size() <= capacity-1);
                     initialNodes.push_back(m);
                 }
             }
         }
 
         for (int i = 0; i < capacity; i++) {
-            assert(outcomingEdges[i].size() == 0);
-            assert(incomingEdges[i].size() == 0);
+            ASSERT(outcomingEdges[i].size() == 0);
+            ASSERT(incomingEdges[i].size() == 0);
         }
 
         for (int i = 0; i < sortedNodes.size(); i ++) {
@@ -381,7 +381,7 @@ struct GraphInstance {
 
         if (oldContext == nullptr || oldContext->timelineValue < newContext->timelineValue) {
             if (oldContext != nullptr) {
-                assert(oldContext->waits > 0);
+                ASSERT(oldContext->waits > 0);
                 oldContext->waits--;
             }
 
@@ -420,7 +420,7 @@ struct GraphInstance {
 
                 auto extSync = externalSync.find(inResource.resource.id);
                 if (extSync != externalSync.end()) {
-                    assert(extSync->second[queueIndex] != UINT32_MAX);
+                    ASSERT(extSync->second[queueIndex] != UINT32_MAX);
 
                     usedSignals.push_back(SignalDescription {
                         nodes[inResource.node].inputDependency[inResource.dependencyIndex].state.accessStage,
@@ -446,7 +446,7 @@ struct GraphInstance {
                 auto extSync = externalSync.find(outResource.id);
                 if (extSync != externalSync.end()) {
                     ResourceUsage write = writes[outResource];
-                    assert(extSync->second[queueIndex] != UINT32_MAX);
+                    ASSERT(extSync->second[queueIndex] != UINT32_MAX);
                     uint32_t syncContext = extSync->second[queueIndex];
                     bool found = false;
                     for (auto alreadySignalled : usedSignals) {
@@ -604,7 +604,7 @@ struct TimelineExecutionContext
 {
     uint32_t queueIndex;
     std::list<QueueTimeStep>& timeline;
-    std::list<QueueTimeStep>::iterator& step;
+    std::list<QueueTimeStep>::iterator step;
     uint64_t& maxTimelineValue;
     std::vector<Ref<Semaphore>>& timelineSemaphores;
     std::vector<uint64_t>& initialSemaphoreValues;
@@ -629,8 +629,8 @@ void FillSemaphoreInfo(RenderContext& context,
     MemBuffer<Ref<Semaphore>>* usedSemaphores = nullptr
 ) {
     uint32_t count = timelineContext.step->signals.size();
-    assert(count <= semaphores.capacity());
-    assert(usedSemaphores == nullptr || usedSemaphores->capacity() >= count);
+    ASSERT(count <= semaphores.capacity());
+    ASSERT(usedSemaphores == nullptr || usedSemaphores->capacity() >= count);
 
     for (int i = 0; i < count; i++) {
         SignalDescription wait = timelineContext.step->signals[i];
@@ -710,7 +710,7 @@ void RunTimeline(
 
     do {
         if (timelineContext.step->type == QueueTimeStep::Type::Wait) {
-            assert(waitContext.data() == nullptr);
+            ASSERT(waitContext.data() == nullptr);
 
             waitSemaphores = alloc.BumpAllocate<Ref<Semaphore>>(timelineContext.step->signals.size());
             waitContext = alloc.BumpAllocate<VkSemaphoreSubmitInfo>(timelineContext.step->signals.size());
@@ -736,7 +736,7 @@ void RunTimeline(
         }
         else {
 
-            assert(signalContext.data() == nullptr);
+            ASSERT(signalContext.data() == nullptr);
 
             bool finalSubmit = std::next(timelineContext.step) == timelineContext.timeline.end();
 

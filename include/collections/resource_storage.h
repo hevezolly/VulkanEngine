@@ -68,39 +68,46 @@ struct ResourceStorage {
             }
         }
 
+
         _generations[index] = id.generation();
-        assert(!_storage[index].has_value());
+        ASSERT(!_storage[index].has_value());
         _storage[index].emplace(std::forward<T>(item));
 
         return id;
     }
 
     virtual bool TryRemove(ResourceId id) {
-        if (id.type() != type)
+
+
+        if (id.type() != type) {
             return false;
+        }
 
         uint32_t generation = id.generation();
         uint32_t index = id.index();
 
-        if (index >= _generations.size())
+        if (index >= _generations.size()) {
             return false;
+        }
 
-        if (_generations[index] != generation)
+        if (_generations[index] != generation) {
             return false;
+        }
 
-        if (!_storage[index].has_value())
+        if (!_storage[index].has_value()) {
             return false;
+        }
 
         RemoveUnchecked(id);
         return true;
     }
 
     void Replace(ResourceId& id, T&& newValue) {
-        assert(id.index() < _storage.size());
+        ASSERT(id.index() < _storage.size());
 
-        uint32_t index = id;
+        uint32_t index = id.index();
         _storage[index].reset();
-        _storage[index].emplace(std::forward(newValue));
+        _storage[index].emplace(std::forward<T>(newValue));
         id = id.NextGeneration();
         _generations[index] = id.generation();
     }
@@ -146,7 +153,7 @@ protected:
 //     }
 
 //     ResourceId InsertChild(T&& item, ResourceId parent) {
-//         assert(_childData[parent.index()].parent == UINT32_MAX);
+//         ASSERT(_childData[parent.index()].parent == UINT32_MAX);
         
 //         ResourceId childId = Insert(std::forward(item));
 
