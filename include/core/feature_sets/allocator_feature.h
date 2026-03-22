@@ -229,7 +229,7 @@ private:
 using RawMemChunk = MemChunk<char>;
 
 
-struct ArenaContext {
+struct API ArenaContext {
 
     ArenaContext(Allocator* a, uintptr_t offset) : freeOffset(offset), alloc(a){}
 
@@ -239,7 +239,7 @@ private:
     uintptr_t freeOffset;
 };
 
-struct Allocator: FeatureSet,
+struct API Allocator: FeatureSet,
     CanHandle<EarlyInitMsg>,
     CanHandle<DestroyMsg>,
     CanHandle<BeginFrameMsg>

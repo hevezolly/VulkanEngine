@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 
 template<typename... Bindings>
-struct API ComputeNode: RenderNodeWithBindings<Bindings...> {
+struct ComputeNode: RenderNodeWithBindings<Bindings...> {
 
     ComputeNode(RenderContext& c, Ref<ComputePipeline> pipeline, QueueType queue=QueueType::Compute): 
         RenderNodeWithBindings<Bindings...>(c), pipeline(pipeline), queue(queue), dispatchSize(1, 1, 1)

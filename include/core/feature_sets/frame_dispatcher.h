@@ -1,7 +1,7 @@
 #pragma once
 #include <feature_set.h>
 
-struct FrameDispatcher: FeatureSet
+struct API FrameDispatcher: FeatureSet
 {
     FrameDispatcher(RenderContext&, uint32_t framesInFlight=1);
     

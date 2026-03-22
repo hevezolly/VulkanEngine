@@ -3,7 +3,7 @@
 #include <render_node.h>
 #include <resource_storage.h>
 
-struct PresentNode: RenderNode {
+struct API PresentNode: RenderNode {
 
     PresentNode(
         RenderContext& c,

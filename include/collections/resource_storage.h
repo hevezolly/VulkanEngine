@@ -92,6 +92,7 @@ struct ResourceStorage {
             return false;
 
         RemoveUnchecked(id);
+        return true;
     }
 
     void Replace(ResourceId& id, T&& newValue) {

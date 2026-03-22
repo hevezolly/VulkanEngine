@@ -4,7 +4,7 @@
 #include <resources.h>
 #include <buffer_region.h>
 
-struct DynamicUniforms: FeatureSet,
+struct API DynamicUniforms: FeatureSet,
     CanHandle<BeginFrameMsg>,
     CanHandle<InitMsg>
 {

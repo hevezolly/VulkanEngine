@@ -11,7 +11,7 @@
 #include <memory>
 #include <algorithm>
 
-struct DescriptorPool 
+struct API DescriptorPool 
 {
     VkDescriptorPool vkPool;
     DescriptorPool(RenderContext*, uint32_t count, const VkDescriptorPoolSize* sizes, bool createFree);

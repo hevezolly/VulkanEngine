@@ -63,7 +63,7 @@ target_compile_definitions(VulkanEngine PUBLIC
     $<$<BOOL:${BUILD_SHARED_LIBS}>:VULKAN_ENGINE_SHARED>
 )
 target_link_libraries(VulkanEngine PUBLIC 
-    Vulkan::Headers volk glfw glslang glslang-default-resource-limits glm)
+    Vulkan::Headers volk glfw glslang glslang-default-resource-limits )
 
 target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

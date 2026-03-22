@@ -7,12 +7,12 @@ struct Descriptors;
 struct ShaderLoader;
 
 namespace Helpers {
-    VkDevice API device(RenderContext*);
+    API VkDevice device(RenderContext*);
 
-    Allocator& API allocator(RenderContext*);
+    API Allocator& allocator(RenderContext*);
 
-    Descriptors& API getDescriptors(RenderContext*);
+    API Descriptors& getDescriptors(RenderContext*);
 
-    ShaderLoader& API shaderLoader(RenderContext*);
+    API ShaderLoader& shaderLoader(RenderContext*);
 }
 

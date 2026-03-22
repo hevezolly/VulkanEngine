@@ -24,8 +24,6 @@
 #include <access_type.h>
 #include <random>
 #include <compute_node.h>
-#include <imgui_ui.h>
-#include <imgui_node.h>
 
 static const uint32_t PARTICLES_COUNT = 1024;
 static const uint32_t THREAD_GROUP_SIZE = 32;
@@ -185,8 +183,6 @@ void DrawFrame(
     
     context.BeginFrame();
 
-    ImGui::ShowDemoWindow();
-
     ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 
     auto& updateParticlesNode = context.Get<RenderGraph>()
@@ -217,8 +213,6 @@ void DrawFrame(
     });
     drawParticlesNode.SetInstanceCount(PARTICLES_COUNT);
 
-    context.Get<RenderGraph>().AddNode<ImguiNode>(outputImage).SetName("ui");
-
     context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 
     context.Get<RenderGraph>().Run();
@@ -245,7 +239,6 @@ void Run() {
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
            .WithFeature<DynamicUniforms>()
-           .WithFeature<ImguiUI>()
            .Initialize();
     volkLoadInstance(context.vkInstance);
 

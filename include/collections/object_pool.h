@@ -8,7 +8,7 @@ template<typename T>
 struct ObjectPoolData;
 
 template<typename T>
-struct API ObjectPool
+struct ObjectPool
 {
     struct Node {
         Node* next;
@@ -153,7 +153,7 @@ struct ObjectPoolData {
 };
 
 template<typename T>
-struct API Borrowed {
+struct Borrowed {
     
     T& val() {
         assert(_ptr != nullptr);
@@ -260,11 +260,11 @@ private:
 };
 
 template<typename T>
-Borrowed<T> ObjectPool<T>::Borrow() {
+inline Borrowed<T> ObjectPool<T>::Borrow() {
     assert(!isEmpty());
 
     Node* extracted = _data->nextAvailable;
     _data->nextAvailable = _data->nextAvailable->previous;
 
-    return Borrowed(_data, extracted);
+    return Borrowed<T>(_data, extracted);
 }

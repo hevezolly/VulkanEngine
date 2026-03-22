@@ -19,7 +19,7 @@ struct Storage
 };
 
 template <typename T>
-struct API Ref
+struct Ref
 {
     T& val() {
         if (!_ptr || !_ptr->item.has_value())

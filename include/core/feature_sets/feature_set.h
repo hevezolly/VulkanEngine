@@ -25,11 +25,18 @@ struct API TypeId {
     }
 
     TypeId(TypeId&& other) noexcept {
-        _info = other._info;
+        if (this != &other) {
+            _info = other._info;
+            other._info = nullptr;
+        }
     }
 
     TypeId& operator=(TypeId&& other) noexcept {
-        _info = other._info;
+        if (this != &other) {
+            _info = other._info;
+            other._info = nullptr;
+        }
+        return *this;
     }
 
     bool operator==(const TypeId& other) const {
@@ -65,6 +72,11 @@ struct RenderContext;
 struct API FeatureSet {
 
     virtual ~FeatureSet(){};
+    FeatureSet(const FeatureSet&) = delete;
+    FeatureSet& operator=(const FeatureSet&) = delete;
+    FeatureSet(FeatureSet&&) = delete;
+    FeatureSet& operator=(FeatureSet&&) = delete;
+
     FeatureSet(RenderContext& c): context(c){};
         
 protected:

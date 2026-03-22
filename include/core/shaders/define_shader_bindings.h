@@ -3,6 +3,7 @@
 #undef SSBO
 #undef DYNAMIC_SSBO
 #undef DYNAMIC_UNIFORM
+#undef IMAGE_STORAGE
 #undef IMAGE
 #undef IMAGE_SAMPLER
 #undef SAMPLER
@@ -13,6 +14,7 @@
     #ifdef RESOURCES
 
         #define IMAGE_SAMPLER(name, binding, stage) WRAPPER(ResourceRef<Image>, name##.id, binding, stage, true, false)
+        #define IMAGE_STORAGE(name, binding, stage, access) WRAPPER(ResourceRef<Image>, name##.id, binding, stage, (static_cast<unsigned int>(access & Access::Read) > 0), (static_cast<unsigned int>(access & Access::Write) > 0))
         #define IMAGE(name, binding, stage) WRAPPER(ResourceRef<Image>, name##.id, binding, stage, true, false)
         #define SAMPLER(name, binding, stage)
         #define UNIFORM_BUFFER(name, binding, stage) WRAPPER(BufferRegion, name##.buffer.id, binding, stage, true, false)
@@ -26,6 +28,7 @@
 
             #define IMAGE_SAMPLER(name, binding, stage) IMAGES(1, name##->view->vkImageView, name##_sampler->vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, name##.id, name##_sampler.id)
             #define IMAGE(name, binding, stage) IMAGES(1, name##->view->vkImageView, nullptr, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, name##.id, ResourceId())
+            #define IMAGE_STORAGE(name, binding, stage, access) IMAGES(1, name##->view->vkImageView, nullptr, VK_IMAGE_LAYOUT_GENERAL, name##.id, ResourceId())
             #define SAMPLER(name, binding, stage) IMAGES(1, nullptr, name##->vkSampler, VK_IMAGE_LAYOUT_UNDEFINED, name##.id, ResourceId())
             #ifndef BUFFERS
             #define SSBO(...)
@@ -39,6 +42,7 @@
 
             #ifndef IMAGES 
             #define IMAGE_SAMPLER(...)
+            #define IMAGE_STORAGE(...)
             #define IMAGE(...)
             #define SAMPLER(...)
             #endif
@@ -61,6 +65,7 @@
         #define SSBO(name, binding, stage, access) WRAPPER(BufferRegion, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
         #define DYNAMIC_SSBO(name, binding, stage, access) WRAPPER(BufferRegion, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
         #define IMAGE(name, binding, stage) WRAPPER(ResourceRef<Image>, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+        #define IMAGE_STORAGE(name, binding, stage, access) WRAPPER(ResourceRef<Image>, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
         #define SAMPLER(name, binding, stage) WRAPPER(ResourceRef<Sampler>, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_SAMPLER)
         #define UNIFORM_BUFFER(name, binding, stage) WRAPPER(BufferRegion, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
         #define DYNAMIC_UNIFORM(name, binding, stage) WRAPPER(BufferRegion, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)

@@ -29,6 +29,9 @@ struct PipelineBuilder {
     PipelineBuilder(RenderContext& c): context(&c){}
     virtual ~PipelineBuilder(){}
 
+    PipelineBuilder(const PipelineBuilder&) = delete;
+    PipelineBuilder& operator=(const PipelineBuilder&) = delete;
+
     virtual Self& AddShaderStage(const std::string& path, Stage stage) {
         return AddShaderStage(Helpers::shaderLoader(context).Get(path, stage));
     }
