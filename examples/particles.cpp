@@ -1,29 +1,12 @@
 #define THROW_ON_UNDESIRED_SWAPCHAIN
 #include <iostream>
-#include <render_context.h>
-#include <shader_source.h>
-#include <present_feature.h>
-#include <graphics_feature.h>
-#include <descriptor_pool.h>
-#include <command_pool.h>
-#include <resources.h>
-#include <allocator_feature.h>
+#include <random>
 #include <chrono>
+#include <thread>
 #define GLM_FORCE_RADIANS
 #include <glm/gtc/matrix_transform.hpp>
-#include <thread>
-#include <stable_frame_rate.h>
-#include <registry.h>
-#include <graphics_node.h>
-#include <render_graph.h>
-#include <shader_loader.h>
-#include <present_node.h>
-#include <frame_dispatcher.h>
-#include <dynamic_uniforms.h>
-#include <compute.h>
-#include <access_type.h>
-#include <random>
-#include <compute_node.h>
+#include <vulkan_engine.h>
+#include <vulkan_engine_ui.h>
 
 static const uint32_t PARTICLES_COUNT = 1024;
 static const uint32_t THREAD_GROUP_SIZE = 32;
@@ -183,6 +166,8 @@ void DrawFrame(
     
     context.BeginFrame();
 
+    ImGui::ShowDemoWindow();
+
     ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 
     auto& updateParticlesNode = context.Get<RenderGraph>()
@@ -213,6 +198,7 @@ void DrawFrame(
     });
     drawParticlesNode.SetInstanceCount(PARTICLES_COUNT);
 
+    context.Get<RenderGraph>().AddNode<ImguiNode>(outputImage).SetName("ui");
     context.Get<RenderGraph>().AddNode<PresentNode>(outputImage).SetName("present");
 
     context.Get<RenderGraph>().Run();
@@ -220,18 +206,16 @@ void DrawFrame(
 
 void Run() {
 
-    volkInitialize();
-
     WindowInitializer windowDescription{};
     SwapChainInitializer swapChainDescription{};
     swapChainDescription.desiredPresentMode = {VK_PRESENT_MODE_IMMEDIATE_KHR};
     windowDescription.width = 800;
     windowDescription.height = 600;
     windowDescription.hint = "VkEngine";
-    RenderContext context;
-
+    
     const uint32_t framesInFlight = 3;
-
+    
+    RenderContext context;
     context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
            .WithFeature<FrameDispatcher>(framesInFlight)
            .WithFeature<GraphicsFeature>()
@@ -239,8 +223,8 @@ void Run() {
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
            .WithFeature<DynamicUniforms>()
-           .Initialize();
-    volkLoadInstance(context.vkInstance);
+           .WithFeature<ImguiUI>();
+    Initialize(context);
 
 
     _Resources resources = PrepareResources(context, framesInFlight);

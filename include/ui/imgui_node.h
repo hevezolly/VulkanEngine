@@ -4,7 +4,7 @@
 #include <render_node.h>
 #include <imgui_ui.h>
 
-struct API ImguiNode: RenderNode {
+struct ImguiNode: RenderNode {
 
     ImguiNode(RenderContext& ctx, ResourceRef<Image> output);
 

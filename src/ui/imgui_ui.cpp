@@ -20,23 +20,26 @@ void ImguiUI::OnMessage(InitMsg*) {
     if (!context.Has<GraphicsFeature>()) {
         throw std::runtime_error("GraphicsFeature is required to use ImguiUI");
     }
-
+    
     if (!context.Has<PresentFeature>()) {
         throw std::runtime_error("PresentFeature is required to use ImguiUI");
     }
 
+    volkLoadInstance(context.vkInstance);
+    volkLoadDevice(context.device());
+    
     float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
     style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
     style.FontScaleDpi = main_scale;
-
+    
     ImGui_ImplGlfw_InitForVulkan(context.Get<PresentFeature>().window->pWindow, true);
     _descriptorPool = new DescriptorPool(&context, {
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE}
     }, true);
-
+    
     std::vector<VkAttachmentDescription> attachments;
     std::vector<VkAttachmentReference> attachmentRefs;
     UiAttachments::GetAttachmentDescriptions(attachments, 
@@ -45,7 +48,7 @@ void ImguiUI::OnMessage(InitMsg*) {
         }
     );
     UiAttachments::GetColorAttachmentReferences(attachmentRefs);
-
+    
     VkSubpassDescription subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = attachmentRefs.size();
@@ -91,6 +94,10 @@ void ImguiUI::OnMessage(InitMsg*) {
 
 void ImguiUI::OnMessage(BeginFrameMsg* m) {
     currentFrame = m->inFlightFrame;
+
+    if (readyToRender) {
+        ImGui::EndFrame();
+    }
     
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();

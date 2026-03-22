@@ -64,7 +64,7 @@ void RenderContext::Initialize() {
     std::vector<const char*> requiredLayers{};
 
     Send(CollectInstanceRequirementsMsg{&requiredExtensions, &requiredLayers}, true);
-
+    
     VK(checkLayersSupport(requiredLayers))
 
     apiVersion = VK_API_VERSION_1_3;
@@ -90,9 +90,8 @@ void RenderContext::Initialize() {
 
     vkInstance = VK_NULL_HANDLE;
     VK(vkCreateInstance(&ci, nullptr, &vkInstance));
-
     volkLoadInstance(vkInstance);
-
+    
     Send<EarlyInitMsg>(nullptr, true);
     Send<InitMsg>(nullptr, true);
 }

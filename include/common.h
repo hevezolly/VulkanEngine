@@ -85,7 +85,7 @@ if (__result != VK_SUCCESS) {\
     std::stringstream ss;\
     ss << "Vk error in " << __FILE__ << " at line " << __LINE__ << " with error " << __result << std::endl;\
     std::cout << ss.str() << std::endl;\
-    throw std::runtime_error(ss.str());\
+    std::exit(1);\
 }\
 }\
 

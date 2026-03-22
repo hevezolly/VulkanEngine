@@ -9,7 +9,7 @@
 #include <resource_storage.h>
 #include <image.h>
 
-struct API ImguiUI: FeatureSet,
+struct ImguiUI: FeatureSet,
     CanHandle<InitMsg>,
     CanHandle<DestroyMsg>,
     CanHandle<BeginFrameMsg>,

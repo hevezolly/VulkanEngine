@@ -70,9 +70,9 @@ struct API RenderContext {
 
     void BeginFrame();
 
-    void Initialize();
-
     void NameVkObject(VkObjectType type, uint64_t handle, const std::string& name);
+
+    void Initialize();
 
     RULE_NO(RenderContext)
 
@@ -205,6 +205,8 @@ struct API RenderContext {
     
 private:
 
+
+
     template<typename T, typename... Args>
     Storage<T>* ConstructStorage(Args&&... args) {
         if constexpr (std::is_constructible_v<T, Args&&...>)
@@ -230,3 +232,10 @@ private:
 
     bool _handling;
 };
+
+inline void Initialize(RenderContext& ctx) {
+    VK(volkInitialize());
+    ctx.Initialize();
+    volkLoadInstance(ctx.vkInstance);
+    volkLoadDevice(ctx.device());
+}

@@ -14,7 +14,7 @@ foreach (tgt_full ${EXAMPLE_FILES})
     add_executable(${tgt} ${tgt}.cpp)
     target_include_directories(${tgt} PRIVATE .)
 
-    target_link_libraries(${tgt} PRIVATE VulkanEngine)
+    target_link_libraries(${tgt} PRIVATE VulkanEngine VulkanEngineUI)
 
     set_target_properties(${tgt} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/examples/${tgt}
