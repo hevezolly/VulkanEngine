@@ -33,7 +33,7 @@
     #define ASSERT_MSG(condition, msg) \
         do { \
             if (!(condition)) { \
-                auto trace = CaptureStackTrace(); \
+                auto trace = std::stacktrace::current(); \
                 fprintf(stderr, \
                     "\n[ASSERT FAILED]\n" \
                     "  Condition : %s\n" \
@@ -43,7 +43,7 @@
                     "  Function  : %s\n" \
                     "Stacktrace:\n%s\n", \
                     #condition, msg, __FILE__, __LINE__, __FUNCTION__, \
-                    trace.c_str()); \
+                    std::to_string(trace).c_str()); \
                 std::abort(); \
             } \
         } while(0)
