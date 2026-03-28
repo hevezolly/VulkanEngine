@@ -197,8 +197,6 @@ void DrawFrame(
 
 void Run() {
 
-    volkInitialize();
-
     WindowInitializer windowDescription{};
     SwapChainInitializer swapChainDescription{};
     swapChainDescription.desiredPresentMode = {VK_PRESENT_MODE_IMMEDIATE_KHR};
@@ -214,15 +212,14 @@ void Run() {
            .WithFeature<GraphicsFeature>()
            .WithFeature<Registry>("examples/resources")
            .WithFeature<RenderGraph>()
-           .WithFeature<DynamicUniforms>()
-           .Initialize();
-    volkLoadInstance(context.vkInstance);
+           .WithFeature<DynamicUniforms>();
+
+    Initialize(context);
 
     context.Get<Descriptors>().Preallocate<ShaderInput>(3);
 
 
     _Resources resources = PrepareResources(context, framesInFlight);
-    glfwSwapInterval(1);
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
         glfwPollEvents();
         DrawFrame(

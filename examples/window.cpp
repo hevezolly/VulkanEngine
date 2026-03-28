@@ -12,8 +12,9 @@ void RunEngine() {
     windowDescription.height = 600;
     windowDescription.hint = "VkEngine";
     RenderContext context;
-    context.WithFeature<PresentFeature>(windowDescription, swapChainDescription)
-           .Initialize();
+    context.WithFeature<PresentFeature>(windowDescription, swapChainDescription);
+
+    Initialize(context);
     
 
     while (!glfwWindowShouldClose(context.Get<PresentFeature>().window->pWindow)) {
