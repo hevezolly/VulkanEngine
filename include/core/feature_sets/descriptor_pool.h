@@ -41,10 +41,14 @@ private:
     RenderContext* context;
 };
 
-struct API ShaderInputInstance {
-    DescriptorSet* descriptor;
+struct API ShaderDynamicState {
     uint32_t dynamicOffsetsCount;
     uint32_t* pDynamicOffsets;
+};
+
+struct API ShaderInputInstance {
+    DescriptorSet* descriptor;
+    ShaderDynamicState dynamicState;
 };
 
 struct API SpecializedDescriptorPool 
@@ -232,28 +236,33 @@ private:
             set.identity = std::make_shared<DescriptorSetIdentity>(*_identityCache);
         }
     }
-    
-    template <typename T>
-    ShaderInputInstance FormInput(DescriptorSet& set, const T& values) {
-        const uint32_t sizeDynamic = T::size_dynamic_states();
+
+    template <typename... T>
+    ShaderDynamicState GatherDynamicState(const T&... values) {
+        const uint32_t sizeDynamic = (values::size_dynamic_states() + ... + 0);
 
         if constexpr (sizeDynamic > 0 ) {
             MemChunk<uint32_t> dynamicStates = Helpers::allocator(&context)
                 .BumpAllocate<uint32_t>(sizeDynamic);
-            values.FillDynamicState(dynamicStates.data);
+
+            uint32_t* writePtr = dynamicStates.data;
+            ((values.FillDynamicState(writePtr), writePtr += values.size_dynamic_states())...);
             
-            return ShaderInputInstance {
-                &set,
+            return ShaderDynamicState {
                 sizeDynamic,
                 dynamicStates.data
             };
         }
 
-        return ShaderInputInstance {
-            &set,
+        return ShaderDynamicState {
             0,
             nullptr
         };
+    } 
+    
+    template <typename T>
+    ShaderInputInstance FormInput(DescriptorSet& set, const T& values) {
+        return ShaderInputInstance{&set, GatherDynamicState<T>(values)};
     }
 
     struct HashDSIByValue {

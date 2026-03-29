@@ -72,7 +72,7 @@ BLOCK
         return value;
     }
 
-    static const constexpr uint32_t size_dynamic_states() {
+    const constexpr uint32_t size_dynamic_states() {
         uint32_t value = 0;
 
         #define WRAPPER(...)
