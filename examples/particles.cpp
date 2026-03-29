@@ -13,14 +13,14 @@ static const uint32_t THREAD_GROUP_SIZE = 32;
 
 #define BLOCK_NAME Particle
 #define BLOCK \
-VEC2(position, 0) \
-VEC2(velocity, 1) \
-VEC4(color, 2)
+VEC2(position) \
+VEC2(velocity) \
+VEC4(color)
 #include <gen_vertex_data.h>
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
-VEC2(offset, 3)
+VEC2(offset)
 #include <gen_vertex_data.h>
 
 #define BLOCK_NAME Attachments

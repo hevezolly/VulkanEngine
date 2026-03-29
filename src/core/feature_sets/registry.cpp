@@ -47,6 +47,10 @@ RawMemChunk getFileName(Allocator& alloc, std::string& basePath, const char* pat
     return name;
 }
 
+MemChunk<char> Registry::GetPath(const char* relativePath) {
+    return getFileName(context.Get<Allocator>(), resourcesBase, relativePath);
+}
+
 RawMemChunk Registry::LoadResource(const char* path) {
     Allocator& alloc = context.Get<Allocator>();
     RawMemChunk name = getFileName(alloc, resourcesBase, path);

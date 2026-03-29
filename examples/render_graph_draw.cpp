@@ -23,9 +23,9 @@
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
-VEC3(position, 0) \
-VEC3(color, 1) \
-VEC2(uv, 2)
+VEC3(position) \
+VEC3(color) \
+VEC2(uv)
 #include <gen_vertex_data.h>
 
 #define BLOCK_NAME ShaderInput

@@ -51,6 +51,7 @@ struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
     std::optional<VkPipelineDepthStencilStateCreateInfo> dsState;
     std::optional<VkAttachmentReference> dsRef;
     VkSubpassDescription subpass;
+    uint32_t location;
 
     GraphicsPipelineBuilder& AddDynamicState(VkDynamicState state);
 
@@ -81,7 +82,7 @@ struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
             binding, sizeof(T), static_cast<VkVertexInputRate>(inputRate) 
         });
 
-        T::CollectAttributeDescription(vertexAttributes, binding);
+        T::CollectAttributeDescription(vertexAttributes, binding, location);
         return *this;
     }
 
