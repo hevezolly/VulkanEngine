@@ -36,7 +36,7 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
     GraphicsNode(
         RenderContext& c, 
         Ref<GraphicsPipeline> p): RenderNodeWithBindings<Bindings...>(c), 
-        pipeline(p), _instanceCount(1){} 
+        pipeline(p){} 
 
     void AddVertexBuffer(ResourceRef<Buffer> vertex, VkDeviceSize offset = 0) {
         _vertexBuffers.push_back(vertex);
@@ -46,11 +46,6 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
     void SetIndexBuffer(ResourceRef<Buffer> index, VkIndexType indexType) {
         _indexBuffer = index;
         _indexType = indexType;
-    }
-
-    void SetInstanceCount(uint32_t count) {
-        ASSERT(count > 0);
-        _instanceCount = count;
     }
 
     void AddDrawParameters(DrawParameters p) {
@@ -210,7 +205,6 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
     }
 
 private:
-    uint32_t _instanceCount;
     Ref<GraphicsPipeline> pipeline;
     std::vector<DrawParameters> _drawParameters;
     VkIndexType _indexType;
