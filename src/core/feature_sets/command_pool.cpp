@@ -281,6 +281,8 @@ void ComputeCommandBuffer::EndPass() {
     
     if (currentPipeline.value().bindPoint == VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS)
         vkCmdEndRenderPass(buffer);
+
+    lastBoundDescriptor = MemChunk<VkDescriptorSet>::Null();
     
     currentPipeline = std::nullopt;
 }
@@ -290,7 +292,7 @@ void ComputeCommandBuffer::BindShaderInput(uint32_t count, const ShaderInputInst
     
     uint32_t dynamicStateSize = 0;
     for (int i = 0; i < count; i++) {
-        dynamicStateSize += input[i].dynamicOffsetsCount;
+        dynamicStateSize += input[i].dynamicState.dynamicOffsetsCount;
     }
 
     Allocator& alloc = context->Get<Allocator>();
@@ -302,13 +304,14 @@ void ComputeCommandBuffer::BindShaderInput(uint32_t count, const ShaderInputInst
     for (int i = 0; i < count; i++) {
         descriptorSets[i] = input[i].descriptor->vkSet;
         
-        uint32_t dCount = input[i].dynamicOffsetsCount;
+        uint32_t dCount = input[i].dynamicState.dynamicOffsetsCount;
         if (dCount > 0) {
-            std::memcpy(dynamicStates.data + dynamicStateSize, input[i].pDynamicOffsets, dCount * sizeof(uint32_t));
+            std::memcpy(dynamicStates.data + dynamicStateSize, input[i].dynamicState.pDynamicOffsets, dCount * sizeof(uint32_t));
             dynamicStateSize += dCount;
         }
     }
 
+    lastBoundDescriptor = descriptorSets;
     if (descriptorSets.size > 0) {
         vkCmdBindDescriptorSets(
             buffer, 
@@ -318,9 +321,23 @@ void ComputeCommandBuffer::BindShaderInput(uint32_t count, const ShaderInputInst
     }
 }
 
+void ComputeCommandBuffer::UpdateDynamicState(ShaderDynamicState state) {
+    ASSERT(lastBoundDescriptor.data != nullptr);
+
+    if (state.pDynamicOffsets != nullptr) {
+        vkCmdBindDescriptorSets(
+            buffer,
+            currentPipeline.value().bindPoint,
+            currentPipeline.value().layout,
+            0, lastBoundDescriptor.size, lastBoundDescriptor.data, state.dynamicOffsetsCount, state.pDynamicOffsets
+        );
+    }
+}
+
 void ComputeCommandBuffer::BindShaderInput(std::initializer_list<ShaderInputInstance> input) {
     BindShaderInput(static_cast<uint32_t>(input.size()), input.begin());
 }
+
 
 void TransferCommandBuffer::ImageBarrier(ResourceRef<Image> img, const ResourceState& newState) {
     Barrier(1, &img.id, &newState);

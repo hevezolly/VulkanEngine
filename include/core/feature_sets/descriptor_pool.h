@@ -239,14 +239,14 @@ private:
 
     template <typename... T>
     ShaderDynamicState GatherDynamicState(const T&... values) {
-        const uint32_t sizeDynamic = (values::size_dynamic_states() + ... + 0);
+        const uint32_t sizeDynamic = (values.size_dynamic_states() + ... + 0);
 
-        if constexpr (sizeDynamic > 0 ) {
+        if (sizeDynamic > 0) {
             MemChunk<uint32_t> dynamicStates = Helpers::allocator(&context)
                 .BumpAllocate<uint32_t>(sizeDynamic);
 
             uint32_t* writePtr = dynamicStates.data;
-            ((values.FillDynamicState(writePtr), writePtr += values.size_dynamic_states())...);
+            ((values.FillDynamicState(writePtr), writePtr += values.size_dynamic_states()), ...);
             
             return ShaderDynamicState {
                 sizeDynamic,

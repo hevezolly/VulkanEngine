@@ -9,19 +9,20 @@
 #include <utility>
 #include <render_node_with_bindings.h>
 
-struct API DrawParameters {
+struct DrawParameters {
     uint32_t drawCount;
     uint32_t instanceCount;
     uint32_t instanceOffset;    
     
     uint32_t offset;
     int32_t vertexOffset;
+    ShaderDynamicState dynamicState;
     
-    DrawParameters(uint32_t count, uint32_t offset): 
-        drawCount(count), offset(offset), vertexOffset(0), instanceCount(1), instanceOffset(0) {} 
+    DrawParameters(uint32_t count, uint32_t offset, ShaderDynamicState dynamicState={}): 
+        drawCount(count), offset(offset), vertexOffset(0), instanceCount(1), instanceOffset(0), dynamicState(dynamicState) {} 
 
-    DrawParameters(uint32_t count, uint32_t offset, uint32_t instanceCount, uint32_t instanceOffset=0, int32_t vertexOffset=0): 
-        drawCount(count), offset(offset), vertexOffset(vertexOffset), instanceCount(instanceCount), instanceOffset(instanceOffset) {} 
+    DrawParameters(uint32_t count, uint32_t offset, uint32_t instanceCount, uint32_t instanceOffset=0, int32_t vertexOffset=0, ShaderDynamicState dynamicState={}): 
+        drawCount(count), offset(offset), vertexOffset(vertexOffset), instanceCount(instanceCount), instanceOffset(instanceOffset), dynamicState(dynamicState) {} 
 };
 
 
@@ -181,7 +182,12 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
             }
             else {
                 for (DrawParameters& params : _drawParameters) {
-                    vkCmdDrawIndexed(cmd.buffer, params.drawCount, params.instanceCount, params.offset, params.vertexOffset, params.instanceCount);
+
+                    if (params.dynamicState.pDynamicOffsets != nullptr) {
+                        cmd.UpdateDynamicState(params.dynamicState);
+                    }
+
+                    vkCmdDrawIndexed(cmd.buffer, params.drawCount, params.instanceCount, params.offset, params.vertexOffset, params.instanceOffset);
                 }
             }
 
@@ -190,6 +196,11 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
             ASSERT_MSG(_drawParameters.size() > 0, "For vertex buffer only draw, parameters must be provided via AddDrawParameters");
 
             for (DrawParameters& params : _drawParameters) {
+
+                if (params.dynamicState.pDynamicOffsets != nullptr) {
+                    cmd.UpdateDynamicState(params.dynamicState);
+                }
+
                 vkCmdDraw(cmd.buffer, params.drawCount, params.instanceCount, params.offset, params.instanceOffset);
             }
         }

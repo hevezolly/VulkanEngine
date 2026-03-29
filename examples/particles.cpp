@@ -197,7 +197,7 @@ void DrawFrame(
     drawParticlesNode.SetAttachments(Attachments {
         outputImage
     });
-    drawParticlesNode.AddDrawParameters(DrawParameters(4, 0, PARTICLES_COUNT, 0));
+    drawParticlesNode.AddDrawParameters(DrawParameters(6, 0, PARTICLES_COUNT, 0));
 
     
     context.Get<RenderGraph>().AddNode<ImguiNode>(outputImage).SetName("ui");

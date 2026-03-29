@@ -41,6 +41,7 @@ struct API ComputeCommandBuffer: TransferCommandBuffer {
 
     void BindShaderInput(uint32_t count, const ShaderInputInstance* input);
     void BindShaderInput(std::initializer_list<ShaderInputInstance> input);
+    void UpdateDynamicState(ShaderDynamicState externalDynamicState);
 
     friend struct CommandPool;
 protected: 
@@ -51,6 +52,7 @@ protected:
     };
 
     std::optional<BoundPipelineData> currentPipeline;
+    MemChunk<VkDescriptorSet> lastBoundDescriptor;
 };
 
 struct API GraphicsCommandBuffer: ComputeCommandBuffer {
