@@ -847,7 +847,7 @@ void RunGraph(
     RenderContext& context, 
     GraphInstance& instance, 
     std::vector<Ref<Semaphore>>& semaphores,
-    std::vector<uint64_t>& initialValuess
+    std::vector<uint64_t>& initialValuess,
 ) {
     uint32_t queueCount = static_cast<size_t>(QueueType::None);
     PerQueueStorage<uint64_t> maxTimelineValues;
@@ -873,11 +873,14 @@ void RunGraph(
 
         while (executionContext.step != instance.queueTimelines[queueIndex].end())
         {
+#ifdef DEBUG_RENDER_GRAPH
+            DebugTimeline(context, instance, executionContext);
+#else
             RunTimeline(context, instance, executionContext);
-            // DebugTimeline(context, instance, executionContext);
+#endif
         }
     }
-    // std::exit(0);
+    
 
     for (uint32_t i = 0; i < static_cast<uint32_t>(QueueType::None); i++) {
         initialValuess[i] += maxTimelineValues[i];
