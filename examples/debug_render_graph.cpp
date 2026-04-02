@@ -1,4 +1,3 @@
-#define DEBUG_RENDER_GRAPH
 #include <render_context.h>
 #include <render_graph.h>
 #include <resource_id.h>
@@ -50,21 +49,22 @@ struct DebugNode: RenderNode {
     QueueType queue;
 };
 
-void main() {
+int main() {
     RenderContext context;
     context.WithFeature<RenderGraph>();
     Initialize(context);
  
-    ResourceId id0 = ResourceId::Compose(ResourceType::Other, 0);
-    ResourceId id1 = ResourceId::Compose(ResourceType::Other, 1);
-    ResourceId id2 = ResourceId::Compose(ResourceType::Other, 2);
-    ResourceId id3 = ResourceId::Compose(ResourceType::Other, 3);
-    ResourceId id4 = ResourceId::Compose(ResourceType::Other, 4);
-    ResourceId id5 = ResourceId::Compose(ResourceType::Other, 5);
-    ResourceId id6 = ResourceId::Compose(ResourceType::Other, 6);
+    ResourceId id0 = ResourceId::Compose(ResourceType::Other, 1);
+    ResourceId id1 = ResourceId::Compose(ResourceType::Other, 2);
+    ResourceId id2 = ResourceId::Compose(ResourceType::Other, 3);
+    ResourceId id3 = ResourceId::Compose(ResourceType::Other, 4);
+    ResourceId id4 = ResourceId::Compose(ResourceType::Other, 5);
+    ResourceId id5 = ResourceId::Compose(ResourceType::Other, 6);
+    ResourceId id6 = ResourceId::Compose(ResourceType::Other, 7);
 
     RenderGraph& graph = context.Get<RenderGraph>();
 
+    std::cout << "graph 1:" << std::endl; 
     graph.AddNode<DebugNode>(QueueType::Graphics)
         .AddInput({id0})
         .AddOutput({id1})
@@ -75,5 +75,39 @@ void main() {
         .AddOutput({id2})
         .SetName("node2");
 
-    graph.Run();
+    graph.Debug();
+    std::cout << std::endl;
+    
+// =====================================================
+    
+    std::cout << "graph 2:" << std::endl; 
+    
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id1})
+        .AddOutput({id2})
+        .SetName("node2");
+
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id0})
+        .AddOutput({id1})
+        .SetName("node1");
+
+    graph.Debug();
+    std::cout << std::endl;
+
+// =====================================================
+    
+    std::cout << "graph 3:" << std::endl; 
+    
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddOutput({id1})
+        .SetName("producer1");
+
+    graph.AddNode<DebugNode>(QueueType::Compute)
+        .AddOutput({id1})
+        .SetName("producer2");
+
+    graph.Debug();
+    std::cout << std::endl;
+
 }

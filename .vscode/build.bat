@@ -5,4 +5,4 @@ cmake --build %build_path% --config %2
 
 IF not %ERRORLEVEL% EQU 0 exit /b %ERRORLEVEL%
 
-IF "%3"=="-e" %build_path%\\%2\\bin\\examples\\particles\\particles.exe
+IF "%3"=="-e" %build_path%\\%2\\bin\\examples\\debug_render_graph\\debug_render_graph.exe

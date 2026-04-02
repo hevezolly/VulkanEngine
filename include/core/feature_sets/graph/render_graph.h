@@ -10,10 +10,8 @@
 
 struct NodeWrapper {
     QueueType queue;
-    MemChunk<NodeDependency> inputDependency;
-    MemChunk<uint32_t> inputVersions;
+    MemBuffer<NodeDependency> inputDependency;
     MemChunk<NodeDependency> outpnputDependency;
-    MemChunk<uint32_t> outputVersions;
     RenderNode* node;
     void(*destructor)(RenderNode*);
     uint32_t sortedIndex;
@@ -73,9 +71,7 @@ struct API RenderGraph: FeatureSet,
         nodes.push_back(NodeWrapper {
             node->getTargetQueue(),
             MemChunk<NodeDependency>::Null(),
-            MemChunk<uint32_t>::Null(),
             MemChunk<NodeDependency>::Null(),
-            MemChunk<uint32_t>::Null(),
             node,
             [](RenderNode* node) {static_cast<T*>(node)->~T();},
             0
@@ -87,7 +83,11 @@ struct API RenderGraph: FeatureSet,
     virtual void OnMessage(BeginFrameMsg*);
     
     void Run();
+    void Debug();
 private:
+
+    template<bool Debug>
+    void RunGraphInternal();
 
     std::vector<NodeWrapper> nodes;
 

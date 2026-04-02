@@ -1,4 +1,5 @@
 #pragma once
+#include <common.h>
 #include <feature_set.h>
 
 #define PREALLOCATED_SIZE 10240
@@ -96,8 +97,8 @@ struct MemChunk {
 template<typename T>
 struct MemBuffer {
 
-    inline uint32_t size() {return _size;}
-    inline uint32_t capacity() {return _data.size;}
+    inline uint32_t size() const {return _size;}
+    inline uint32_t capacity() const {return _data.size;}
 
     inline T* data() {return _data.data;}
 
@@ -167,6 +168,7 @@ struct MemBuffer {
     }
 
     void resize(uint32_t count) {
+        ASSERT(count <= capacity());
         _size = count;
     }
 

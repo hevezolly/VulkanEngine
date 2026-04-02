@@ -185,26 +185,28 @@ struct GraphInstance {
         uint32_t inputSize = wrapper.node->getInputDependenciesCount();
         uint32_t outputSize = wrapper.node->getOutputDependenciesCount();
         wrapper.queue = wrapper.node->getTargetQueue();
-        if (inputSize != 0) {
-            wrapper.inputDependency = alloc.BumpAllocate<NodeDependency>(inputSize);
-            wrapper.inputVersions = alloc.BumpAllocate<uint32_t>(inputSize);
-            wrapper.node->getInputDependencies(wrapper.inputDependency.data);
-        }
-
+        
         if (outputSize != 0) {
             wrapper.outpnputDependency = alloc.BumpAllocate<NodeDependency>(outputSize);
-            wrapper.outputVersions = alloc.BumpAllocate<uint32_t>(outputSize);
             wrapper.node->getOutputDependencies(wrapper.outpnputDependency.data);
+        }
+
+        if ((inputSize + outputSize) != 0) {
+            wrapper.inputDependency = alloc.BumpAllocate<NodeDependency>(inputSize + outputSize);
+            
+            if (inputSize != 0) {
+                wrapper.inputDependency.resize(inputSize);
+                wrapper.node->getInputDependencies(wrapper.inputDependency.data());
+            }
         }
 
         outEdges.push_back(std::vector<VersionedResource>());
         inEdges.push_back(std::vector<ResourceUsage>());
 
-        for (uint32_t i = 0; i < wrapper.inputDependency.size; i++) {
+        for (uint32_t i = 0; i < wrapper.inputDependency.size(); i++) {
 
             ResourceId resource = wrapper.inputDependency[i].resource;
             VersionedResource r {resource, versions[resource]};
-            wrapper.inputVersions[i] = r.version;
             
             if (wrapper.inputDependency[i].stateByWriter) {
                 forceWriteStates[r] = wrapper.inputDependency[i].state;
@@ -216,7 +218,6 @@ struct GraphInstance {
 
         for (uint32_t i = 0; i < wrapper.outpnputDependency.size; i++) {
             uint32_t writeVersion = ++versions[wrapper.outpnputDependency[i].resource];
-            wrapper.outputVersions[i] = writeVersion;
             VersionedResource r {wrapper.outpnputDependency[i].resource, writeVersion};
             
             outEdges[nodeIndex].push_back(r);
@@ -224,10 +225,50 @@ struct GraphInstance {
         }
     }
 
+    void solveCrossQueueWriteWriteHazard(NodeWrapper& wrapper, uint32_t nodeIndex) {
+
+        for (uint32_t outEdge = 0; outEdge < outEdges[nodeIndex].size(); outEdge++) {
+
+            QueueType queue = wrapper.queue;
+            VersionedResource r = outEdges[nodeIndex][outEdge];
+
+            if (r.version <= 1)
+                continue;
+
+            VersionedResource previousVersion = {r.id, r.version - 1};
+
+            QueueType prevWriterQueue = nodes[writes[previousVersion].node].queue;
+
+            if (prevWriterQueue == queue)
+                continue;
+
+            bool alreadyDepends = false;
+            for (ResourceUsage read : reads[previousVersion]) {
+                if (read.node == nodeIndex) {
+                    alreadyDepends = true;
+                    break;
+                }
+            }
+
+            if (alreadyDepends) {
+                continue;
+            }
+
+
+            uint32_t depIndex = wrapper.inputDependency.size();
+            wrapper.inputDependency.push_back(NodeDependency{
+                r.id, wrapper.outpnputDependency[writes[r].dependencyIndex].state
+            });
+            inEdges[nodeIndex].push_back({previousVersion, nodeIndex, depIndex});
+            reads[previousVersion].push_back({previousVersion, nodeIndex, depIndex});
+        }
+    }
+
     void findStartingNodes(uint32_t count, MemBuffer<uint32_t>& data) {
         for (uint32_t i = 0; i < count; i++) {
+            uint32_t node = count - i - 1;
             bool found = false;
-            for (ResourceUsage usage : inEdges[i]) {
+            for (ResourceUsage usage : inEdges[node]) {
                 if (writes.find(usage.resource) != writes.end()) {
                     found = true;
                     break;
@@ -235,7 +276,7 @@ struct GraphInstance {
             }
 
             if (!found) {
-                data.push_back(i);
+                data.push_back(node);
             }
         }
     }
@@ -252,14 +293,14 @@ struct GraphInstance {
         std::vector<std::vector<uint32_t>> outcomingEdges;
         std::vector<std::unordered_set<uint32_t>> incomingEdges;
 
+        outcomingEdges.resize(capacity);
+        incomingEdges.resize(capacity);
+
         for (uint32_t i = 0; i < outEdges.size(); i++) {
-            outcomingEdges.push_back(std::vector<uint32_t>());
             for (VersionedResource write : outEdges[i]) {
                 const std::vector<ResourceUsage>& reads = getReads(write);
 
                 for (ResourceUsage read: reads) {
-                    if (read.node >= incomingEdges.size())
-                        incomingEdges.resize(read.node + 1);
                     auto result = incomingEdges[read.node].insert(i);
                     
                     if (result.second) {
@@ -278,7 +319,6 @@ struct GraphInstance {
                 uint32_t m = outcomingEdges[node][m_index];
                 outcomingEdges[node].pop_back();
                 incomingEdges[m].erase(node);
-
                 if (incomingEdges[m].size() == 0) {
                     ASSERT(initialNodes.size() <= capacity-1);
                     initialNodes.push_back(m);
@@ -543,10 +583,10 @@ void EnqueueBarriers(const NodeWrapper& node, Allocator& alloc, TransferCommandB
 {
     auto _ = alloc.BeginContext();
     MemBuffer<ResourceId> resources = alloc.BumpAllocate<ResourceId>(
-        node.inputDependency.size + node.outpnputDependency.size);
+        node.inputDependency.size() + node.outpnputDependency.size);
     MemBuffer<ResourceState> states = alloc.BumpAllocate<ResourceState>(
-        node.inputDependency.size + node.outpnputDependency.size);
-    for (int i = 0; i < node.inputDependency.size; i++) {
+        node.inputDependency.size() + node.outpnputDependency.size);
+    for (int i = 0; i < node.inputDependency.size(); i++) {
         
         if (node.inputDependency[i].stateByWriter)
             continue;
@@ -843,11 +883,12 @@ void DebugTimeline(
     std::cout << ss.str() << std::endl;
 }
 
+template<bool DoDebug>
 void RunGraph(
     RenderContext& context, 
     GraphInstance& instance, 
     std::vector<Ref<Semaphore>>& semaphores,
-    std::vector<uint64_t>& initialValuess,
+    std::vector<uint64_t>& initialValues
 ) {
     uint32_t queueCount = static_cast<size_t>(QueueType::None);
     PerQueueStorage<uint64_t> maxTimelineValues;
@@ -866,24 +907,26 @@ void RunGraph(
             instance.queueTimelines[queueIndex].begin(),
             maxTimelineValues[queueIndex],
             semaphores,
-            initialValuess,
+            initialValues,
             binarySemaphores,
             externalSync
         };
 
         while (executionContext.step != instance.queueTimelines[queueIndex].end())
         {
-#ifdef DEBUG_RENDER_GRAPH
-            DebugTimeline(context, instance, executionContext);
-#else
-            RunTimeline(context, instance, executionContext);
-#endif
+            if constexpr (DoDebug) {
+                DebugTimeline(context, instance, executionContext);
+            } 
+            else {
+                RunTimeline(context, instance, executionContext);
+            }
         }
     }
     
 
+    initialValues.resize(static_cast<uint32_t>(QueueType::None));
     for (uint32_t i = 0; i < static_cast<uint32_t>(QueueType::None); i++) {
-        initialValuess[i] += maxTimelineValues[i];
+        initialValues[i] += maxTimelineValues[i];
     }
 }
 
@@ -929,7 +972,8 @@ void RenderGraph::OnMessage(BeginFrameMsg* m) {
     }
 }
 
-void RenderGraph::Run() {
+template<bool DoDebug>
+void RenderGraph::RunGraphInternal() {
 
     if (nodes.size() == 0)
         return;
@@ -949,36 +993,18 @@ void RenderGraph::Run() {
         instance.populateNode(node, index++);
     }
 
-    // index = 0;
-    // for (NodeWrapper& node: nodes) {
-    //     LOG("Node_" << index << " " << node.node->getName())
-    //     LOG("Input dependencies:")
-    //     for (int i = 0; i < node.inputDependency.size; i++) {
-    //         auto& d = node.inputDependency[i];
-    //         LOG("   " << context.Get<Resources>().GetName(d.resource) << " " << d.resource.id)
-    //         LOG("   state: " << d.state.accessStage)
-    //         LOG("   version: " << node.inputVersions[i])
-    //         LOG("")
-    //     }
-    //     LOG("")
-    //     LOG("Output dependencies:")
-    //     for (int i = 0; i < node.outpnputDependency.size; i++) {
-    //         auto& d = node.outpnputDependency[i];
-    //         LOG("   " << context.Get<Resources>().GetName(d.resource) << " " << d.resource.id)
-    //         LOG("   stage: " << d.state.accessStage)
-    //         LOG("   version: " << node.outputVersions[i])
-    //         LOG("")
-    //     }
-    //     LOG("")
-    //     LOG("")
-    //     index++;
-    // }
+    
+    index = 0;
+    for (NodeWrapper& node : nodes) {
+        instance.solveCrossQueueWriteWriteHazard(node, index++);
+    }
     
     instance.sortNodes();
+    
     instance.defineSyncronizationContexts(context);
     instance.buildTimelines();
     instance.simplifyTimelines();
-    RunGraph(
+    RunGraph<DoDebug>(
         context, 
         instance, 
         *semaphoresPerQueue,
@@ -991,3 +1017,23 @@ void RenderGraph::Run() {
 
     nodes.clear();
 }
+
+void RenderGraph::Run() {
+    RunGraphInternal<false>();
+}
+
+void RenderGraph::Debug() {
+    RunGraphInternal<true>();
+}
+
+template void RunGraph<true>(RenderContext& context, 
+    GraphInstance& instance, 
+    std::vector<Ref<Semaphore>>& semaphores,
+    std::vector<uint64_t>& initialValuess);
+template void RunGraph<false>(RenderContext& context, 
+    GraphInstance& instance, 
+    std::vector<Ref<Semaphore>>& semaphores,
+    std::vector<uint64_t>& initialValuess);
+    
+template void RenderGraph::RunGraphInternal<true>();
+template void RenderGraph::RunGraphInternal<false>();

@@ -1,4 +1,6 @@
 #ifdef BLOCK
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 #include <common.h>
 #include <glm/glm.hpp>
 #include <vector>
