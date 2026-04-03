@@ -10,11 +10,11 @@
 
 struct NodeWrapper {
     QueueType queue;
-    MemBuffer<NodeDependency> inputDependency;
+    std::vector<NodeDependency> inputDependency;
     MemChunk<NodeDependency> outpnputDependency;
     RenderNode* node;
     void(*destructor)(RenderNode*);
-    uint32_t sortedIndex;
+    uint32_t depth;
 };
 
 struct VersionedResource {
@@ -25,6 +25,8 @@ struct VersionedResource {
         return id == other.id && version == other.version;
     }
 };
+
+typedef VersionedResource DepthedResource;
 
 namespace std {
     template <>
@@ -70,7 +72,7 @@ struct API RenderGraph: FeatureSet,
 
         nodes.push_back(NodeWrapper {
             node->getTargetQueue(),
-            MemChunk<NodeDependency>::Null(),
+            std::vector<NodeDependency>(),
             MemChunk<NodeDependency>::Null(),
             node,
             [](RenderNode* node) {static_cast<T*>(node)->~T();},

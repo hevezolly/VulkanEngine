@@ -41,63 +41,6 @@ std::string queueName(QueueType type) {
     }
 }
 
-static constexpr VkPipelineStageFlags2 kStageOrder[] = {
-    VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
-    VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT,
-    VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT,
-
-    VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
-    VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT,
-    VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT,
-    VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT,
-    VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT,
-    VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT,
-    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-
-    VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
-    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-
-    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-
-    VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-
-    VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-    VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR,
-
-    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-};
-
-inline VkPipelineStageFlags2 earliest_stage(VkPipelineStageFlags2 mask)
-{
-    for (VkPipelineStageFlags2 s : kStageOrder)
-        if (mask & s)
-            return s;
-
-    return VK_PIPELINE_STAGE_2_NONE;
-}
-
-inline VkPipelineStageFlags2 min_stage(
-    VkPipelineStageFlags2 a,
-    VkPipelineStageFlags2 b)
-{
-    if (a == VK_PIPELINE_STAGE_2_NONE) return b;
-    if (b == VK_PIPELINE_STAGE_2_NONE) return a;
-
-    VkPipelineStageFlags2 ea = earliest_stage(a);
-    VkPipelineStageFlags2 eb = earliest_stage(b);
-
-    // find which appears first in the canonical order
-    for (VkPipelineStageFlags2 s : kStageOrder)
-    {
-        if (s == ea) return ea;
-        if (s == eb) return eb;
-    }
-
-    // fallback (should never happen)
-    return ea;
-}
-
 struct ResourceUsage {
     VersionedResource resource;
     uint32_t node;
@@ -155,6 +98,11 @@ struct SynchronizationContext {
     uint32_t waits;
 };
 
+struct ResourceUsageOnQueue {
+    ResourceUsage usage;
+    QueueType queue;
+}
+
 struct GraphInstance {
     std::vector<NodeWrapper>& nodes;
     Allocator& alloc;
@@ -191,13 +139,9 @@ struct GraphInstance {
             wrapper.node->getOutputDependencies(wrapper.outpnputDependency.data);
         }
 
-        if ((inputSize + outputSize) != 0) {
-            wrapper.inputDependency = alloc.BumpAllocate<NodeDependency>(inputSize + outputSize);
-            
-            if (inputSize != 0) {
-                wrapper.inputDependency.resize(inputSize);
-                wrapper.node->getInputDependencies(wrapper.inputDependency.data());
-            }
+        if ((inputSize) != 0) {            
+            wrapper.inputDependency.resize(inputSize);
+            wrapper.node->getInputDependencies(wrapper.inputDependency.data());
         }
 
         outEdges.push_back(std::vector<VersionedResource>());
@@ -225,115 +169,81 @@ struct GraphInstance {
         }
     }
 
-    void solveCrossQueueWriteWriteHazard(NodeWrapper& wrapper, uint32_t nodeIndex) {
+    void BumpDepth(NodeWrapper& wrapper, uint32_t nodeIndex, uint32_t depth) {
+        wrapper.depth = std::max(depth, wrapper.depth);
+        for (VersionedResource write : outEdges[nodeIndex]) {
+            ResourceUsage usage = writes[write];
 
-        for (uint32_t outEdge = 0; outEdge < outEdges[nodeIndex].size(); outEdge++) {
+            BumpDepth(nodes[usage.node], usage.node, wrapper.depth + 1);
+        }
+    }
 
-            QueueType queue = wrapper.queue;
-            VersionedResource r = outEdges[nodeIndex][outEdge];
+    bool solveCrossQueueWriteWriteHazard(NodeWrapper& wrapper, uint32_t nodeIndex) {
 
-            if (r.version <= 1)
+        std::unordered_map<DepthedResource, ResourceUsageOnQueue> resourceWritesOnDepth; //move
+
+        uint32_t depth = wrapper.depth;
+        QueueType queue = wrapper.queue;
+        
+        for (VersionedResource write : outEdges[nodeIndex]) {
+            ResourceUsage usage = writes[write];
+            DepthedResource depthedResource {
+                write.id,
+                depth
+            };
+
+            auto it = resourceWritesOnDepth.find(depthedResource);
+
+            if (it == resourceWritesOnDepth.end()) {
+                resourceWritesOnDepth[depthedResource] = {
+                    usage,
+                    queue
+                };
                 continue;
-
-            VersionedResource previousVersion = {r.id, r.version - 1};
-
-            QueueType prevWriterQueue = nodes[writes[previousVersion].node].queue;
-
-            if (prevWriterQueue == queue)
-                continue;
-
-            bool alreadyDepends = false;
-            for (ResourceUsage read : reads[previousVersion]) {
-                if (read.node == nodeIndex) {
-                    alreadyDepends = true;
-                    break;
-                }
             }
 
-            if (alreadyDepends) {
+            if (it->second.queue == queue) {
                 continue;
             }
-
 
             uint32_t depIndex = wrapper.inputDependency.size();
-            wrapper.inputDependency.push_back(NodeDependency{
-                r.id, wrapper.outpnputDependency[writes[r].dependencyIndex].state
+            
+            wrapper.inputDependency.push_back(NodeDependency {
+                write.id,
+                wrapper.outpnputDependency[usage.dependencyIndex].state
             });
-            inEdges[nodeIndex].push_back({previousVersion, nodeIndex, depIndex});
-            reads[previousVersion].push_back({previousVersion, nodeIndex, depIndex});
+
+            inEdges[nodeIndex].push_back({it->second.usage.resource, nodeIndex, depIndex});
+            reads[it->second.usage.resource].push_back({it->second.usage.resource, nodeIndex, depIndex});
+            BumpDepth(wrapper, nodeIndex, wrapper.depth + 1);
+            return true;
         }
+
+        return false;
     }
 
-    void findStartingNodes(uint32_t count, MemBuffer<uint32_t>& data) {
-        for (uint32_t i = 0; i < count; i++) {
-            uint32_t node = count - i - 1;
-            bool found = false;
-            for (ResourceUsage usage : inEdges[node]) {
-                if (writes.find(usage.resource) != writes.end()) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                data.push_back(node);
-            }
-        }
-    }
-
-    void sortNodes() 
+    void assignDepths() 
     {
-        uint32_t capacity = outEdges.size();
-
-        auto _ = alloc.BeginContext();
-
-        MemBuffer<uint32_t> initialNodes = alloc.BumpAllocate<uint32_t>(capacity);
-        findStartingNodes(capacity, initialNodes);
-
-        std::vector<std::vector<uint32_t>> outcomingEdges;
-        std::vector<std::unordered_set<uint32_t>> incomingEdges;
-
-        outcomingEdges.resize(capacity);
-        incomingEdges.resize(capacity);
-
-        for (uint32_t i = 0; i < outEdges.size(); i++) {
-            for (VersionedResource write : outEdges[i]) {
-                const std::vector<ResourceUsage>& reads = getReads(write);
-
-                for (ResourceUsage read: reads) {
-                    auto result = incomingEdges[read.node].insert(i);
-                    
-                    if (result.second) {
-                        outcomingEdges[i].push_back(read.node);
-                    }
-                }
+        for (uint32_t nodeId = 0; nodeId < nodes.size(); nodeId++) {
+            for (ResourceUsage in: inEdges[nodeId]) {
+                nodes[nodeId].depth = std::max(nodes[in.node].depth + 1, nodes[nodeId].depth);
             }
         }
+    }
 
-        while (initialNodes.size() > 0) {
-            uint32_t node = initialNodes.back();
-            initialNodes.pop_back();
-            sortedNodes.push_back(node);
+    void sortNodes() {
 
-            for (int m_index = outcomingEdges[node].size() - 1; m_index >= 0; m_index--) {
-                uint32_t m = outcomingEdges[node][m_index];
-                outcomingEdges[node].pop_back();
-                incomingEdges[m].erase(node);
-                if (incomingEdges[m].size() == 0) {
-                    ASSERT(initialNodes.size() <= capacity-1);
-                    initialNodes.push_back(m);
-                }
-            }
+        sortedNodes.clear();
+        sortedNodes.reserve(nodes.size());
+        for (uint32_t i = 0; i < nodes.size(); i++) {
+            sortedNodes.push_back(i);
         }
 
-        for (int i = 0; i < capacity; i++) {
-            ASSERT(outcomingEdges[i].size() == 0);
-            ASSERT(incomingEdges[i].size() == 0);
-        }
+        auto& n = nodes;
 
-        for (int i = 0; i < sortedNodes.size(); i ++) {
-            nodes[sortedNodes[i]].sortedIndex = i;
-        }
+        std::stable_sort(sortedNodes.begin(), sortedNodes.end(), [&n](uint32_t a, uint32_t b) {
+            return n[a].depth < n[b].depth;
+        });
     }
 
     void tryAddResourceExternalSync(ResourceId id, RenderContext& context, uint32_t queue, uint32_t& timelineValue) {
@@ -867,8 +777,7 @@ void DebugTimeline(
         }
         else if (timelineContext.step->type == QueueTimeStep::Type::Node) {
             ss << "Node(" << instance.nodes[timelineContext.step->node].node->getName() << ")";
-            ss << "(" << queueName(instance.nodes[timelineContext.step->node].queue) << ")";
-            ss << "[" << instance.nodes[timelineContext.step->node].sortedIndex << "]";
+            ss << "[" << instance.nodes[timelineContext.step->node].depth << "]";
             ss << sep;
         }
         else {
@@ -994,9 +903,17 @@ void RenderGraph::RunGraphInternal() {
     }
 
     
-    index = 0;
-    for (NodeWrapper& node : nodes) {
-        instance.solveCrossQueueWriteWriteHazard(node, index++);
+    bool changed = true;
+    instance.assignDepths();
+
+    while (changed) {
+        index = 0;
+        changed = false;
+        for (NodeWrapper& node : nodes) {
+            changed |= instance.solveCrossQueueWriteWriteHazard(node, index++);
+            if (changed)
+                break;
+        }
     }
     
     instance.sortNodes();

@@ -64,7 +64,7 @@ int main() {
 
     RenderGraph& graph = context.Get<RenderGraph>();
 
-    std::cout << "graph 1:" << std::endl; 
+    std::cout << "simple graph" << std::endl; 
     graph.AddNode<DebugNode>(QueueType::Graphics)
         .AddInput({id0})
         .AddOutput({id1})
@@ -77,27 +77,10 @@ int main() {
 
     graph.Debug();
     std::cout << std::endl;
-    
-// =====================================================
-    
-    std::cout << "graph 2:" << std::endl; 
-    
-    graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddInput({id1})
-        .AddOutput({id2})
-        .SetName("node2");
-
-    graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddInput({id0})
-        .AddOutput({id1})
-        .SetName("node1");
-
-    graph.Debug();
-    std::cout << std::endl;
 
 // =====================================================
     
-    std::cout << "graph 3:" << std::endl; 
+    std::cout << "prevent write-write hazard on different queues:" << std::endl; 
     
     graph.AddNode<DebugNode>(QueueType::Graphics)
         .AddOutput({id1})
@@ -106,6 +89,85 @@ int main() {
     graph.AddNode<DebugNode>(QueueType::Compute)
         .AddOutput({id1})
         .SetName("producer2");
+
+    graph.Debug();
+    std::cout << std::endl;
+
+// =====================================================
+    
+    std::cout << "reordering:" << std::endl; 
+    
+    graph.AddNode<DebugNode>(QueueType::Compute)
+        .AddOutput({id1})
+        .SetName("waitJob");
+
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id1})
+        .AddOutput({id2})
+        .SetName("producer1");
+    
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id2})
+        .AddOutput({id2})
+        .SetName("producer2");
+ 
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddOutput({id2, id3})
+        .SetName("producer3");
+
+    graph.Debug();
+    std::cout << std::endl;
+
+    // =====================================================
+    
+    std::cout << "reordering 2:" << std::endl; 
+    
+    graph.AddNode<DebugNode>(QueueType::Compute)
+        .AddOutput({id1})
+        .SetName("waitJob");
+
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id1})
+        .AddOutput({id2})
+        .SetName("producer1");
+    
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id2})
+        .AddOutput({id2})
+        .SetName("producer2");
+ 
+    graph.AddNode<DebugNode>(QueueType::Compute)
+        .AddOutput({id2, id3})
+        .SetName("producer4");
+
+    graph.Debug();
+    std::cout << std::endl;
+
+// =====================================================
+    
+    std::cout << "reordering 3:" << std::endl; 
+    
+    graph.AddNode<DebugNode>(QueueType::Compute)
+        .AddOutput({id1})
+        .SetName("waitJob");
+
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id1})
+        .AddOutput({id2})
+        .SetName("producer1");
+    
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddInput({id2})
+        .AddOutput({id2})
+        .SetName("producer2");
+
+    graph.AddNode<DebugNode>(QueueType::Graphics)
+        .AddOutput({id2})
+        .SetName("producer3");
+ 
+    graph.AddNode<DebugNode>(QueueType::Compute)
+        .AddOutput({id2, id3})
+        .SetName("producer4");
 
     graph.Debug();
     std::cout << std::endl;
