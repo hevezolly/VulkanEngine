@@ -101,7 +101,7 @@ struct SynchronizationContext {
 struct ResourceUsageOnQueue {
     ResourceUsage usage;
     QueueType queue;
-}
+};
 
 struct GraphInstance {
     std::vector<NodeWrapper>& nodes;
@@ -135,8 +135,8 @@ struct GraphInstance {
         wrapper.queue = wrapper.node->getTargetQueue();
         
         if (outputSize != 0) {
-            wrapper.outpnputDependency = alloc.BumpAllocate<NodeDependency>(outputSize);
-            wrapper.node->getOutputDependencies(wrapper.outpnputDependency.data);
+            wrapper.outputDependency = alloc.BumpAllocate<NodeDependency>(outputSize);
+            wrapper.node->getOutputDependencies(wrapper.outputDependency.data);
         }
 
         if ((inputSize) != 0) {            
@@ -160,9 +160,9 @@ struct GraphInstance {
             reads[r].push_back({r, nodeIndex, i});
         }
 
-        for (uint32_t i = 0; i < wrapper.outpnputDependency.size; i++) {
-            uint32_t writeVersion = ++versions[wrapper.outpnputDependency[i].resource];
-            VersionedResource r {wrapper.outpnputDependency[i].resource, writeVersion};
+        for (uint32_t i = 0; i < wrapper.outputDependency.size; i++) {
+            uint32_t writeVersion = ++versions[wrapper.outputDependency[i].resource];
+            VersionedResource r {wrapper.outputDependency[i].resource, writeVersion};
             
             outEdges[nodeIndex].push_back(r);
             writes[r] = {r, nodeIndex, i};
@@ -170,17 +170,23 @@ struct GraphInstance {
     }
 
     void BumpDepth(NodeWrapper& wrapper, uint32_t nodeIndex, uint32_t depth) {
-        wrapper.depth = std::max(depth, wrapper.depth);
-        for (VersionedResource write : outEdges[nodeIndex]) {
-            ResourceUsage usage = writes[write];
 
-            BumpDepth(nodes[usage.node], usage.node, wrapper.depth + 1);
+        if (depth <= wrapper.depth)
+            return;
+
+        wrapper.depth = depth;
+        for (VersionedResource write : outEdges[nodeIndex]) {
+            for (ResourceUsage read : reads[write]) {
+                BumpDepth(nodes[read.node], read.node, wrapper.depth + 1);
+            }
         }
     }
 
-    bool solveCrossQueueWriteWriteHazard(NodeWrapper& wrapper, uint32_t nodeIndex) {
-
-        std::unordered_map<DepthedResource, ResourceUsageOnQueue> resourceWritesOnDepth; //move
+    bool solveCrossQueueWriteWriteHazard(
+        NodeWrapper& wrapper, 
+        uint32_t nodeIndex,
+        std::unordered_map<DepthedResource, ResourceUsageOnQueue>& resourceWritesOnDepth
+    ) {
 
         uint32_t depth = wrapper.depth;
         QueueType queue = wrapper.queue;
@@ -210,9 +216,9 @@ struct GraphInstance {
             
             wrapper.inputDependency.push_back(NodeDependency {
                 write.id,
-                wrapper.outpnputDependency[usage.dependencyIndex].state
+                wrapper.outputDependency[usage.dependencyIndex].state
             });
-
+            
             inEdges[nodeIndex].push_back({it->second.usage.resource, nodeIndex, depIndex});
             reads[it->second.usage.resource].push_back({it->second.usage.resource, nodeIndex, depIndex});
             BumpDepth(wrapper, nodeIndex, wrapper.depth + 1);
@@ -224,9 +230,50 @@ struct GraphInstance {
 
     void assignDepths() 
     {
+     
+        for (uint32_t nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
+            for (VersionedResource write : outEdges[nodeIndex]) {
+                if (write.version <= 1)
+                    continue;
+                
+                ResourceUsage usage = writes[write];
+                bool found = false;
+                NodeWrapper& wrapper = nodes[nodeIndex];
+                for (uint32_t readId = 0; readId < wrapper.inputDependency.size(); readId++) {
+                    if (wrapper.inputDependency[readId].resource == write.id) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (found)
+                    continue;
+
+                VersionedResource prevResource = {
+                    write.id,
+                    write.version - 1
+                };
+    
+                uint32_t depIndex = wrapper.inputDependency.size();
+                
+                wrapper.inputDependency.push_back(NodeDependency {
+                    write.id,
+                    wrapper.outputDependency[usage.dependencyIndex].state
+                });
+                
+                inEdges[nodeIndex].push_back({prevResource, nodeIndex, depIndex});
+                reads[prevResource].push_back({prevResource, nodeIndex, depIndex});
+            }
+        }
+
         for (uint32_t nodeId = 0; nodeId < nodes.size(); nodeId++) {
             for (ResourceUsage in: inEdges[nodeId]) {
-                nodes[nodeId].depth = std::max(nodes[in.node].depth + 1, nodes[nodeId].depth);
+                auto write = writes.find(in.resource);
+
+                if (write != writes.end()) {
+                    nodes[nodeId].depth = std::max(nodes[write->second.node].depth + 1, nodes[nodeId].depth);
+                }
+
             }
         }
     }
@@ -302,7 +349,7 @@ struct GraphInstance {
                 }
 
                 if (found) {
-                    stage |= nodes[write.node].outpnputDependency[write.dependencyIndex].state.accessStage;
+                    stage |= nodes[write.node].outputDependency[write.dependencyIndex].state.accessStage;
                 }
             }
 
@@ -407,7 +454,7 @@ struct GraphInstance {
                     }
                     if (!found) {
                         usedSignals.push_back(SignalDescription {
-                            nodes[write.node].outpnputDependency[write.dependencyIndex].state.accessStage,
+                            nodes[write.node].outputDependency[write.dependencyIndex].state.accessStage,
                             syncContext
                         });
                     }
@@ -493,9 +540,9 @@ void EnqueueBarriers(const NodeWrapper& node, Allocator& alloc, TransferCommandB
 {
     auto _ = alloc.BeginContext();
     MemBuffer<ResourceId> resources = alloc.BumpAllocate<ResourceId>(
-        node.inputDependency.size() + node.outpnputDependency.size);
+        node.inputDependency.size() + node.outputDependency.size);
     MemBuffer<ResourceState> states = alloc.BumpAllocate<ResourceState>(
-        node.inputDependency.size() + node.outpnputDependency.size);
+        node.inputDependency.size() + node.outputDependency.size);
     for (int i = 0; i < node.inputDependency.size(); i++) {
         
         if (node.inputDependency[i].stateByWriter)
@@ -509,14 +556,14 @@ void EnqueueBarriers(const NodeWrapper& node, Allocator& alloc, TransferCommandB
         states.push_back(node.inputDependency[i].state);
     }
 
-    for (int i = 0; i < node.outpnputDependency.size; i++) {
+    for (int i = 0; i < node.outputDependency.size; i++) {
         
-        if (node.outpnputDependency[i].resource.type() != ResourceType::Image &&
-            node.outpnputDependency[i].resource.type() != ResourceType::Buffer)
+        if (node.outputDependency[i].resource.type() != ResourceType::Image &&
+            node.outputDependency[i].resource.type() != ResourceType::Buffer)
             continue;
 
-        resources.push_back(node.outpnputDependency[i].resource);
-        states.push_back(node.outpnputDependency[i].state);
+        resources.push_back(node.outputDependency[i].resource);
+        states.push_back(node.outputDependency[i].state);
     }
 
     commandBuffer.Barrier(resources.size(), resources.data(), states.data());
@@ -903,19 +950,7 @@ void RenderGraph::RunGraphInternal() {
     }
 
     
-    bool changed = true;
     instance.assignDepths();
-
-    while (changed) {
-        index = 0;
-        changed = false;
-        for (NodeWrapper& node : nodes) {
-            changed |= instance.solveCrossQueueWriteWriteHazard(node, index++);
-            if (changed)
-                break;
-        }
-    }
-    
     instance.sortNodes();
     
     instance.defineSyncronizationContexts(context);

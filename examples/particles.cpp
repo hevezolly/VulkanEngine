@@ -3,10 +3,10 @@
 #include <random>
 #include <chrono>
 #include <thread>
-#define GLM_FORCE_RADIANS
-#include <glm/gtc/matrix_transform.hpp>
 #include <vulkan_engine.h>
 #include <vulkan_engine_ui.h>
+#define GLM_FORCE_RADIANS
+#include <glm/gtc/matrix_transform.hpp>
 
 static const uint32_t PARTICLES_COUNT = 1024;
 static const uint32_t THREAD_GROUP_SIZE = 32;

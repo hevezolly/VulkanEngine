@@ -1,6 +1,4 @@
 #ifdef BLOCK
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
 #include <common.h>
 #include <glm/glm.hpp>
 #include <vector>
@@ -65,19 +63,19 @@ BLOCK
     }
 };
 
-namespace std {
-    template<> struct hash<BLOCK_NAME> {
+// namespace std {
+//     template<> struct hash<BLOCK_NAME> {
         
-        size_t operator()(const BLOCK_NAME & value) const {
-                size_t seed = 0;
-#define WRAPPER(t, n, l, f) hash_combine(seed, value.##n);
-        #include "define_scalar_atributes.h"
-BLOCK
-#undef WRAPPER
-            return seed;
-        }
-    };
-}
+//         size_t operator()(const BLOCK_NAME & value) const {
+//                 size_t seed = 0;
+// #define WRAPPER(t, n, l, f) hash_combine(seed, value.##n);
+//         #include "define_scalar_atributes.h"
+// BLOCK
+// #undef WRAPPER
+//             return seed;
+//         }
+//     };
+// }
 
 #undef BLOCK_NAME
 

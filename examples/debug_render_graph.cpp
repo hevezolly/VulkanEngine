@@ -80,22 +80,7 @@ int main() {
 
 // =====================================================
     
-    std::cout << "prevent write-write hazard on different queues:" << std::endl; 
-    
-    graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddOutput({id1})
-        .SetName("producer1");
-
-    graph.AddNode<DebugNode>(QueueType::Compute)
-        .AddOutput({id1})
-        .SetName("producer2");
-
-    graph.Debug();
-    std::cout << std::endl;
-
-// =====================================================
-    
-    std::cout << "reordering:" << std::endl; 
+    std::cout << "write dependency" << std::endl; 
     
     graph.AddNode<DebugNode>(QueueType::Compute)
         .AddOutput({id1})
@@ -118,58 +103,24 @@ int main() {
     graph.Debug();
     std::cout << std::endl;
 
-    // =====================================================
-    
-    std::cout << "reordering 2:" << std::endl; 
-    
-    graph.AddNode<DebugNode>(QueueType::Compute)
-        .AddOutput({id1})
-        .SetName("waitJob");
-
-    graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddInput({id1})
-        .AddOutput({id2})
-        .SetName("producer1");
-    
-    graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddInput({id2})
-        .AddOutput({id2})
-        .SetName("producer2");
- 
-    graph.AddNode<DebugNode>(QueueType::Compute)
-        .AddOutput({id2, id3})
-        .SetName("producer4");
-
-    graph.Debug();
-    std::cout << std::endl;
-
 // =====================================================
     
-    std::cout << "reordering 3:" << std::endl; 
+    std::cout << "parallel execution" << std::endl; 
     
     graph.AddNode<DebugNode>(QueueType::Compute)
         .AddOutput({id1})
-        .SetName("waitJob");
+        .SetName("producer1");
 
     graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddInput({id1})
-        .AddOutput({id2})
-        .SetName("producer1");
-    
-    graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddInput({id2})
         .AddOutput({id2})
         .SetName("producer2");
-
+    
     graph.AddNode<DebugNode>(QueueType::Graphics)
-        .AddOutput({id2})
-        .SetName("producer3");
+        .AddInput({id1, id2})
+        .AddOutput({id3})
+        .SetName("consumer");
  
-    graph.AddNode<DebugNode>(QueueType::Compute)
-        .AddOutput({id2, id3})
-        .SetName("producer4");
 
     graph.Debug();
     std::cout << std::endl;
-
 }

@@ -11,7 +11,7 @@
 struct NodeWrapper {
     QueueType queue;
     std::vector<NodeDependency> inputDependency;
-    MemChunk<NodeDependency> outpnputDependency;
+    MemChunk<NodeDependency> outputDependency;
     RenderNode* node;
     void(*destructor)(RenderNode*);
     uint32_t depth;
