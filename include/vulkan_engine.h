@@ -11,6 +11,7 @@
 #include <registry.h>
 #include <graphics_node.h>
 #include <render_graph.h>
+#include <clear_image_node.h>
 #include <shader_loader.h>
 #include <present_node.h>
 #include <frame_dispatcher.h>
