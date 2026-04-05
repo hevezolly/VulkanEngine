@@ -101,10 +101,10 @@ Image createRawImage(Resources* r, RenderContext& context, const ImageDescriptio
     auto _ = context.Get<Allocator>().BeginContext();
     VkImage image;
     VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-    imageInfo.imageType = description.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
+    imageInfo.imageType = description.arrayLayers == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
     imageInfo.extent.width = description.width;
     imageInfo.extent.height = description.height;
-    imageInfo.extent.depth = description.depth;
+    imageInfo.extent.depth = description.arrayLayers;
     imageInfo.mipLevels = 1;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.arrayLayers = 1;
@@ -261,7 +261,7 @@ ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFo
     ImageDescription description;
     description.width = imageData.x;
     description.height = imageData.y;
-    description.depth = 1;
+    description.arrayLayers = 1;
     description.format = format;
     description.usage = usage | ImageUsage::TransferDst;
     
@@ -421,7 +421,7 @@ void Resources::GiveName(ResourceId id, const std::string& name) {
                 name);
             context.NameVkObject(
                 VkObjectType::VK_OBJECT_TYPE_IMAGE_VIEW, 
-                (uint64_t)image.view->vkImageView,
+                (uint64_t)image.view().vkImageView,
                 name);
             break;
         }

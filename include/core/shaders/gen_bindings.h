@@ -11,7 +11,7 @@
 #include <resource_storage.h>
 #include <render_node.h>
 #include <descriptor_identity.h>
-#include <buffer_region.h>
+#include <subresources.h>
 #include <access_type.h>
 
 #ifndef BLOCK_NAME

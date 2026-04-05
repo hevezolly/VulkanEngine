@@ -2,7 +2,7 @@
 #include <feature_set.h>
 #include <framed_storage.h>
 #include <resources.h>
-#include <buffer_region.h>
+#include <subresources.h>
 
 struct API DynamicUniforms: FeatureSet,
     CanHandle<BeginFrameMsg>,

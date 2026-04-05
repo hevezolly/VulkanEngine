@@ -372,7 +372,7 @@ void TransferCommandBuffer::Barrier(uint32_t count, const ResourceId* ids, const
 
             auto image = resources.Get<Image>(id);
             imageBarriers.back().image = image->vkImage;
-            imageBarriers.back().subresourceRange =  image->view->subresourceRange;
+            imageBarriers.back().subresourceRange =  image->view().subresourceRange;
 
             imageBarriers.back().srcAccessMask = oldState.currentAccess;
             imageBarriers.back().dstAccessMask = newState.currentAccess;

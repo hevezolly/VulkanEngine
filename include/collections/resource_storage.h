@@ -284,7 +284,7 @@ struct ResourceRef {
     }
 
     void Replace(T&& newValue) {
-        _storage->Replace(id, newValue);
+        _storage->Replace(id, std::move(newValue));
     }
 
 private: 

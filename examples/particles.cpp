@@ -97,8 +97,8 @@ _Resources PrepareResources(
     
     r.graphicsPipeline = context
         .Get<GraphicsFeature>().NewGraphicsPipeline()
-        .AddVertex<Vertex>(VertexInputRate::Vertex)
         .AddVertex<Particle>(VertexInputRate::Instance)
+        .AddVertex<Vertex>(VertexInputRate::Vertex)
         .SetAttachments<Attachments>({
             context.Get<PresentFeature>().swapChain->format
         })
@@ -191,8 +191,8 @@ void DrawFrame(
     auto& drawParticlesNode = context.Get<RenderGraph>()
         .AddNode<GraphicsNode<Attachments>>(r.graphicsPipeline);
     drawParticlesNode.SetName("draw particles");
-    drawParticlesNode.AddVertexBuffer(r.vertexBuffer);
     drawParticlesNode.AddVertexBuffer(r.particlesBuffer);
+    drawParticlesNode.AddVertexBuffer(r.vertexBuffer);
     drawParticlesNode.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);
     drawParticlesNode.SetAttachments(Attachments {
         outputImage

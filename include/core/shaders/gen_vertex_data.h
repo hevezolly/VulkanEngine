@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <hash_combine.h>
+#include <glam_hash_redefine.h>
 
 #ifndef BLOCK_NAME
 #error "BLOCK_NAME must be defined"
@@ -46,7 +47,7 @@ BLOCK
 #undef WRAPPER
 
         __counter = initialSize;
-#define WRAPPER(t, n, l, f) location += l; __attributes[__counter++].location = location; 
+#define WRAPPER(t, n, l, f) __attributes[__counter++].location = location; location += l; 
         #include "define_scalar_atributes.h"
 BLOCK
 #undef WRAPPER
@@ -63,19 +64,19 @@ BLOCK
     }
 };
 
-// namespace std {
-//     template<> struct hash<BLOCK_NAME> {
+namespace std {
+    template<> struct hash<BLOCK_NAME> {
         
-//         size_t operator()(const BLOCK_NAME & value) const {
-//                 size_t seed = 0;
-// #define WRAPPER(t, n, l, f) hash_combine(seed, value.##n);
-//         #include "define_scalar_atributes.h"
-// BLOCK
-// #undef WRAPPER
-//             return seed;
-//         }
-//     };
-// }
+        size_t operator()(const BLOCK_NAME & value) const {
+                size_t seed = 0;
+#define WRAPPER(t, n, l, f) hash_combine(seed, value.##n);
+        #include "define_scalar_atributes.h"
+BLOCK
+#undef WRAPPER
+            return seed;
+        }
+    };
+}
 
 #undef BLOCK_NAME
 

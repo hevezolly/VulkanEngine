@@ -4,7 +4,7 @@
 #include <shader_loader.h>
 
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
-    PipelineBuilder<GraphicsPipelineBuilder>(context)
+    PipelineBuilder<GraphicsPipelineBuilder>(context), location(0)
 {
     inputAssembly = {VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;

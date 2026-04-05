@@ -35,26 +35,19 @@ VkImageAspectFlags getAspect(VkFormat format) {
     return aspect;
 }
 
-ImageView::ImageView(RenderContext& context, const Image* image, VkImageAspectFlags aspect):
+ImageView::ImageView(RenderContext& context, const Image* image, const VkImageSubresourceRange& range):
 context(&context),
-referencedImage(image)
+referencedImage(image),
+subresourceRange(range)
 {
     VkImageViewCreateInfo createInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     createInfo.image = image->vkImage;
-    createInfo.viewType = image->description.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D;
+    createInfo.viewType = image->description.arrayLayers == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     createInfo.format = image->description.format;
     createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    subresourceRange = {};
-
-    subresourceRange.aspectMask = aspect;
-    subresourceRange.baseMipLevel = 0;
-    subresourceRange.levelCount = 1;
-    subresourceRange.baseArrayLayer = 0;
-    subresourceRange.layerCount = 1;
 
     createInfo.subresourceRange = subresourceRange;
 
@@ -96,14 +89,32 @@ Image::Image(
 ):  vkImage(readyImage),
     description(description),
     memory(std::nullopt),
-    context(nullptr)
+    context(&ctx)
 {
     auto aspect = getAspect(description.format);
+    mainRange = VkImageSubresourceRange {
+        aspect,
+        0,
+        description.mipLevels,
+        0,
+        description.arrayLayers
+    };
     if ((aspect & VK_IMAGE_ASPECT_COLOR_BIT) == VK_IMAGE_ASPECT_COLOR_BIT)
         clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
     else 
         clearValue.depthStencil = {1.0f, 0};
-    view = new ImageView(ctx, this, aspect);
+}
+
+ImageView& Image::GetSubresource(const VkImageSubresourceRange& range) {
+    auto it = subresources.find(range);
+    if (it != subresources.end())
+        return it->second;
+
+    subresources.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(range),
+        std::forward_as_tuple(*context, this, range));
+    return subresources[range];
 }
 
 Image::Image(
@@ -116,13 +127,19 @@ Image::Image(
     memory(std::move(memory)),
     context(&ctx)
 {
-    vkBindImageMemory(ctx.device(), img, this->memory.value().vkMemory, memory.offset);
     auto aspect = getAspect(description.format);
+    mainRange = VkImageSubresourceRange {
+        aspect,
+        0,
+        description.mipLevels,
+        0,
+        description.arrayLayers
+    };
+    vkBindImageMemory(ctx.device(), img, this->memory.value().vkMemory, memory.offset);
     if ((aspect & VK_IMAGE_ASPECT_COLOR_BIT) == VK_IMAGE_ASPECT_COLOR_BIT)
         clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
     else 
         clearValue.depthStencil = {1.0f, 0};
-    view = new ImageView(ctx, this, aspect);
 }
 
 Image& Image::operator=(Image&& other) noexcept {
@@ -132,14 +149,16 @@ Image& Image::operator=(Image&& other) noexcept {
     memory = std::move(other.memory);
     context = other.context;
     vkImage = other.vkImage;
-    view = other.view;
+    mainRange = other.mainRange;
+    subresources = std::move(other.subresources);
+    for (auto& pair : subresources) {
+        pair.second.referencedImage = this;
+    }
     clearValue = other.clearValue;
-    view->referencedImage = this;
     description = other.description;
     other.context = nullptr;
     other.memory = std::nullopt;
     other.vkImage = VK_NULL_HANDLE;
-    other.view = nullptr;
 
     return *this;
 }
@@ -149,9 +168,25 @@ Image::Image(Image&& other) noexcept {
 }
 
 Image::~Image() {
-    delete view;
-    if (context != nullptr) {
+    subresources.clear();
+    if (memory.has_value()) {
         vkDestroyImage(context->device(), vkImage, nullptr);
         context = nullptr;
     }
+}
+
+ImageView& Image::get(Mip mip, Layer layer) {
+
+    VkImageSubresourceRange range = mainRange;
+    range.baseArrayLayer = layer.layer;
+    range.layerCount = layer.count;
+    range.baseMipLevel = mip.level;
+    range.levelCount = mip.count;
+
+    ASSERT(range.baseArrayLayer >= mainRange.baseArrayLayer);
+    ASSERT(range.baseMipLevel >= mainRange.baseMipLevel);
+    ASSERT(range.baseArrayLayer + range.layerCount <= mainRange.baseArrayLayer + mainRange.layerCount);
+    ASSERT(range.baseMipLevel + range.levelCount <= mainRange.baseMipLevel + mainRange.levelCount);
+
+    return GetSubresource(range);
 }

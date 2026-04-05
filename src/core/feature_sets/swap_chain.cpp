@@ -147,7 +147,7 @@ SwapChain::SwapChain(RenderContext* context, const SwapChainInitializer& args) {
     auto premadeImages = vkCollect<VkImage>(vkGetSwapchainImagesKHR, device->device, swapChain);
 
     ImageDescription description{};
-    description.depth = 1;
+    description.arrayLayers = 1;
     description.width = extent.width;
     description.height = extent.height;
     description.format = format;
