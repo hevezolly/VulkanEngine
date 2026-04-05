@@ -211,7 +211,7 @@ struct API Descriptors : FeatureSet,
 
             uint32_t* writePtr = dynamicStates.data;
             ((values.FillDynamicState(writePtr), writePtr += values.size_dynamic_states()), ...);
-            
+
             return ShaderDynamicState {
                 sizeDynamic,
                 dynamicStates.data

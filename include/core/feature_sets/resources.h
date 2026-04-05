@@ -12,6 +12,7 @@
 #include <resource_storage.h>
 #include <synchronization.h>
 #include <framed_storage.h>
+#include <subresources.h>
 
 struct API Resources: FeatureSet,
     CanHandle<InitMsg>,
@@ -45,7 +46,7 @@ struct API Resources: FeatureSet,
 
     ResourceRef<Image> CreateImage(const ImageDescription& dsecription);
 
-    ResourceRef<Image> LoadImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
+    ResourceRef<Image> LoadImageResource(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
 
     void DestroyImmediate(ResourceId resource);
     void QueueDestruction(ResourceId resource);

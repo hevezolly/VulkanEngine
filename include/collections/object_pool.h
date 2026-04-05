@@ -238,6 +238,7 @@ struct Borrowed {
             next->previous = prev;
         }
 
+        _data.reset();
         _data = other._data;
 
         _ptr->next = nullptr;

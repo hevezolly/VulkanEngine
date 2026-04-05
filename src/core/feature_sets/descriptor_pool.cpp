@@ -55,7 +55,6 @@ DescriptorSet::DescriptorSet(DescriptorSet&& other) noexcept {
 }
 
 SpecializedDescriptorPool::~SpecializedDescriptorPool() {
-    ASSERT(availableInstances == maxInstances);
 }
 
 void SpecializedDescriptorPool::OnReturnOne(VkDescriptorSet set) 

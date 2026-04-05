@@ -241,15 +241,15 @@ VkFormat getFormatFromNativeComponents(int components)
         case 2:
             return VK_FORMAT_R8G8_UNORM;
         case 3:
-            return VK_FORMAT_R8G8B8_SRGB;
+            return VK_FORMAT_R8G8B8_UNORM;
         case 4:
-            return VK_FORMAT_R8G8B8A8_SRGB;
+            return VK_FORMAT_R8G8B8A8_UNORM;
         default:
             ASSERT(false);
     }
 }
 
-ResourceRef<Image> Resources::LoadImage(ImageUsage usage, const char* path, VkFormat format) {
+ResourceRef<Image> Resources::LoadImageResource(ImageUsage usage, const char* path, VkFormat format) {
 
     int forceComponents = getStbiForceComponents(format);
 

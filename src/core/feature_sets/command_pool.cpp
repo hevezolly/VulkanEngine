@@ -324,6 +324,12 @@ void ComputeCommandBuffer::BindShaderInput(uint32_t count, const ShaderInputInst
 void ComputeCommandBuffer::UpdateDynamicState(ShaderDynamicState state) {
     ASSERT(lastBoundDescriptor.data != nullptr);
 
+     std::cout << "dynamic state: ";
+    for (uint32_t offset = 0; offset < state.dynamicOffsetsCount; offset++) {
+        std::cout << state.pDynamicOffsets[offset] << " ";
+    }
+    std::cout << std::endl;
+
     if (state.pDynamicOffsets != nullptr) {
         vkCmdBindDescriptorSets(
             buffer,

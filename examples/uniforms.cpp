@@ -106,7 +106,7 @@ _Resources PrepareResources(
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
     r.depth = context.Get<Resources>().CreateImage({dsFormat, ImageUsage::DepthStencil, context.Get<PresentFeature>().swapChainExtent()});
-    r.image = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
+    r.image = context.Get<Resources>().LoadImageResource(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
 
 
     r.pipeline = context

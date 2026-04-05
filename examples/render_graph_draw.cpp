@@ -87,7 +87,7 @@ _Resources PrepareResources(
     context.Get<Resources>().GiveName(r.image, "image");
     r.image->clearValue = {{1.0, 1.0, 1.0}};
     
-    r.resourceImg = context.Get<Resources>().LoadImage(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
+    r.resourceImg = context.Get<Resources>().LoadImageResource(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
     
     r.pipeline = context

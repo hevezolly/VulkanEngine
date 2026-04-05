@@ -112,7 +112,7 @@ BLOCK
         #include "define_shader_bindings.h"
         BLOCK
         #undef WRAPPER
-        #undef RESOURCES
+    #undef RESOURCES
     }
 
     static constexpr uint32_t count(VkDescriptorType type) {

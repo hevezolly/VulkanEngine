@@ -1,11 +1,11 @@
 #pragma once
 #include <render_context.h>
+#include <resources.h>
 #include <shader_source.h>
 #include <present_feature.h>
 #include <graphics_feature.h>
 #include <descriptor_pool.h>
 #include <command_pool.h>
-#include <resources.h>
 #include <allocator_feature.h>
 #include <stable_frame_rate.h>
 #include <registry.h>
