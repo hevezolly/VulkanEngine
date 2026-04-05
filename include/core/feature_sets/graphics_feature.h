@@ -95,20 +95,27 @@ struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
 
         if (T::size_depth_stencil() > 0) {
             dsRef = T::GetDepthStencilAttachmentReference();
-            if (!dsState.has_value()) {
-                dsState = VkPipelineDepthStencilStateCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-                dsState.value().depthTestEnable = VK_TRUE;
-                dsState.value().depthWriteEnable = VK_TRUE;
-                dsState.value().depthCompareOp = VK_COMPARE_OP_LESS;
-                dsState.value().depthBoundsTestEnable = VK_FALSE;
-                dsState.value().minDepthBounds = 0.0f;
-                dsState.value().maxDepthBounds = 1.0f; 
-                dsState.value().stencilTestEnable = VK_FALSE;
-                dsState.value().front = {}; 
-                dsState.value().back = {};
-            }
+            initDepth();
         }
 
+        return *this;
+    }
+
+    GraphicsPipelineBuilder& SetDepthCompareOp(VkCompareOp op) {
+        initDepth();
+        dsState.value().depthCompareOp = op;
+        return *this;
+    }
+
+    GraphicsPipelineBuilder& SetDepthWriteEnabled(bool enabled) {
+        initDepth();
+        dsState.value().depthWriteEnable = enabled ? VK_TRUE : VK_FALSE;
+        return *this;
+    }
+
+    GraphicsPipelineBuilder& SetDepthTestEnabled(bool enabled) {
+        initDepth();
+        dsState.value().depthTestEnable = enabled ? VK_TRUE : VK_FALSE;
         return *this;
     }
 
@@ -122,6 +129,23 @@ protected:
     }
 
 private:
+
+    void initDepth() {
+        if (dsState.has_value())
+            return;
+
+        dsState = VkPipelineDepthStencilStateCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+        dsState.value().depthTestEnable = VK_TRUE;
+        dsState.value().depthWriteEnable = VK_TRUE;
+        dsState.value().depthCompareOp = VK_COMPARE_OP_LESS;
+        dsState.value().depthBoundsTestEnable = VK_FALSE;
+        dsState.value().minDepthBounds = 0.0f;
+        dsState.value().maxDepthBounds = 1.0f; 
+        dsState.value().stencilTestEnable = VK_FALSE;
+        dsState.value().front = {}; 
+        dsState.value().back = {};
+    }
+
     GraphicsPipelineBuilder(RenderContext& context);
 };
 
