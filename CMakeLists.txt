@@ -74,10 +74,10 @@ target_include_directories(VulkanEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
 )
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(VulkanEngine PUBLIC ENABLE_VULKAN_VALIDATION)
-    target_compile_definitions(VulkanEngine PUBLIC ENGINE_LOG)
-endif()
+target_compile_definitions(VulkanEngine PUBLIC
+    $<$<CONFIG:Debug>:ENABLE_VULKAN_VALIDATION>
+    $<$<CONFIG:Debug>:ENGINE_LOG>
+)
 
 option(VULKAN_ENGINE_IMGUI_UI "Add Imgui UI" ON)
 if (VULKAN_ENGINE_IMGUI_UI)

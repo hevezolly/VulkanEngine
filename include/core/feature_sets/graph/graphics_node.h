@@ -30,6 +30,7 @@ template<typename Attachments, typename... Bindings>
 struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
 
     void SetAttachments(const Attachments& a) {
+        attachmentsSet = true;
         _attachments = a;
     }
 
@@ -105,7 +106,6 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
     }
 
     virtual void Record(ExecutionContext commandBuffer) {
-
         ASSERT(commandBuffer.commandBuffer != nullptr);
 
         GraphicsCommandBuffer* c = dynamic_cast<GraphicsCommandBuffer*>(commandBuffer.commandBuffer);
@@ -114,9 +114,10 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
 
         GraphicsCommandBuffer& cmd = dynamic_cast<GraphicsCommandBuffer&>(*commandBuffer.commandBuffer);
         
+        ASSERT(attachmentsSet);
+
         const FrameBuffer& frameBuffer = this->context.Get<GraphicsFeature>()
             .CreateFrameBuffer(_attachments, pipeline->renderPass);
-
         cmd.BeginRenderPass(pipeline, frameBuffer);
 
         VkViewport viewport{};
@@ -181,7 +182,6 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
                     if (params.dynamicState.pDynamicOffsets != nullptr) {
                         cmd.UpdateDynamicState(params.dynamicState);
                     }
-
                     vkCmdDrawIndexed(cmd.buffer, params.drawCount, params.instanceCount, params.offset, params.vertexOffset, params.instanceOffset);
                 }
             }
@@ -205,6 +205,7 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
     }
 
 private:
+    bool attachmentsSet = false;
     Ref<GraphicsPipeline> pipeline;
     std::vector<DrawParameters> _drawParameters;
     VkIndexType _indexType;

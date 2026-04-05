@@ -390,7 +390,9 @@ ResourceRef<Image> Resources::Resize(ResourceRef<Image> image, uint32_t width, u
     _synchronization.erase(id);
     _states.erase(id);
 
-    _images.Replace(id, createRawImage(this, context, newDescription));
+    QueueDestruction(image);
+
+    _images.Insert(createRawImage(this, context, newDescription));
     
     auto node = _names.extract(prevId);
     if (!node.empty()) {
@@ -459,6 +461,18 @@ void Resources::DestroyImmediate(ResourceId resource) {
 
 bool Resources::ResourceRequiresSynchronization(ResourceId resource) {
     return _synchronization.find(resource) != _synchronization.end();
+}
+
+void Resources::QueueDestruction(ResourceId resource) {
+    _retirementQueue->push_back(resource);
+}
+
+void Resources::OnMessage(BeginFrameLateMsg* m) {
+    _retirementQueue.SetFrame(m->inFlightFrame);
+    for (ResourceId resource : _retirementQueue.val()) {
+        DestroyImmediate(resource);
+    }
+    _retirementQueue->clear();
 }
 
 Ref<Semaphore> Resources::ExtractSyncContext(ResourceId resource) {

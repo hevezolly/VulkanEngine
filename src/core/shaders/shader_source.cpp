@@ -46,7 +46,7 @@ ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source)
     
 
     if (!glslang_shader_preprocess(shader, &input))	{
-        printf("GLSL preprocessing failed %s\n", source.name);
+        printf("GLSL preprocessing failed %s\n", source.name.c_str());
         printf("%s\n", glslang_shader_get_info_log(shader));
         printf("%s\n", glslang_shader_get_info_debug_log(shader));
         printf("%s\n", input.code);
@@ -55,7 +55,7 @@ ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source)
     }
 
     if (!glslang_shader_parse(shader, &input)) {
-        printf("GLSL parsing failed %s\n", source.name);
+        printf("GLSL parsing failed %s\n", source.name.c_str());
         printf("%s\n", glslang_shader_get_info_log(shader));
         printf("%s\n", glslang_shader_get_info_debug_log(shader));
         printf("%s\n", glslang_shader_get_preprocessed_code(shader));
@@ -67,7 +67,7 @@ ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source)
     glslang_program_add_shader(program, shader);
 
     if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT)) {
-        printf("GLSL linking failed %s\n", source.name);
+        printf("GLSL linking failed %s\n", source.name.c_str());
         printf("%s\n", glslang_program_get_info_log(program));
         printf("%s\n", glslang_program_get_info_debug_log(program));
         glslang_program_delete(program);
@@ -82,7 +82,7 @@ ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source)
 
     const char* spirv_messages = glslang_program_SPIRV_get_messages(program);
     if (spirv_messages)
-        printf("(%s) %s\b", source.name, spirv_messages);
+        printf("(%s) %s\b", source.name.c_str(), spirv_messages);
 
     glslang_program_delete(program);
     glslang_shader_delete(shader);

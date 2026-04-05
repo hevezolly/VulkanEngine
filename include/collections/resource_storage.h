@@ -244,14 +244,17 @@ struct ResourceRef {
     ResourceRef(ResourceId i, ResourceStorage<T>* storage): id(i), _storage(storage) {}
 
     T& val() {
+        ASSERT(_storage != nullptr);
         return _storage->GetUnchecked(id);
     }
 
     const T& val() const {
+        ASSERT(_storage != nullptr);
         return _storage->GetUnchecked(id);
     }
 
     T* try_get() {
+        ASSERT(_storage != nullptr);
         return _storage->TryGet(id);
     }
 

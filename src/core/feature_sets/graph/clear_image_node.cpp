@@ -1,4 +1,14 @@
+#include <render_context.h>
+#include <resources.h>
 #include <clear_image_node.h>
+
+ClearImageNode::ClearImageNode(RenderContext& ctx, ImageSubresource img):
+RenderNode(ctx), image(img), clearValue(img.image->clearValue)
+{
+    isDepthImage = image.range.aspectMask != VK_IMAGE_ASPECT_COLOR_BIT;
+    dsAspects = image.range.aspectMask;
+    SetName("clear " + ctx.Get<Resources>().GetName(img.image));
+}
 
 void ClearImageNode::getOutputDependencies(NodeDependency* buffer) {
     *buffer = NodeDependency {

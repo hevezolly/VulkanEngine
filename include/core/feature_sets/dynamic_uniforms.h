@@ -38,6 +38,5 @@ private:
     VkDeviceSize minAlignment;
     VkDeviceSize maxSize;
     FramedStorage<BufferRegion> allocations; 
-    FramedStorage<std::vector<ResourceRef<Buffer>>> retirementQueue;
     ResourceRef<Buffer> currentBuffer;
 };

@@ -33,9 +33,9 @@ void DynamicUniforms::OnMessage(InitMsg*) {
 }
 
 void DynamicUniforms::Reallocate() {
-    retirementQueue->push_back(currentBuffer);
-
     Resources& r = context.Get<Resources>();
+    
+    r.QueueDestruction(currentBuffer);
     currentBuffer = r.CreateRawBuffer(BufferPreset::UNIFORM, framesInFlight * capacityPerFrame);
     r.GiveName(currentBuffer, "global_dynamic_uniform_buffer");
 
@@ -68,13 +68,6 @@ BufferRegion DynamicUniforms::AllocateRange(uint32_t size) {
 
 void DynamicUniforms::OnMessage(BeginFrameMsg* m) {
 
-    Resources& r = context.Get<Resources>();
-
-    retirementQueue.SetFrame(m->inFlightFrame);
-    for (int i = 0; i < retirementQueue->size(); i++) {
-        r.DestroyImmediate(retirementQueue.val()[i]);
-    }
-    retirementQueue->clear();
     allocations.SetFrame(m->inFlightFrame);
 
     if (m->inFlightFrame >= framesInFlight) {

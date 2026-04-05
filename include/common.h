@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <stacktrace>
 
-
+#ifdef ENGINE_LOG
 #define ASSERT(condition) \
     do { \
         if (!(condition)) { \
@@ -44,6 +44,11 @@
             std::abort(); \
         } \
     } while(0)
+
+#else
+#define ASSERT(condition)
+#define ASSERT_MSG(condition, msg)
+#endif
 
 #if defined(_WIN32) && defined(VULKAN_ENGINE_SHARED)
     #if defined(VulkanEngine_EXPORTS)

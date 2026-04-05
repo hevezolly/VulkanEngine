@@ -15,7 +15,8 @@
 
 struct API Resources: FeatureSet,
     CanHandle<InitMsg>,
-    CanHandle<DestroyMsg>
+    CanHandle<DestroyMsg>,
+    CanHandle<BeginFrameLateMsg>
 {
     using FeatureSet::FeatureSet;
 
@@ -47,6 +48,7 @@ struct API Resources: FeatureSet,
     ResourceRef<Image> LoadImage(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
 
     void DestroyImmediate(ResourceId resource);
+    void QueueDestruction(ResourceId resource);
 
     template <typename T>
     ResourceRef<T> Register(T&& value, const ResourceState& resourceState) {
@@ -97,6 +99,7 @@ struct API Resources: FeatureSet,
 
     virtual void OnMessage(InitMsg*);
     virtual void OnMessage(DestroyMsg*);
+    virtual void OnMessage(BeginFrameLateMsg*);
 
     bool ResourceRequiresSynchronization(ResourceId resource);
     Ref<Semaphore> ExtractSyncContext(ResourceId resource);
@@ -112,4 +115,6 @@ private:
     ResourceStorage<Buffer> _buffers;
     ResourceStorage<Image> _images;
     ResourceStorage<Sampler> _samplers;
+
+    FramedStorage<std::vector<ResourceId>> _retirementQueue;
 };

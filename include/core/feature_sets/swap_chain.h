@@ -14,7 +14,7 @@ struct API SwapChainInitializer {
     std::vector<VkFormat> desiredFormats = {VK_FORMAT_B8G8R8A8_SRGB};
     std::vector<VkColorSpaceKHR> desiredColorSpaces = {VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
     std::vector<VkPresentModeKHR> desiredPresentMode = {VK_PRESENT_MODE_FIFO_KHR};
-    ImageUsage imageUsage = ImageUsage::ColorAttachment;
+    ImageUsage imageUsage = ImageUsage::ColorAttachment | ImageUsage::TransferDst;
     uint32_t imageCount = 0;
 };
 

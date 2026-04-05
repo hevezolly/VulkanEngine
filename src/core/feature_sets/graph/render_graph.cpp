@@ -699,14 +699,23 @@ void RunTimeline(
         cmd->Begin();
     }
 
+    uint32_t recordedNodes = 0;
+
     MemBuffer<VkSemaphoreSubmitInfo> waitContext = MemChunk<VkSemaphoreSubmitInfo>::Null();
     MemBuffer<Ref<Semaphore>> waitSemaphores = MemChunk<Ref<Semaphore>>::Null();
     MemBuffer<VkSemaphoreSubmitInfo> signalContext = MemChunk<VkSemaphoreSubmitInfo>::Null();
 
-    bool finalSubmit = true;
+    bool finalSubmit = false;
 
     do {
+        finalSubmit = std::next(timelineContext.step) == timelineContext.timeline.end();
         if (timelineContext.step->type == QueueTimeStep::Type::Wait) {
+
+            if (recordedNodes != 0) {
+                ASSERT(!finalSubmit);
+                break;
+            }
+
             ASSERT(waitContext.data() == nullptr);
 
             waitSemaphores = alloc.BumpAllocate<Ref<Semaphore>>(timelineContext.step->signals.size());
@@ -726,6 +735,7 @@ void RunTimeline(
                 cmd.get(),
                 waitSemaphores
             });
+            recordedNodes++;
 
             if (cmd) {
                 EnqueuePostBarriers(instance, timelineContext.step->node, alloc, *cmd);
@@ -734,8 +744,6 @@ void RunTimeline(
         else {
 
             ASSERT(signalContext.data() == nullptr);
-
-            bool finalSubmit = std::next(timelineContext.step) == timelineContext.timeline.end();
 
             uint32_t allocationSize = timelineContext.step->signals.size();
             if (finalSubmit) {
@@ -851,7 +859,7 @@ void RunGraph(
     std::unordered_map<QueueTimelineValue, Ref<Semaphore>> binarySemaphores;
     std::unordered_map<ResourceId, Ref<Semaphore>> externalSync;
 
-    for (int queueIndex =0; queueIndex < queueCount; queueIndex++) {
+    for (uint32_t queueIndex =0; queueIndex < queueCount; queueIndex++) {
 
         maxTimelineValues[queueIndex] = 0;
         if (instance.queueTimelines[queueIndex].size() == 0)
@@ -952,7 +960,6 @@ void RenderGraph::RunGraphInternal() {
     
     instance.assignDepths();
     instance.sortNodes();
-    
     instance.defineSyncronizationContexts(context);
     instance.buildTimelines();
     instance.simplifyTimelines();

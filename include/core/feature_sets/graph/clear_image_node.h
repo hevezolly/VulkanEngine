@@ -4,17 +4,11 @@
 #include <subresources.h>
 
 struct ClearImageNode: RenderNode {
-    ClearImageNode(
-        RenderContext& ctx, 
-        ImageSubresource img): 
-    RenderNode(ctx), image(img), clearValue(img.image->clearValue){
-        isDepthImage = image.range.aspectMask != VK_IMAGE_ASPECT_COLOR_BIT;
-        dsAspects = image.range.aspectMask;
-    }
+    ClearImageNode(RenderContext& ctx, ImageSubresource img);
 
     virtual QueueType getTargetQueue() {return QueueType::Graphics;}
     virtual uint32_t getInputDependenciesCount() {return 0;}
-    virtual uint32_t getOutputDependenciesCount() {return 0;}
+    virtual uint32_t getOutputDependenciesCount() {return 1;}
 
     void SetClearColor(VkClearColorValue clearValue){
         ASSERT(!isDepthImage);
@@ -31,7 +25,7 @@ struct ClearImageNode: RenderNode {
 
     virtual void getOutputDependencies(NodeDependency* buffer);
 
-    virtual void Record(ExecutionContext commandBuffer) = 0;
+    virtual void Record(ExecutionContext commandBuffer);
 
 private:
     VkImageAspectFlags dsAspects;
