@@ -1,8 +1,5 @@
 #pragma once
 
-#define GLFW_INCLUDE_NONE
-#include <volk.h>
-#include <GLFW/glfw3.h>
 #include <common.h>
 
 struct API WindowInitializer {

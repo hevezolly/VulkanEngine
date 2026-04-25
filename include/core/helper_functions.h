@@ -5,6 +5,7 @@ struct RenderContext;
 struct Allocator;
 struct Descriptors;
 struct ShaderLoader;
+struct Resources;
 
 namespace Helpers {
     API VkDevice device(RenderContext*);
@@ -14,5 +15,7 @@ namespace Helpers {
     API Descriptors& getDescriptors(RenderContext*);
 
     API ShaderLoader& shaderLoader(RenderContext*);
+
+    API Resources& resources(RenderContext*);
 }
 

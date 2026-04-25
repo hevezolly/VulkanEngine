@@ -1,7 +1,6 @@
 #pragma once
 
 #include <common.h>
-#include <volk.h>
 #include <vector>
 #include <optional>
 #include <feature_set.h>

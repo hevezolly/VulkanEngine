@@ -63,7 +63,7 @@ struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
         VkPrimitiveTopology topology, bool restartEnabled=false);
 
     GraphicsPipelineBuilder& SetCullMode(
-        VkCullModeFlagBits mode, VkFrontFace frontFace = VK_FRONT_FACE_CLOCKWISE
+        VkCullModeFlags mode, VkFrontFace frontFace = VK_FRONT_FACE_CLOCKWISE
     );
 
     GraphicsPipelineBuilder& SetDepthClampEnable(bool enable);

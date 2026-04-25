@@ -7,6 +7,7 @@
 #include <allocator_feature.h>
 #include <tuple>
 #include <utility>
+#include <resources.h>
 #include <render_node_with_bindings.h>
 
 struct DrawParameters {

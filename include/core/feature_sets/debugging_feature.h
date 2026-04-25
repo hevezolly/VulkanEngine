@@ -1,6 +1,5 @@
 #pragma once
 
-#include <volk.h>
 #include <feature_set.h>
 #include <common.h>
 #include <messages.h>

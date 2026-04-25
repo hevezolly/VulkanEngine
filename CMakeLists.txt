@@ -34,6 +34,7 @@ add_subdirectory(third_party/glslang)
 
 set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/glm)
+target_compile_definitions(glm INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 file(GLOB_RECURSE SOURCE_FILES 
     src/*.cpp

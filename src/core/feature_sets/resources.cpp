@@ -385,14 +385,13 @@ ResourceRef<Image> Resources::Resize(ResourceRef<Image> image, uint32_t width, u
     newDescription.width = width;
     newDescription.height = height;
 
-    ResourceId id = image.id;
-    ResourceId prevId = id;
-    _synchronization.erase(id);
-    _states.erase(id);
+    ResourceId prevId = image.id;
+    _synchronization.erase(prevId);
+    _states.erase(prevId);
 
     QueueDestruction(image);
 
-    _images.Insert(createRawImage(this, context, newDescription));
+    ResourceId id = _images.Insert(createRawImage(this, context, newDescription));
     
     auto node = _names.extract(prevId);
     if (!node.empty()) {

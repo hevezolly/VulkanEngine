@@ -78,7 +78,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetTopology(
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::SetCullMode(
-    VkCullModeFlagBits mode, 
+    VkCullModeFlags mode, 
     VkFrontFace frontFace
 ) {
     rasterization.cullMode = mode;

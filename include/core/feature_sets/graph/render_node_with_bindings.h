@@ -4,6 +4,7 @@
 #include <tuple>
 #include <utility>
 #include <allocator_feature.h>
+#include <resources.h>
 #include <helper_functions.h>
 
 template<typename... Bindings>
@@ -24,23 +25,25 @@ struct RenderNodeWithBindings: RenderNode {
     }
 
     virtual void getInputDependencies(NodeDependency* dependencies) {
-        WriteInputsEach(dependencies, 0, std::index_sequence_for<Bindings...>{});
+        WriteInputsEach(dependencies, std::index_sequence_for<Bindings...>{});
     }
 
     virtual void getOutputDependencies(NodeDependency* dependencies) {
-        WriteOutputsEach(dependencies, 0, std::index_sequence_for<Bindings...>{});
+        WriteOutputsEach(dependencies, std::index_sequence_for<Bindings...>{});
     }
 
 private:
 
     template<size_t... Is>
-    void WriteInputsEach(NodeDependency* dependencies, uint32_t offset, std::index_sequence<Is...>) {
-        (std::get<Is>(_bindings).write_inputs(dependencies + offset + Is), ...);
+    void WriteInputsEach(NodeDependency* dependencies, std::index_sequence<Is...>) {
+        ((std::get<Is>(_bindings).write_inputs(dependencies), 
+          dependencies += std::get<Is>(_bindings).size_inputs()), ...);
     }
 
     template<size_t... Is>
-    void WriteOutputsEach(NodeDependency* dependencies, uint32_t offset, std::index_sequence<Is...>) {
-        (std::get<Is>(_bindings).write_outputs(dependencies + offset + Is), ...);
+    void WriteOutputsEach(NodeDependency* dependencies, std::index_sequence<Is...>) {
+        ((std::get<Is>(_bindings).write_outputs(dependencies),
+          dependencies += std::get<Is>(_bindings).size_outputs()), ...);
     }
 
     template<size_t... Is>
