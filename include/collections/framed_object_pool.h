@@ -13,6 +13,11 @@ struct FramedObjectPool {
         }
     }
 
+    void SetFrameWithResetNoTransfer(uint32_t currentFrame) {
+        storage.SetFrame(currentFrame);
+        storage->Reset();
+    }
+
     void SetFrameWithReset(uint32_t currentFrame) {
         storage.SetFrame(currentFrame);
         storage->Reset();

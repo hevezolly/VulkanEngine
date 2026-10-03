@@ -124,22 +124,20 @@ SwapChain::SwapChain(RenderContext* context, const SwapChainInitializer& args) {
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    uint32_t usedQueuesCount = 1;
-    uint32_t usedQueuesIndices[2];
-    usedQueuesIndices[0] = device->queueFamilies.get(QueueType::Present);
+    // Swapchain images can be written by any queue the render graph uses (e.g. compute passes
+    // drawing into them), so share them between all of those families, like other images.
+    auto _ = context->Get<Allocator>().BeginContext();
+    MemBuffer<uint32_t> usedQueues = device->FillQueueUsages(
+        QueueType::Present | QueueType::Graphics | QueueType::Compute | QueueType::Transfer);
 
-    if (context->Has<GraphicsFeature>()) {
-        usedQueuesIndices[usedQueuesCount++] = device->queueFamilies.get(QueueType::Graphics);
-    }
-
-    if (usedQueuesCount == 1 || usedQueuesIndices[0] == usedQueuesIndices[1]) {
+    if (usedQueues.size() <= 1) {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         createInfo.queueFamilyIndexCount = 0;
         createInfo.pQueueFamilyIndices = nullptr;
     } else {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = usedQueuesIndices;
+        createInfo.queueFamilyIndexCount = usedQueues.size();
+        createInfo.pQueueFamilyIndices = usedQueues.data();
     }
 
     VK(vkCreateSwapchainKHR(device->device, &createInfo, nullptr, &swapChain));

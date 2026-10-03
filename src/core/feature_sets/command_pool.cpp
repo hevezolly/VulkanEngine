@@ -475,6 +475,6 @@ void CommandPool::OnMessage(BeginFrameLateMsg* msg) {
     }
 
     for (int i = 0; i < allocatedBuffers.size(); i++) {
-        allocatedBuffers[i].SetFrameWithReset(msg->inFlightFrame);
+        allocatedBuffers[i].SetFrameWithResetNoTransfer(msg->inFlightFrame);
     }
 }

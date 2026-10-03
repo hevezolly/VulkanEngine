@@ -32,7 +32,7 @@ static bool CheckQueueFits(
         return (((properties->queueFlags) & (VK_QUEUE_TRANSFER_BIT | VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) > 0);
     case QueueType::Compute:
         suboptimal = ((properties->queueFlags) & (VK_QUEUE_GRAPHICS_BIT)) > 0;
-        return (properties->queueFlags) & (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT) > 0;
+        return ((properties->queueFlags) & (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT)) > 0;
     default:
         std::stringstream ss;
         ss << "queue type " << (int)type << " is invalid";
