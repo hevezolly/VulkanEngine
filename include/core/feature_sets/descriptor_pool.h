@@ -184,16 +184,12 @@ struct API Descriptors : FeatureSet,
         }
 
         Borrowed<DescriptorSet> set = _descriptorSetPool[id].Borrow();
-
-        auto toReplace = _preallocatedDescriptorSets.find(set->identity);
-        if (toReplace != _preallocatedDescriptorSets.end()) {
-            toReplace->second.Forget();
-            _preallocatedDescriptorSets.erase(toReplace);
-        }
+        _preallocatedDescriptorSets.erase(set->identity);
 
         UpdateDescriptorSetPreloaded(*set, values);
 
-        auto result = _preallocatedDescriptorSets.emplace(set->identity, std::move(set));
+        std::shared_ptr<DescriptorSetIdentity> identity = set->identity;
+        auto result = _preallocatedDescriptorSets.emplace(identity, WeakNodeRef<DescriptorSet>(std::move(set)));
 
         return FormInput(*(result.first->second), values);
     }
@@ -299,7 +295,7 @@ private:
     std::unordered_map<TypeId, std::vector<Ref<SpecializedDescriptorPool>>> _descriptorPools;
     std::unordered_map<TypeId, uint32_t> _preallocatedPoolSize;
 
-    std::unordered_map<std::shared_ptr<DescriptorSetIdentity>, Borrowed<DescriptorSet>, HashDSIByValue, EqualDSIByValue> _preallocatedDescriptorSets;
+    std::unordered_map<std::shared_ptr<DescriptorSetIdentity>, WeakNodeRef<DescriptorSet>, HashDSIByValue, EqualDSIByValue> _preallocatedDescriptorSets;
 
     std::unordered_map<TypeId, FramedObjectPool<DescriptorSet>> _descriptorSetPool;
 

@@ -133,9 +133,6 @@ void Descriptors::OnMessage(DestroyMsg*) {
 
 void Descriptors::OnMessage(EarlyDestroyMsg*) {
 
-    for (auto& pair : _preallocatedDescriptorSets) {
-        pair.second.Forget();
-    }
     _preallocatedDescriptorSets.clear();
 
     for (auto& pair : _descriptorSetPool) {
