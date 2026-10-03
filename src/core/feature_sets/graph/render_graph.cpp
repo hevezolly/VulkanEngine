@@ -103,6 +103,16 @@ struct ResourceUsageOnQueue {
     QueueType queue;
 };
 
+// The first node (in execution order) using an externally synchronized resource.
+// Only its queue waits on the external semaphore: a binary semaphore can be waited on once.
+// Other queues using the resource wait on this node's signal instead.
+struct ExternalSyncOwner {
+    uint32_t node;
+    uint32_t queue;
+    uint32_t usedQueuesMask;
+    VkPipelineStageFlags2 stage;
+};
+
 struct GraphInstance {
     std::vector<NodeWrapper>& nodes;
     Allocator& alloc;
@@ -117,6 +127,7 @@ struct GraphInstance {
     std::vector<uint32_t> sortedNodes;
 
     std::unordered_map<ResourceId, PerQueueStorage<uint32_t>> externalSync;
+    std::unordered_map<ResourceId, ExternalSyncOwner> externalSyncOwners;
     std::unordered_map<VersionedResource, ResourceState> forceWriteStates;
 
     std::vector<SynchronizationContext> syncContexts;
@@ -293,8 +304,53 @@ struct GraphInstance {
         });
     }
 
+    void addExternalSyncUsage(ResourceId id, RenderContext& context, uint32_t node, VkPipelineStageFlags2 stage) {
+        uint32_t queue = (uint32_t)nodes[node].queue;
+
+        // The present queue never waits on external semaphores, it relies on the graph dependencies.
+        if (queue == (uint32_t)QueueType::Present)
+            return;
+
+        if (!context.Get<Resources>().ResourceRequiresSynchronization(id))
+            return;
+
+        auto [it, inserted] = externalSyncOwners.try_emplace(id, ExternalSyncOwner{node, queue, 0, 0});
+        it->second.usedQueuesMask |= 1u << queue;
+
+        if (it->second.node == node)
+            it->second.stage |= stage;
+    }
+
+    void assignExternalSyncOwners(RenderContext& context) {
+        for (uint32_t node : sortedNodes) {
+            for (VersionedResource outResource : outEdges[node]) {
+                ResourceUsage write = writes[outResource];
+                addExternalSyncUsage(outResource.id, context, node,
+                    nodes[node].outputDependency[write.dependencyIndex].state.accessStage);
+            }
+
+            for (ResourceUsage inResource : inEdges[node]) {
+                addExternalSyncUsage(inResource.resource.id, context, node,
+                    nodes[node].inputDependency[inResource.dependencyIndex].state.accessStage);
+            }
+        }
+    }
+
+    // Stage the owner node has to signal so other queues can wait on its use of external resources.
+    VkPipelineStageFlags2 externalSyncOwnerSignalStage(uint32_t node, ResourceId id) {
+        auto owner = externalSyncOwners.find(id);
+        if (owner == externalSyncOwners.end() || owner->second.node != node)
+            return 0;
+
+        if ((owner->second.usedQueuesMask & ~(1u << owner->second.queue)) == 0)
+            return 0;
+
+        return owner->second.stage != 0 ? owner->second.stage : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    }
+
     void tryAddResourceExternalSync(ResourceId id, RenderContext& context, uint32_t queue, uint32_t& timelineValue) {
-        if (context.Get<Resources>().ResourceRequiresSynchronization(id)) {
+        auto owner = externalSyncOwners.find(id);
+        if (owner != externalSyncOwners.end() && owner->second.queue == queue) {
             bool notFound = externalSync.find(id) == externalSync.end();
             auto& sync = externalSync[id];
             
@@ -351,10 +407,13 @@ struct GraphInstance {
                 if (found) {
                     stage |= nodes[write.node].outputDependency[write.dependencyIndex].state.accessStage;
                 }
+
+                stage |= externalSyncOwnerSignalStage(node, outResource.id);
             }
 
             for (ResourceUsage inResource: inEdges[node]) {
                 tryAddResourceExternalSync(inResource.resource.id, context, queueIndex, semaphoreValues[queueIndex]);
+                stage |= externalSyncOwnerSignalStage(node, inResource.resource.id);
             }
             
             if (stage != 0) {
@@ -393,6 +452,42 @@ struct GraphInstance {
             syncContexts[signal.syncContext].semaphoreRequirements = semaphoreRequirements;
     }
 
+    void addExternalSyncWait(
+        uint32_t node,
+        ResourceId id,
+        VkPipelineStageFlags2 stage,
+        std::vector<SignalDescription>& usedSignals,
+        MemChunk<SignalDescription>& perQueueSignals
+    ) {
+        auto owner = externalSyncOwners.find(id);
+        if (owner == externalSyncOwners.end())
+            return;
+
+        uint32_t queueIndex = (uint32_t)nodes[node].queue;
+        if (queueIndex == (uint32_t)QueueType::Present)
+            return;
+
+        if (owner->second.queue == queueIndex) {
+            uint32_t syncContext = externalSync[id][queueIndex];
+            ASSERT(syncContext != UINT32_MAX);
+
+            for (SignalDescription& alreadyWaited : usedSignals) {
+                if (alreadyWaited.syncContext == syncContext) {
+                    alreadyWaited.stage |= stage;
+                    return;
+                }
+            }
+
+            usedSignals.push_back(SignalDescription {stage, syncContext});
+            return;
+        }
+
+        // The owner's queue consumes the external semaphore, wait for the owner node instead.
+        AssignWait(perQueueSignals[owner->second.queue],
+            SignalDescription {stage, owner->second.node},
+            nodes[node].node->getSemaphoreRequirements());
+    }
+
     void buildTimelines() {
         uint32_t queuesCount = (uint32_t)QueueType::None;
         auto _ = alloc.BeginContext();
@@ -407,24 +502,18 @@ struct GraphInstance {
             std::vector<SignalDescription> usedSignals;
 
             for (ResourceUsage inResource : inEdges[node]) {
+                addExternalSyncWait(node, inResource.resource.id,
+                    nodes[inResource.node].inputDependency[inResource.dependencyIndex].state.accessStage,
+                    usedSignals, perQueueSignals);
+
                 auto it = writes.find(inResource.resource);
-                if (it == writes.end()) 
+                if (it == writes.end())
                 {
                     continue;
                 }
 
                 ResourceUsage write = it->second;
 
-                auto extSync = externalSync.find(inResource.resource.id);
-                if (extSync != externalSync.end()) {
-                    ASSERT(extSync->second[queueIndex] != UINT32_MAX);
-
-                    usedSignals.push_back(SignalDescription {
-                        nodes[inResource.node].inputDependency[inResource.dependencyIndex].state.accessStage,
-                        extSync->second[queueIndex]
-                    });
-                }
-                
                 uint32_t newQueue = (uint32_t)nodes[write.node].queue; 
 
                 if (newQueue == queueIndex) {
@@ -440,25 +529,10 @@ struct GraphInstance {
             }
 
             for (VersionedResource outResource: outEdges[node]) {
-                auto extSync = externalSync.find(outResource.id);
-                if (extSync != externalSync.end()) {
-                    ResourceUsage write = writes[outResource];
-                    ASSERT(extSync->second[queueIndex] != UINT32_MAX);
-                    uint32_t syncContext = extSync->second[queueIndex];
-                    bool found = false;
-                    for (auto alreadySignalled : usedSignals) {
-                        if (alreadySignalled.syncContext == syncContext) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        usedSignals.push_back(SignalDescription {
-                            nodes[write.node].outputDependency[write.dependencyIndex].state.accessStage,
-                            syncContext
-                        });
-                    }
-                }
+                ResourceUsage write = writes[outResource];
+                addExternalSyncWait(node, outResource.id,
+                    nodes[write.node].outputDependency[write.dependencyIndex].state.accessStage,
+                    usedSignals, perQueueSignals);
             }
 
             for (int i = 0; i < queuesCount; i++) {
@@ -607,6 +681,8 @@ struct TimelineExecutionContext
     std::vector<uint64_t>& initialSemaphoreValues;
     std::unordered_map<QueueTimelineValue, Ref<Semaphore>>& binarySemaphores;
     std::unordered_map<ResourceId, Ref<Semaphore>>& externalSyncContexts;
+    // Highest sync context timeline value whose signal has been submitted, per queue.
+    PerQueueStorage<uint64_t>& submittedSignalValues;
 
     Ref<Semaphore> GetExternalSync(RenderContext& context, ResourceId id) {
         auto it = externalSyncContexts.find(id);
@@ -753,6 +829,16 @@ void RunTimeline(
             signalContext = alloc.BumpAllocate<VkSemaphoreSubmitInfo>(allocationSize);
 
             FillSemaphoreInfo(context, instance, timelineContext, signalContext, false);
+
+            for (SignalDescription signal : timelineContext.step->signals) {
+                SynchronizationContext& syncContext = instance.syncContexts[signal.syncContext];
+                if (syncContext.externalSyncSource.has_value())
+                    continue;
+
+                uint64_t& submitted = timelineContext.submittedSignalValues[syncContext.queue];
+                submitted = std::max(submitted, syncContext.timelineValue);
+            }
+
             ++timelineContext.step;
             break;
         }
@@ -847,25 +933,48 @@ void DebugTimeline(
     std::cout << ss.str() << std::endl;
 }
 
+// A submit can be recorded once every graph signal it waits for has been submitted on its queue.
+bool CanRunNextSubmit(GraphInstance& instance, TimelineExecutionContext& timelineContext) {
+    if (timelineContext.step->type != QueueTimeStep::Type::Wait)
+        return true;
+
+    for (SignalDescription wait : timelineContext.step->signals) {
+        SynchronizationContext& syncContext = instance.syncContexts[wait.syncContext];
+        if (syncContext.externalSyncSource.has_value())
+            continue;
+
+        if (timelineContext.submittedSignalValues[syncContext.queue] < syncContext.timelineValue)
+            return false;
+    }
+
+    return true;
+}
+
 template<bool DoDebug>
 void RunGraph(
-    RenderContext& context, 
-    GraphInstance& instance, 
+    RenderContext& context,
+    GraphInstance& instance,
     std::vector<Ref<Semaphore>>& semaphores,
     std::vector<uint64_t>& initialValues
 ) {
     uint32_t queueCount = static_cast<size_t>(QueueType::None);
     PerQueueStorage<uint64_t> maxTimelineValues;
+    PerQueueStorage<uint64_t> submittedSignalValues;
     std::unordered_map<QueueTimelineValue, Ref<Semaphore>> binarySemaphores;
     std::unordered_map<ResourceId, Ref<Semaphore>> externalSync;
 
+    maxTimelineValues.clear_to_zero();
+    submittedSignalValues.clear_to_zero();
+
+    std::vector<TimelineExecutionContext> executionContexts;
+    executionContexts.reserve(queueCount);
+
     for (uint32_t queueIndex =0; queueIndex < queueCount; queueIndex++) {
 
-        maxTimelineValues[queueIndex] = 0;
         if (instance.queueTimelines[queueIndex].size() == 0)
             continue;
 
-        TimelineExecutionContext executionContext {
+        executionContexts.push_back(TimelineExecutionContext {
             queueIndex,
             instance.queueTimelines[queueIndex],
             instance.queueTimelines[queueIndex].begin(),
@@ -873,20 +982,54 @@ void RunGraph(
             semaphores,
             initialValues,
             binarySemaphores,
-            externalSync
-        };
+            externalSync,
+            submittedSignalValues
+        });
+    }
 
-        while (executionContext.step != instance.queueTimelines[queueIndex].end())
-        {
-            if constexpr (DoDebug) {
+    if constexpr (DoDebug) {
+        for (TimelineExecutionContext& executionContext : executionContexts) {
+            while (executionContext.step != executionContext.timeline.end()) {
                 DebugTimeline(context, instance, executionContext);
-            } 
-            else {
-                RunTimeline(context, instance, executionContext);
             }
         }
     }
-    
+    else {
+        // Record and submit in dependency order rather than queue order, so that
+        // resource states are tracked in execution order and every signal is
+        // submitted before a submit that waits on it.
+        bool pending = true;
+        while (pending) {
+            pending = false;
+            bool progress = false;
+
+            for (TimelineExecutionContext& executionContext : executionContexts) {
+                if (executionContext.step == executionContext.timeline.end())
+                    continue;
+
+                if (CanRunNextSubmit(instance, executionContext)) {
+                    RunTimeline(context, instance, executionContext);
+                    progress = true;
+                }
+
+                if (executionContext.step != executionContext.timeline.end())
+                    pending = true;
+            }
+
+            if (pending && !progress) {
+                ASSERT_MSG(false, "Render graph queues wait on each other");
+
+                // Fall back to queue order so the frame still gets submitted.
+                for (TimelineExecutionContext& executionContext : executionContexts) {
+                    if (executionContext.step != executionContext.timeline.end()) {
+                        RunTimeline(context, instance, executionContext);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
 
     initialValues.resize(static_cast<uint32_t>(QueueType::None));
     for (uint32_t i = 0; i < static_cast<uint32_t>(QueueType::None); i++) {
@@ -960,6 +1103,7 @@ void RenderGraph::RunGraphInternal() {
     
     instance.assignDepths();
     instance.sortNodes();
+    instance.assignExternalSyncOwners(context);
     instance.defineSyncronizationContexts(context);
     instance.buildTimelines();
     instance.simplifyTimelines();
