@@ -77,7 +77,8 @@ std::string Registry::LoadText(const char* path) {
 
     std::ifstream file(name.data);
 
-    ASSERT(file.is_open());
+    if (!file.is_open())
+        return "";
 
     std::stringstream buffer;
     buffer << file.rdbuf();

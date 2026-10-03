@@ -9,6 +9,6 @@ ShaderBinary ShaderLoader::Get(const std::string& path, Stage stage) {
     source.stage = stage;
     source.source = context.Get<Registry>().LoadText(path.c_str());
 
-    ShaderCompiler compiler;
+    ShaderCompiler compiler(context);
     return compiler.FromSource(source);
 }

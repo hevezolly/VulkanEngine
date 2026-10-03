@@ -1,5 +1,5 @@
 #pragma once
-#include <common.h>
+#include "../../common.h"
 #include <atomic>
 #include <vector>
 #include <typeindex>
@@ -62,7 +62,7 @@ namespace std {
 }
 
 template <typename T>
-TypeId getTypeId() {
+TypeId API getTypeId() {
     const std::type_info& id = typeid(T);
     return TypeId(id);
 }

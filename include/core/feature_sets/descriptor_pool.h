@@ -10,6 +10,9 @@
 #include <helper_functions.h>
 #include <memory>
 #include <algorithm>
+#include <subresources.h>
+
+
 
 struct API DescriptorPool 
 {
@@ -74,6 +77,8 @@ private:
     uint32_t availableInstances;
     uint32_t maxInstances;
 };
+
+void API logMemory(const void* addr, size_t size);
 
 struct API Descriptors : FeatureSet,
     CanHandle<DestroyMsg>,

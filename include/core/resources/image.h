@@ -19,10 +19,23 @@ struct API ImageDescription {
     ImageUsage usage;
     uint32_t arrayLayers=1;
     uint32_t mipLevels=1;
+    bool cubemap = false;
 
     ImageDescription()=default;
     ImageDescription(VkFormat f, ImageUsage u, VkExtent2D extent, uint32_t d=1, uint32_t mips=1):
         usage(u), format(f), width(extent.width), height(extent.height), arrayLayers(d), mipLevels(mips){}
+
+    static ImageDescription Cube(VkFormat format, VkExtent2D extent, ImageUsage usage, uint32_t mipLevels=1, uint32_t arrayCount=1) {
+        ImageDescription result;
+        result.format = format;
+        result.width = extent.width;
+        result.height = extent.height;
+        result.usage = usage;
+        result.mipLevels = 1;
+        result.arrayLayers = 6 * arrayCount;
+        result.cubemap = true;
+        return result; 
+    }
 };
 
 struct API Image;

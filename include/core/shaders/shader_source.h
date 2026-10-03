@@ -1,9 +1,10 @@
 #pragma once
 #include <vector>
 #include <string>
-#include <common.h>
+#include "../../common.h"
 #include <shader_common.h>
 
+struct RenderContext;
 
 struct API ShaderSource
 {
@@ -21,5 +22,10 @@ struct API ShaderBinary {
 
 struct API ShaderCompiler {
 
+    ShaderCompiler(RenderContext& context) : renderContext(context){}
+
     ShaderBinary FromSource(const ShaderSource& source);
+
+private:
+    RenderContext& renderContext;
 };

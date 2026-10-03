@@ -1,7 +1,10 @@
-#include "core/shaders/shader_source.h"
+#include <shader_source.h>
 #include <glslang_c_interface.h>
 #include <stdexcept>
 #include <glslang/Public/resource_limits_c.h>
+#include <render_context.h>
+#include <registry.h>
+#include <shader_loader.h>
 
 glslang_stage_t GetShaderStage(Stage stage) {
     switch (stage)
@@ -18,16 +21,67 @@ glslang_stage_t GetShaderStage(Stage stage) {
     }
 }
 
+struct IncludeStorage {
+    std::string data;
+    glsl_include_result_t result;
+};
+
+static glsl_include_result_t* include_local(
+    void *ctx,
+    const char *header_name,
+    const char *includer_name,
+    size_t include_depth)
+{
+    RenderContext* context = static_cast<RenderContext*>(ctx);
+    ShaderLoader& loader = context->Get<ShaderLoader>();
+    Registry& registry = context->Get<Registry>();
+
+    std::string path = loader.ShaderIncludeRoot() + "/" + std::string(header_name);
+
+    std::string fileContent = registry.LoadText(path.c_str());
+    
+    if (fileContent.empty())
+        return nullptr;
+
+    auto storage = new IncludeStorage {
+        .data = std::move(fileContent)
+    };
+
+    storage->result.header_name = header_name;
+    storage->result.header_data = storage->data.c_str();
+    storage->result.header_length = storage->data.size();
+
+    return &storage->result;
+}
+
+int my_free_include(void *ctx, glsl_include_result_t *result) {
+     if (!result) return 0;
+    // Recover the full wrapper from the pointer to its `result` member
+    auto *storage = reinterpret_cast<IncludeStorage*>(
+        reinterpret_cast<char*>(result) - offsetof(IncludeStorage, result)
+    );
+    delete storage;
+    return 0;
+}
+
 ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source) 
 {
 
     glslang_stage_t stage = GetShaderStage(source.stage);
 
+    auto _ = renderContext.Get<Allocator>().BeginContext();
+
+    glsl_include_callbacks_t callbacks = {
+        .include_system      = include_local,           // or provide one for <> includes
+        .include_local       = nullptr,
+        .free_include_result = my_free_include
+    };
+
     glslang_input_t input;
     input.language = GLSLANG_SOURCE_GLSL;
     input.stage = stage;
     input.client = GLSLANG_CLIENT_VULKAN;
-    input.client_version = GLSLANG_TARGET_VULKAN_1_2;
+    input.client_version = GLSLANG_TARGET_VULKAN_1_3;
     input.target_language = GLSLANG_TARGET_SPV;
     input.target_language_version = GLSLANG_TARGET_SPV_1_5;
     input.code = source.source.c_str();
@@ -37,6 +91,8 @@ ShaderBinary ShaderCompiler::FromSource(const ShaderSource& source)
     input.forward_compatible = false;
     input.messages = GLSLANG_MSG_DEFAULT_BIT;
     input.resource = glslang_default_resource();
+    input.callbacks = callbacks;
+    input.callbacks_ctx = &renderContext;
 
     glslang_shader_t* shader = glslang_shader_create(&input);
 

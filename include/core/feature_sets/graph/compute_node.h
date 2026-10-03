@@ -25,7 +25,7 @@ struct ComputeNode: RenderNodeWithBindings<Bindings...> {
     }
 
     QueueType getTargetQueue() {
-        return QueueType::Compute;
+        return queue;
     }
 
     void Record(ExecutionContext executionContext) {

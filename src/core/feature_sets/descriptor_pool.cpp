@@ -19,6 +19,14 @@ DescriptorPool::DescriptorPool(
     VK(vkCreateDescriptorPool(c->device(), &info, nullptr, &vkPool));
 }
 
+void logMemory(const void* addr, size_t size) {
+    const auto* p = reinterpret_cast<const unsigned char*>(addr);
+    for (size_t i = 0; i < size; ++i) {
+        std::cout << static_cast<int>(p[i]) << " ";
+    }
+    std::cout << std::endl;
+}
+
 DescriptorPool::DescriptorPool(
     RenderContext* c, 
     std::initializer_list<VkDescriptorPoolSize> sizes, 

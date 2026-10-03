@@ -101,16 +101,18 @@ Image createRawImage(Resources* r, RenderContext& context, const ImageDescriptio
     auto _ = context.Get<Allocator>().BeginContext();
     VkImage image;
     VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-    imageInfo.imageType = description.arrayLayers == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
     imageInfo.extent.width = description.width;
     imageInfo.extent.height = description.height;
-    imageInfo.extent.depth = description.arrayLayers;
-    imageInfo.mipLevels = 1;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = description.mipLevels;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.arrayLayers = 1;
+    imageInfo.arrayLayers = description.arrayLayers;
     imageInfo.format = description.format;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (description.cubemap)
+        imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     imageInfo.usage = static_cast<VkImageUsageFlags>(description.usage);
     MemBuffer<uint32_t> usedQueues = context.Get<Device>().FillQueueUsages(
         QueueType::Transfer | QueueType::Graphics | QueueType::Compute);
@@ -249,6 +251,59 @@ VkFormat getFormatFromNativeComponents(int components)
     }
 }
 
+void LoadTo(RenderContext& context, ImageSubresource subresource, RawImageData imageData) {
+    ASSERT(subresource.image->description.width == imageData.x && subresource.image->description.height == imageData.y);
+
+    Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, imageData.size(), imageData.data);
+    imageData.Free();
+    TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
+    cmd.Begin();
+
+    cmd.ImageBarrier(subresource.image, 
+        ResourceState {
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        }
+    );
+    
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.baseArrayLayer = subresource.range.baseArrayLayer;
+    region.imageSubresource.layerCount = subresource.range.layerCount;
+    region.imageSubresource.mipLevel = subresource.range.baseMipLevel;
+
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {
+        subresource.image->description.width,
+        subresource.image->description.height,
+        1
+    };
+
+    vkCmdCopyBufferToImage(cmd.buffer, 
+        stagingBuffer.vkBuffer, subresource.image->vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+
+    cmd.End();
+    context.Get<CommandPool>().Submit(cmd);
+
+    vkQueueWaitIdle(context.Get<Device>().queues.get(QueueType::Transfer));
+}
+
+void Resources::LoadImageTo(ImageSubresource subresource, const char* path) {
+    ASSERT(subresource.range.layerCount == 1 && subresource.range.levelCount == 1);
+
+    int forceComponents = getStbiForceComponents(subresource.image->description.format);
+
+    RawImageData imageData = context.Get<Registry>().LoadImage(path, forceComponents);
+
+    LoadTo(context, subresource, imageData);
+}
+
 ResourceRef<Image> Resources::LoadImageResource(ImageUsage usage, const char* path, VkFormat format) {
 
     int forceComponents = getStbiForceComponents(format);
@@ -267,44 +322,8 @@ ResourceRef<Image> Resources::LoadImageResource(ImageUsage usage, const char* pa
     
     ResourceRef<Image> result = CreateImage(description);
     GiveName(result, path);
-    Buffer stagingBuffer = createAndFillBuffer(context, BufferPreset::STAGING, imageData.size(), imageData.data);
-    imageData.Free();
-    TransferCommandBuffer cmd = context.Get<CommandPool>().CreateTransferBuffer(true);
-    cmd.Begin();
 
-    cmd.ImageBarrier(result, 
-        ResourceState {
-            VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-            VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-        }
-    );
-    
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {
-        description.width,
-        description.height,
-        1
-    };
-
-    vkCmdCopyBufferToImage(cmd.buffer, 
-        stagingBuffer.vkBuffer, result->vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-
-    cmd.End();
-    context.Get<CommandPool>().Submit(cmd);
-
-    vkQueueWaitIdle(context.Get<Device>().queues.get(QueueType::Transfer));
+    LoadTo(context, result, imageData);
 
     return result;
 }
