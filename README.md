@@ -95,5 +95,6 @@ With possibility to make custom nodes. Examples:
 #### Other features
 * **ImGUI integration**
 * **Resource managment**
+* **Extensive Descriptor set reuse**
 * **Dynamic uniform buffers**
 * **And More**
