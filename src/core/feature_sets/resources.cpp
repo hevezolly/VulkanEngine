@@ -294,6 +294,41 @@ void LoadTo(RenderContext& context, ImageSubresource subresource, RawImageData i
     vkQueueWaitIdle(context.Get<Device>().queues.get(QueueType::Transfer));
 }
 
+ResourceRef<Image> Resources::LoadCubeImage(
+    ImageUsage usage, 
+    const char* px,
+    const char* nx,
+    const char* py,
+    const char* ny,
+    const char* pz,
+    const char* nz,
+    VkFormat format
+) {
+    int forceComponents = getStbiForceComponents(format);
+
+    RawImageData imageData = context.Get<Registry>().LoadImage(px, forceComponents);
+    
+    if (forceComponents == 0)
+        format = getFormatFromNativeComponents(imageData.num_components);
+
+    uint32_t size = imageData.x;
+    ASSERT(imageData.x == imageData.y);
+
+    ResourceRef<Image> img = CreateImage(ImageDescription::Cube(format, {
+        static_cast<uint32_t>(imageData.x), 
+        static_cast<uint32_t>(imageData.y)
+    }, usage));
+
+    LoadTo(context, getSingle(img, Layer(0)), imageData);
+    Resources::LoadImageTo(getSingle(img, Layer(1)), nx);
+    Resources::LoadImageTo(getSingle(img, Layer(2)), py);
+    Resources::LoadImageTo(getSingle(img, Layer(3)), ny);
+    Resources::LoadImageTo(getSingle(img, Layer(4)), pz);
+    Resources::LoadImageTo(getSingle(img, Layer(5)), nz);
+
+    return img;
+}
+
 void Resources::LoadImageTo(ImageSubresource subresource, const char* path) {
     ASSERT(subresource.range.layerCount == 1 && subresource.range.levelCount == 1);
 

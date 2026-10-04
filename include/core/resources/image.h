@@ -25,6 +25,10 @@ struct API ImageDescription {
     ImageDescription(VkFormat f, ImageUsage u, VkExtent2D extent, uint32_t d=1, uint32_t mips=1):
         usage(u), format(f), width(extent.width), height(extent.height), arrayLayers(d), mipLevels(mips){}
 
+    VkExtent2D extent() {
+        return {width, height};
+    }
+
     static ImageDescription Cube(VkFormat format, VkExtent2D extent, ImageUsage usage, uint32_t mipLevels=1, uint32_t arrayCount=1) {
         ImageDescription result;
         result.format = format;

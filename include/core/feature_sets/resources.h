@@ -48,6 +48,17 @@ struct API Resources: FeatureSet,
 
     ResourceRef<Image> LoadImageResource(ImageUsage usage, const char* path, VkFormat format = VK_FORMAT_UNDEFINED);
 
+    ResourceRef<Image> LoadCubeImage(
+        ImageUsage usage, 
+        const char* px,
+        const char* nx,
+        const char* py,
+        const char* ny,
+        const char* pz,
+        const char* nz,
+        VkFormat format = VK_FORMAT_UNDEFINED
+    );
+
     void LoadImageTo(ImageSubresource image, const char* path);
 
     void DestroyImmediate(ResourceId resource);
