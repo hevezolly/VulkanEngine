@@ -3,7 +3,7 @@
 #include <image.h>
 #include <resource_storage.h>
 
-struct ImageSubresource {
+struct API ImageSubresource {
     ResourceRef<Image> image;
     VkImageView vkView;
     VkImageSubresourceRange range;
@@ -20,7 +20,13 @@ struct ImageSubresource {
     operator VkImageView() const {return vkView;}
 };
 
-struct BufferRegion {
+ImageSubresource get(ResourceRef<Image> img, Mip mip);
+ImageSubresource get(ResourceRef<Image> img, Layer layer);
+ImageSubresource get(ResourceRef<Image> img, Mip mip, Layer layer);
+ImageSubresource getSingle(ResourceRef<Image> img, Mip mip);
+ImageSubresource getSingle(ResourceRef<Image> img, Layer layer);
+
+struct API BufferRegion {
     ResourceRef<Buffer> buffer;
     uint64_t offset;
     uint64_t size;

@@ -31,7 +31,7 @@ struct API ImageDescription {
         result.width = extent.width;
         result.height = extent.height;
         result.usage = usage;
-        result.mipLevels = 1;
+        result.mipLevels = mipLevels;
         result.arrayLayers = 6 * arrayCount;
         result.cubemap = true;
         return result; 
