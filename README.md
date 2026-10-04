@@ -1,6 +1,8 @@
 # Vulkan Engine
-The purpose of the project is to build a rendering engine on Vulkan with the main focus on streamlining development experience, 
+The purpose of the project is to build a rendering framework on Vulkan with the main focus on streamlining development experience, 
 make bringing new features to life as fast as possible while still allowing for a good portion of low level control.
+
+There is a simple example I've built to showcase its capabilites. Can be found [here](https://github.com/hevezolly/VulkanSandbox)
 
 ### Features
 
