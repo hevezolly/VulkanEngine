@@ -42,13 +42,14 @@ subresourceRange(range)
 {
     VkImageViewCreateInfo createInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     createInfo.image = image->vkImage;
-    if (image->description.cubemap) {
-        ASSERT(image->description.arrayLayers % 6 == 0);
-        uint32_t count = image->description.arrayLayers / 6;
+    // view type depends on the viewed range, not the whole image:
+    // a single face of a cubemap has to be viewed as a 2D image
+    if (image->description.cubemap && range.layerCount % 6 == 0) {
+        uint32_t count = range.layerCount / 6;
         createInfo.viewType = count == 1 ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
     }
     else {
-        createInfo.viewType = image->description.arrayLayers == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        createInfo.viewType = range.layerCount == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     }
     createInfo.format = image->description.format;
     createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
