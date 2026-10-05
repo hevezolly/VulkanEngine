@@ -68,7 +68,7 @@ BufferRegion DynamicUniforms::AllocateRange(uint32_t size) {
 
 void DynamicUniforms::OnMessage(BeginFrameMsg* m) {
 
-    allocations.SetFrame(m->inFlightFrame);
+    allocations.SetFrame(m->inFlightFrame, BufferRegion::Null());
 
     if (m->inFlightFrame >= framesInFlight) {
         framesInFlight = m->inFlightFrame + 1;

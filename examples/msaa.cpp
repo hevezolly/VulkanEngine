@@ -186,20 +186,22 @@ void DrawFrame(
     BufferRegion transforms = context.Get<DynamicUniforms>().Allocate(GetShaderData(context)); 
 
     auto& node0 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
-    Attachments attachments;
+    Attachments attachments {
 #ifdef USE_MSAA
-    attachments.color = r.colorAttachment;
-    attachments.color_resolve = outputImage;
+        .color = r.colorAttachment,
+        .color_resolve = outputImage,
 #else
-    attachments.color = outputImage;
+        .color = outputImage,
 #endif
-    attachments.depth = r.depth;
+        .depth = r.depth
+    };
     node0.SetAttachments(attachments);
 
-    ShaderInput data{};
-    data.transforms = transforms;
-    data.img = r.resourceImg;
-    data.img_sampler = r.sampler;
+    ShaderInput data{
+        .transforms = transforms,
+        .img = r.resourceImg,
+        .img_sampler = r.sampler
+    };
     node0.SetBindings(data);
 
     node0.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);

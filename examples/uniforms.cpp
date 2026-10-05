@@ -248,16 +248,18 @@ void DrawFrame(
 
     UpdateShaderData(context, *r.uniformBuffers[frameId]);
 
-    ShaderInput data{};
-    data.transforms = r.uniformBuffers.back();
-    data.img = r.image;
-    data.img_sampler = r.sampler;
+    ShaderInput data{
+        .transforms = r.uniformBuffers.back(),
+        .img = r.image,
+        .img_sampler = r.sampler
+    };
 
     ShaderInputInstance input = context.Get<Descriptors>().BorrowDescriptorSet(data);
 
-    Attachments attachments;
-    attachments.color = context.Get<PresentFeature>().swapChain->images[imageIndex];
-    attachments.depth = r.depth;
+    Attachments attachments {
+        .color = context.Get<PresentFeature>().swapChain->images[imageIndex],
+        .depth = r.depth
+    };
     
     const FrameBuffer& buffer = context.Get<GraphicsFeature>()
         .CreateFrameBuffer(attachments, r.pipeline->renderPass);

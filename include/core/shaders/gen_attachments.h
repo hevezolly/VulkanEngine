@@ -39,6 +39,18 @@ BLOCK
 
 public:
 
+    static BLOCK_NAME Null() {
+        return BLOCK_NAME {
+            #define WRAPPER(name, sc, lo, so, slo, sso, ol) .##name = ImageSubresource::Null(),
+#if MSAA != 1
+            #define RESOLVE_WRAPPER(name) .##name = ImageSubresource::Null(),
+#endif
+            #include <define_attachments.h>
+            BLOCK
+            #include <reset_attachment_defines.h>
+        };
+    }
+
     static constexpr uint32_t size_depth_stencil() {
         uint32_t counter = 0;
         #define WRAPPER(...)

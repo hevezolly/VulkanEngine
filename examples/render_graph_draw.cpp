@@ -164,15 +164,17 @@ void DrawFrame(
 
     auto& node0 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
     node0.SetName("draw1");
-    Attachments attachments;
-    attachments.color = r.image;
-    attachments.depth = r.depth2;
+    Attachments attachments {
+        .color = r.image,
+        .depth = r.depth2
+    };
     node0.SetAttachments(attachments);
 
-    ShaderInput data{};
-    data.transforms = transforms;
-    data.img = r.resourceImg;
-    data.img_sampler = r.sampler;
+    ShaderInput data {
+        .transforms = transforms,
+        .img = r.resourceImg,
+        .img_sampler = r.sampler
+    };
     node0.SetBindings(data);
 
     node0.SetIndexBuffer(r.indexBuffer, VkIndexType::VK_INDEX_TYPE_UINT16);

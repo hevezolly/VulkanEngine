@@ -26,7 +26,7 @@
 
         #ifdef IMAGES
 
-            #define IMAGE_SAMPLER(name, binding, stage) IMAGES(1, name, name##_sampler->vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, name##.image.id, name##_sampler.id)
+            #define IMAGE_SAMPLER(name, binding, stage) IMAGES(1, name, name##_sampler->vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, name##.image.id, name##_sampler.id())
             #define IMAGE(name, binding, stage) IMAGES(1, name, nullptr, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, name##.image.id, ResourceId())
             #define IMAGE_STORAGE(name, binding, stage, access) IMAGES(1, name, nullptr, VK_IMAGE_LAYOUT_GENERAL, name##.image.id, ResourceId())
             #define SAMPLER(name, binding, stage) IMAGES(1, nullptr, name##->vkSampler, VK_IMAGE_LAYOUT_UNDEFINED, name##.id, ResourceId())
@@ -57,7 +57,7 @@
         #ifdef DEFINITION
             #define IMAGE_SAMPLER(name, binding, stage) \
             WRAPPER(ImageSubresource, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) \
-            WRAPPER(ResourceRef<Sampler>, name##_sampler, binding, stage, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            WRAPPER(NonDefaultRef<Sampler>, name##_sampler, binding, stage, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
             #else
             #define IMAGE_SAMPLER(name, binding, stage) WRAPPER(ImageSubresource, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
         #endif
@@ -66,7 +66,7 @@
         #define DYNAMIC_SSBO(name, binding, stage, access) WRAPPER(BufferRegion, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
         #define IMAGE(name, binding, stage) WRAPPER(ImageSubresource, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
         #define IMAGE_STORAGE(name, binding, stage, access) WRAPPER(ImageSubresource, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-        #define SAMPLER(name, binding, stage) WRAPPER(ResourceRef<Sampler>, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_SAMPLER)
+        #define SAMPLER(name, binding, stage) WRAPPER(NonDefaultRef<Sampler>, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_SAMPLER)
         #define UNIFORM_BUFFER(name, binding, stage) WRAPPER(BufferRegion, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
         #define DYNAMIC_UNIFORM(name, binding, stage) WRAPPER(BufferRegion, name, binding, stage, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
 

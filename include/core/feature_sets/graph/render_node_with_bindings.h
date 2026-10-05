@@ -64,5 +64,5 @@ protected:
         return inputBuffer;
     }
 
-    std::tuple<Bindings...> _bindings;
+    std::tuple<Bindings...> _bindings{Bindings::Null()...};
 };

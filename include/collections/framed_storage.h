@@ -1,12 +1,26 @@
 #pragma once
 
 #include <common.h>
+#include <type_traits>
 
 template<typename T>
 struct FramedStorage {
 
-    FramedStorage() {
+    FramedStorage() requires std::is_default_constructible_v<T> {
         SetFrame(0);
+    }
+
+    explicit FramedStorage(const T& initial) {
+        SetFrame(0, initial);
+    }
+
+
+    void SetFrame(uint32_t frame, const T& item) {
+        if (_storage.size() <= frame) {
+            _storage.resize(frame+1, item);
+        }
+
+        currentFrame = frame;
     }
 
     void SetFrame(uint32_t frame) {

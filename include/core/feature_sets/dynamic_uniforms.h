@@ -9,7 +9,7 @@ struct API DynamicUniforms: FeatureSet,
     CanHandle<InitMsg>
 {
     DynamicUniforms(RenderContext& c, uint64_t preallocatedSize = 256):
-        FeatureSet(c), capacityPerFrame(preallocatedSize)
+        FeatureSet(c), capacityPerFrame(preallocatedSize), allocations(BufferRegion::Null())
     {} 
 
     void OnMessage(BeginFrameMsg*);

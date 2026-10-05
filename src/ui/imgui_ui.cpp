@@ -114,8 +114,9 @@ void ImguiUI::Record(ResourceRef<Image> output, GraphicsCommandBuffer& commandBu
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
 
-    UiAttachments a;
-    a.color = output;
+    UiAttachments a {
+        .color = output
+    };
 
     const FrameBuffer& frameBuffer = context.Get<GraphicsFeature>().CreateFrameBuffer(a, renderPass);    
 

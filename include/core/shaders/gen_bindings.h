@@ -27,6 +27,17 @@ BLOCK
 #undef WRAPPER
 #undef DEFINITION
 
+    static BLOCK_NAME Null() {
+        return BLOCK_NAME {
+            #define DEFINITION
+            #define WRAPPER(t, n, b, s, dc, dt) .##n = t::Null(),
+            #include "define_shader_bindings.h"
+            BLOCK
+            #undef WRAPPER
+            #undef DEFINITION
+        };
+    }
+
     static constexpr uint32_t size() {
         uint32_t value = 0;
         #define WRAPPER(t, n, b, s, dc, dt) value++;

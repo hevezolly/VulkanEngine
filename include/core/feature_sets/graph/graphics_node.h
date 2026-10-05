@@ -38,7 +38,7 @@ struct GraphicsNode: RenderNodeWithBindings<Bindings...> {
     GraphicsNode(
         RenderContext& c, 
         Ref<GraphicsPipeline> p): RenderNodeWithBindings<Bindings...>(c), 
-        pipeline(p){} 
+        pipeline(p), _attachments(Attachments::Null()){} 
 
     void AddVertexBuffer(ResourceRef<Buffer> vertex, VkDeviceSize offset = 0) {
         _vertexBuffers.push_back(vertex);
