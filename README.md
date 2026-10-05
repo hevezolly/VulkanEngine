@@ -97,4 +97,5 @@ With possibility to make custom nodes. Examples:
 * **Resource managment**
 * **Extensive Descriptor set reuse**
 * **Dynamic uniform buffers**
+* **MSAA Support**
 * **And More**

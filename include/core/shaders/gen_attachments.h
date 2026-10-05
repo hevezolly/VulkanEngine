@@ -190,7 +190,6 @@ public:
     }
 
     static void GetColorResolveAttachmentReferences(std::vector<VkAttachmentReference>& data) {
-        ASSERT(size_resolve() > 0);
         uint32_t initialSize = data.size();
         data.resize(initialSize + size() - size_depth_stencil() - size_resolve());
         uint32_t attachmentIndex;
