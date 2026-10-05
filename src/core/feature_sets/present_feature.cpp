@@ -199,6 +199,6 @@ VkExtent2D PresentFeature::swapChainExtent() {
 }
 
 VkFormat PresentFeature::swapChainFormat() {
-    return swapChain->images[0]->description.format;
+    return swapChain->format;
 }
 
