@@ -125,7 +125,7 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
         subpass.pDepthStencilAttachment = &dsRef.value();
     
     if (resolveAttachmentRef.size() != 0) {
-        ASSERT(resolveAttachmentRef.size() == colorAttachmentRef.size())
+        ASSERT(resolveAttachmentRef.size() == colorAttachmentRef.size());
         subpass.pResolveAttachments = resolveAttachmentRef.data();
     }
 

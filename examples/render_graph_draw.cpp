@@ -82,11 +82,12 @@ _Resources PrepareResources(
         ImageUsage::DepthStencil, {100, 100}});
     context.Get<Resources>().GiveName(r.depth2, "depth2");
 
-    r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_SRGB, 
+    r.image = context.Get<Resources>().CreateImage({VK_FORMAT_B8G8R8A8_UNORM, 
         ImageUsage::ColorAttachment | ImageUsage::Sampled, {100, 100}});
     context.Get<Resources>().GiveName(r.image, "image");
     r.image->clearValue = {{1.0, 1.0, 1.0}};
     
+
     r.resourceImg = context.Get<Resources>().LoadImageResource(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
     

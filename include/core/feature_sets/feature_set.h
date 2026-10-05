@@ -62,7 +62,7 @@ namespace std {
 }
 
 template <typename T>
-TypeId API getTypeId() {
+TypeId getTypeId() {
     const std::type_info& id = typeid(T);
     return TypeId(id);
 }

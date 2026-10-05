@@ -3,7 +3,7 @@
 #include <render_node.h>
 #include <subresources.h>
 
-struct ClearImageNode: RenderNode {
+struct API ClearImageNode: RenderNode {
     ClearImageNode(RenderContext& ctx, ImageSubresource img);
 
     virtual QueueType getTargetQueue() {return QueueType::Graphics;}

@@ -74,6 +74,9 @@ public:
     }
 
     static constexpr uint32_t size_resolve() {
+#if MSAA == 1
+        return 0;
+#else
         uint32_t counter = 0;
         #define WRAPPER(n, sc, lo, so, slo, sso, ol)
         #define RESOLVE_WRAPPER(n) counter++;
@@ -81,6 +84,7 @@ public:
         BLOCK
         #include <reset_attachment_defines.h>
         return counter;
+#endif
     }
 
     void write_outputs(NodeDependency* dependencies) {
@@ -96,7 +100,8 @@ public:
 #if MSAA != 1
         #define RESOLVE_WRAPPER(n) \
         dependencies[index].resource = n##.image.id; \
-        dependencies[index++].state = dependencies[index - 2].state;
+        dependencies[index].state = dependencies[index - 1].state; \
+        index++;
 #endif
         #include <define_attachments.h>
         BLOCK
@@ -138,11 +143,12 @@ public:
         #include <reset_attachment_defines.h>
 
 #if MSAA != 1
-        index = initialSize-1;
+        index = initialSize;
         #define WRAPPER(n, sc, lo, so, slo, sso, ol) index++;
         #define RESOLVE_WRAPPER(n) \
-        data[index] = data[index-1]; \
         data[index-1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; \
+        data[index] = data[index-1]; \
+        data[index].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; \
         data[index++].samples = VK_SAMPLE_COUNT_1_BIT;
         #include <define_attachments.h>
         BLOCK
@@ -163,7 +169,9 @@ public:
         data[refIndex].attachment = attachmentIndex++; \
         data[refIndex++].layout = ol;
         #define DS_WRAPPER(...) attachmentIndex++;
+#if MSAA != 1
         #define RESOLVE_WRAPPER(...) attachmentIndex++;
+#endif
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
@@ -172,7 +180,7 @@ public:
     static void GetColorResolveAttachmentReferences(std::vector<VkAttachmentReference>& data) {
         ASSERT(size_resolve() > 0);
         uint32_t initialSize = data.size();
-        data.resize(initialSize + size_resolve());
+        data.resize(initialSize + size() - size_depth_stencil() - size_resolve());
         uint32_t attachmentIndex;
         uint32_t refIndex;
         VkImageLayout lastLayout;
@@ -186,7 +194,7 @@ public:
         data[refIndex++].layout = VK_IMAGE_LAYOUT_UNDEFINED; \
         lastLayout = ol; 
         #define DS_WRAPPER(...) attachmentIndex++;
-        #define RESOVE_WRAPPER(...) \
+        #define RESOLVE_WRAPPER(...) \
         data[refIndex-1].attachment = attachmentIndex++; \
         data[refIndex-1].layout = lastLayout;
         #include <define_attachments.h>
@@ -202,7 +210,9 @@ public:
         attachmentIndex = 0;
         #define WRAPPER(...)
         #define COLOR_WRAPPER(...) attachmentIndex++;
+#if MSAA != 1
         #define RESOLVE_WRAPPER(...) attachmentIndex++;
+#endif
         #define DS_WRAPPER(n, sc, lo, so, slo, sso, ol) \
         result.attachment = attachmentIndex++; \
         result.layout = ol;
@@ -218,9 +228,11 @@ public:
         #define WRAPPER(n, sc, lo, so, slo, sso, ol) \
         views[index]=n##.vkView; \
         clearValues[index++]=n##.image->clearValue;
+#if MSAA != 1
         #define RESOLVE_WRAPPER(n) \
         views[index]=n##.vkView; \
         clearValues[index++]=n##.image->clearValue;
+#endif
         #include <define_attachments.h>
         BLOCK
         #include <reset_attachment_defines.h>
@@ -270,7 +282,7 @@ public:
         #define WRAPPER(...)
         #define COLOR_WRAPPER(...) currentColor = true; resolveAfterColor = 0;
         #define DS_WRAPPER(...) currentColor = false;
-        #define RESOLVE() \
+        #define RESOLVE_WRAPPER(...) \
         maxResolveAfterColor = std::max(maxResolveAfterColor, ++resolveAfterColor); \
         resolveAfterDS |= !currentColor;
         #include <define_attachments.h>
@@ -284,15 +296,13 @@ public:
 
 static_assert(BLOCK_NAME::check_layout_correctness(), "INITIAL_LAYOUT and FINAL_LAYOUT are placed incorrectly");
 static_assert(BLOCK_NAME::size_depth_stencil() <= 1, "only one depthstencil is supported");
-#if MSAA == 1
-static_assert(BLOCK_NAME::size_resolve() == 0, "RESOLVE_WITH can be used only when MSAA > 1");
-#else
+#if MSAA != 1
 static_assert(MSAA == 0x00000002 ||
               MSAA == 0x00000004 ||
               MSAA == 0x00000008 ||
               MSAA == 0x00000010 ||
               MSAA == 0x00000020 ||
-              MSAA == 0x00000040, "unsupported MSAA count")
+              MSAA == 0x00000040, "unsupported MSAA count");
 static_assert(BLOCK_NAME::check_resolve_correctness(), "RESOLVE_WITH can be placed only after color attachment and only once");
 #endif
 

@@ -20,6 +20,10 @@
 #include <present_node.h>
 #include <frame_dispatcher.h>
 #include <dynamic_uniforms.h>
+#include <clear_image_node.h>
+
+// comment out to check the difference
+#define USE_MSAA 4
 
 #define BLOCK_NAME Vertex
 #define BLOCK \
@@ -35,9 +39,12 @@ IMAGE_SAMPLER(img, 1, Stage::Fragment)
 #include <gen_bindings.h>
 
 #define BLOCK_NAME Attachments
-#define MSAA 4
+#ifdef USE_MSAA
+#define MSAA USE_MSAA /* MSAA macro is required for attachments used with multisampling */
+#endif
+// RESOLVE_WITH can be inserted after attachment to mark that it is resolved in the render pass
 #define BLOCK \
-COLOR(color, LoadOp::Clear) RESOLVE_WITH(color_resolve) \
+COLOR(color, LoadOp::Load) RESOLVE_WITH(color_resolve) \
 DEPTH(depth, LoadOp::Clear)
 #include <gen_attachments.h>
 
@@ -77,15 +84,22 @@ _Resources PrepareResources(
         dsFormat, 
         ImageUsage::DepthStencil | ImageUsage::TransientAttachment, 
         context.Get<PresentFeature>().swapChainExtent()
-    ).with_msaa(VK_SAMPLE_COUNT_4_BIT));
+    )
+#ifdef USE_MSAA
+    .with_msaa(static_cast<VkSampleCountFlagBits>(USE_MSAA))
+#endif
+    );
     context.Get<Resources>().GiveName(r.depth, "depth");
 
     r.colorAttachment = context.Get<Resources>().CreateImage(ImageDescription {
         context.Get<PresentFeature>().swapChainFormat(), 
-        ImageUsage::ColorAttachment | ImageUsage::TransientAttachment, context.Get<PresentFeature>().swapChainExtent()
-    }.with_msaa(VK_SAMPLE_COUNT_4_BIT));
+        ImageUsage::ColorAttachment | ImageUsage::TransferDst, context.Get<PresentFeature>().swapChainExtent()
+    }
+#ifdef USE_MSAA
+    .with_msaa(static_cast<VkSampleCountFlagBits>(USE_MSAA))
+#endif
+    );
     context.Get<Resources>().GiveName(r.colorAttachment, "colorAttachment");
-    r.colorAttachment->clearValue = {{1.0, 1.0, 1.0}};
     
     r.resourceImg = context.Get<Resources>().LoadImageResource(ImageUsage::Sampled, "test_img.png", VK_FORMAT_R8G8B8A8_SRGB);
     context.Get<Resources>().GiveName(r.resourceImg, "resourceImg");
@@ -138,7 +152,7 @@ UniformData GetShaderData(RenderContext& context) {
 
     SwapChain* swapChain = context.Get<PresentFeature>().swapChain;
     UniformData d{};
-    d.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    d.model = glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     d.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     d.proj = glm::perspective(glm::radians(25.0f), swapChain->extent.width / (float) swapChain->extent.height, 0.1f, 10.0f);
     
@@ -160,12 +174,25 @@ void DrawFrame(
 
     ResourceRef<Image> outputImage = context.Get<PresentFeature>().AcquireNextImage();
 
-    BufferRegion transforms = context.Get<DynamicUniforms>().Allocate(GetShaderData(context));  
+    auto& clearNode = context.Get<RenderGraph>().AddNode<ClearImageNode>(
+#ifdef USE_MSAA
+        r.colorAttachment
+#else
+        outputImage
+#endif
+    );
+    clearNode.SetClearColor({1.0, 1.0, 1.0, 1.0});
+
+    BufferRegion transforms = context.Get<DynamicUniforms>().Allocate(GetShaderData(context)); 
 
     auto& node0 = context.Get<RenderGraph>().AddNode<GraphicsNode<Attachments, ShaderInput>>(r.pipeline);
     Attachments attachments;
+#ifdef USE_MSAA
     attachments.color = r.colorAttachment;
     attachments.color_resolve = outputImage;
+#else
+    attachments.color = outputImage;
+#endif
     attachments.depth = r.depth;
     node0.SetAttachments(attachments);
 

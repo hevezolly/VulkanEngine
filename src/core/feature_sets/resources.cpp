@@ -438,6 +438,7 @@ ResourceRef<Image> Resources::Resize(ResourceRef<Image> image, uint32_t width, u
     ImageDescription newDescription = image->description;
     newDescription.width = width;
     newDescription.height = height;
+    auto clearValue = image->clearValue;
 
     ResourceId prevId = image.id;
     _synchronization.erase(prevId);
@@ -453,7 +454,10 @@ ResourceRef<Image> Resources::Resize(ResourceRef<Image> image, uint32_t width, u
         _names.insert(std::move(node));
     }
 
-    return {id, &_images};
+    ResourceRef<Image> result = {id, &_images};
+    result->clearValue = clearValue;
+
+    return result;
 }
 
 

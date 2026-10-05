@@ -99,6 +99,8 @@ struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
             T::GetColorResolveAttachmentReferences(resolveAttachmentRef);
         }
 
+        multisampling.rasterizationSamples = T::msaa_count();
+
         if (T::size_depth_stencil() > 0) {
             dsRef = T::GetDepthStencilAttachmentReference();
             initDepth();
