@@ -52,6 +52,7 @@ struct API PresentFeature: FeatureSet,
     ResourceRef<Image> AcquireNextImage();
 
     VkExtent2D swapChainExtent();
+    VkFormat swapChainFormat();
 
     uint32_t swapChainSize();
 

@@ -106,7 +106,7 @@ Image createRawImage(Resources* r, RenderContext& context, const ImageDescriptio
     imageInfo.extent.height = description.height;
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = description.mipLevels;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = description.msaa;
     imageInfo.arrayLayers = description.arrayLayers;
     imageInfo.format = description.format;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;

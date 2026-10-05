@@ -18,7 +18,6 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(RenderContext& context):
     rasterization.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterization.polygonMode = VK_POLYGON_MODE_FILL;
 
-    multisampling = {};
     multisampling = {VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -124,6 +123,11 @@ Ref<GraphicsPipeline> GraphicsPipelineBuilder::Build() {
     subpass.pDepthStencilAttachment = nullptr;
     if (dsRef.has_value())
         subpass.pDepthStencilAttachment = &dsRef.value();
+    
+    if (resolveAttachmentRef.size() != 0) {
+        ASSERT(resolveAttachmentRef.size() == colorAttachmentRef.size())
+        subpass.pResolveAttachments = resolveAttachmentRef.data();
+    }
 
     VkRenderPassCreateInfo renderPassInfo{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
     renderPassInfo.attachmentCount = attachments.size();

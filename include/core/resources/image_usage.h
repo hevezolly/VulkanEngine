@@ -7,7 +7,8 @@ enum struct ImageUsage: VkFlags {
     TransferSrc = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     TransferDst = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
     Sampled = VK_IMAGE_USAGE_SAMPLED_BIT,
-    Storage = VK_IMAGE_USAGE_STORAGE_BIT
+    Storage = VK_IMAGE_USAGE_STORAGE_BIT,
+    TransientAttachment = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
 };
 
 inline ImageUsage operator |(ImageUsage l, ImageUsage r) {

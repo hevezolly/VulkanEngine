@@ -5,6 +5,7 @@
 #undef DEPTH_STENCIL
 #undef INITIAL_LAYOUT
 #undef FINAL_LAYOUT
+#undef RESOLVE_WITH
 #endif
 
 #ifndef INITIAL_LAYOUT_WRAPPER
@@ -23,10 +24,14 @@
 #define DS_WRAPPER(a1, a2, a3, a4, a5, a6, a7) WRAPPER(a1, a2, a3, a4, a5, a6, a7)
 #endif
 
+#ifndef RESOLVE_WRAPPER
+#define RESOLVE_WRAPPER(name)
+#endif
+
 #ifdef WRAPPER
 #define INITIAL_LAYOUT(l) INITIAL_LAYOUT_WRAPPER(l)
 #define FINAL_LAYOUT(l) FINAL_LAYOUT_WRAPPER(l)
-
+#define RESOLVE_WITH(name) RESOLVE_WRAPPER(name)
 //                                      name, sample_count, loadOp, storeOp, stencilLoad, stencilStore, 
 
 #define COLOR(name, load) COLOR_WRAPPER(name, VK_SAMPLE_COUNT_1_BIT, static_cast<VkAttachmentLoadOp>(load), VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)

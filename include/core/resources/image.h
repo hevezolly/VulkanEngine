@@ -19,6 +19,7 @@ struct API ImageDescription {
     ImageUsage usage;
     uint32_t arrayLayers=1;
     uint32_t mipLevels=1;
+    VkSampleCountFlagBits msaa = VK_SAMPLE_COUNT_1_BIT;
     bool cubemap = false;
 
     ImageDescription()=default;
@@ -27,6 +28,12 @@ struct API ImageDescription {
 
     VkExtent2D extent() {
         return {width, height};
+    }
+
+    ImageDescription with_msaa(VkSampleCountFlagBits flags) {
+        ImageDescription result = *this;
+        result.msaa = flags;
+        return result;
     }
 
     static ImageDescription Cube(VkFormat format, VkExtent2D extent, ImageUsage usage, uint32_t mipLevels=1, uint32_t arrayCount=1) {

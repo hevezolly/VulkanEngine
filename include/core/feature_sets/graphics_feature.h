@@ -48,6 +48,7 @@ struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
 
     std::vector<VkAttachmentDescription> attachments;
     std::vector<VkAttachmentReference> colorAttachmentRef;
+    std::vector<VkAttachmentReference> resolveAttachmentRef;
     std::optional<VkPipelineDepthStencilStateCreateInfo> dsState;
     std::optional<VkAttachmentReference> dsRef;
     VkSubpassDescription subpass;
@@ -92,6 +93,11 @@ struct API GraphicsPipelineBuilder: PipelineBuilder<GraphicsPipelineBuilder> {
         T::GetAttachmentDescriptions(attachments, formats);
         colorAttachmentRef.clear();
         T::GetColorAttachmentReferences(colorAttachmentRef);
+
+        resolveAttachmentRef.clear();
+        if (T::uses_msaa()) {
+            T::GetColorResolveAttachmentReferences(resolveAttachmentRef);
+        }
 
         if (T::size_depth_stencil() > 0) {
             dsRef = T::GetDepthStencilAttachmentReference();

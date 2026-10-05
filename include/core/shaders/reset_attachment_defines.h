@@ -21,3 +21,7 @@
 #ifdef DS_WRAPPER
 #undef DS_WRAPPER
 #endif
+
+#ifdef RESOLVE_WRAPPER
+#undef RESOLVE_WRAPPER
+#endif
